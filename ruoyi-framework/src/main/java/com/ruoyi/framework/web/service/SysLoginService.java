@@ -2,6 +2,7 @@ package com.ruoyi.framework.web.service;
 
 import javax.annotation.Resource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -51,6 +52,9 @@ public class SysLoginService
     @Autowired
     private ISysConfigService configService;
 
+    @Value("${system.param.wechat_key:5c89231b711447acbf995c28c435dc39}")
+    private String wechat_key;
+
     /**
      * 登录验证
      * 
@@ -58,12 +62,15 @@ public class SysLoginService
      * @param password 密码
      * @param code 验证码
      * @param uuid 唯一标识
+     * @param isWechat 微信端标识id
      * @return 结果
      */
-    public String login(String username, String password, String code, String uuid)
+    public String login(String username, String password, String code, String uuid, String isWechat)
     {
-        // 验证码校验
-        validateCaptcha(username, code, uuid);
+        if (isWechat == null || !wechat_key.equals(isWechat)){
+            // 验证码校验
+            validateCaptcha(username, code, uuid);
+        }
         // 登录前置校验
         loginPreCheck(username, password);
         // 用户验证
