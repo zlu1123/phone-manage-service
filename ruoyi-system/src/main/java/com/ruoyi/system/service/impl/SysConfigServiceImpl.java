@@ -219,6 +219,23 @@ public class SysConfigServiceImpl implements ISysConfigService
         return UserConstants.UNIQUE;
     }
 
+    @Override
+    public int updateConfigByKey(SysConfig config)
+    {
+        SysConfig temp = configMapper.checkConfigKeyUnique(config.getConfigKey());
+        if (StringUtils.isNotNull(temp)){
+            config.setConfigId(temp.getConfigId());
+        } else {
+            return 0;
+        }
+        int row = configMapper.updateConfig(config);
+        if (row > 0)
+        {
+            redisCache.setCacheObject(getCacheKey(config.getConfigKey()), config.getConfigValue());
+        }
+        return row;
+    }
+
     /**
      * 设置cache key
      * 

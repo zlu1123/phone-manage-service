@@ -86,4 +86,13 @@ public interface ISysConfigService
      * @return 结果
      */
     public boolean checkConfigKeyUnique(SysConfig config);
+
+    /**
+     * 修改参数配置-根据key修改
+     *
+     * @param config 参数配置信息
+     * @return 结果
+     */
+    public int updateConfigByKey(SysConfig config);
+
 }

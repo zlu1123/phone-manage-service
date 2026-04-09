@@ -14,6 +14,6 @@ public class Constants {
     /**
      * 自动转盘B类型
      */
-    public static final String DEVICE_ZDZP_B_TYPE = "ZDZP_B";
+    public static final String SYSTEM_TIME_CACHE_KEY = "sys_config:sys.time";
 
 }

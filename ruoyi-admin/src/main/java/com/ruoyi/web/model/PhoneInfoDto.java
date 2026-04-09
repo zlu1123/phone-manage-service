@@ -22,4 +22,7 @@ public class PhoneInfoDto {
     private String activateDate;
     @ApiModelProperty("保修结束日期")
     private String coverage;
+
+    @ApiModelProperty("系统时间")
+    private String systemTime;
 }

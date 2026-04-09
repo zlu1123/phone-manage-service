@@ -2,6 +2,9 @@ package com.ruoyi.web.controller.system;
 
 import java.util.List;
 import javax.servlet.http.HttpServletResponse;
+
+import com.ruoyi.web.model.SysConfigDto;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
@@ -129,5 +132,15 @@ public class SysConfigController extends BaseController
     {
         configService.resetConfigCache();
         return success();
+    }
+
+    @Log(title = "系统时间修改", businessType = BusinessType.UPDATE)
+    @PostMapping("/updateSysTime")
+    public AjaxResult editSystemTimeByKey(@Validated @RequestBody SysConfigDto config)
+    {
+        SysConfig sysConfig = new SysConfig();
+        BeanUtils.copyProperties(config, sysConfig);
+        config.setUpdateBy(getUsername());
+        return toAjax(configService.updateConfigByKey(sysConfig));
     }
 }
