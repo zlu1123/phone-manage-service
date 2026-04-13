@@ -58,3 +58,12 @@ export function refreshCache() {
     method: 'delete'
   })
 }
+
+// 修改系统时间
+export function updateSysTime(data) {
+  return request({
+    url: '/system/config/updateSysTime',
+    method: 'post',
+    data: data
+  })
+}
