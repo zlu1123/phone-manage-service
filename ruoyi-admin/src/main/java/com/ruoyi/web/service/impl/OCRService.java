@@ -1,6 +1,5 @@
 package com.ruoyi.web.service.impl;
 
-import com.ruoyi.web.controller.tool.ImageOCRDockerLastController;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -17,8 +16,15 @@ import java.util.concurrent.TimeUnit;
 public class OCRService {
 
     private static final String DOCKER_IMAGE = "tesseractshadow/tesseract4re:latest";
-    private static final String SHARED_DIR = "D:/ocr_shared";
     private static final String CONTAINER_DATA_DIR = "/data";
+
+    /**
+     * OCR共享目录：宿主机与Docker容器之间的文件交换目录
+     * macOS/Linux 默认: /tmp/ocr_shared
+     * Windows 需在配置文件中设置为: D:/ocr_shared
+     */
+    @Value("${ocr.shared.dir:/tmp/ocr_shared}")
+    private String sharedDir;
 
     @Value("${docker.command.timeout:30}")
     private int dockerTimeoutSeconds;
@@ -31,7 +37,7 @@ public class OCRService {
     }
 
     private File saveToSharedDir(MultipartFile file) throws IOException {
-        File dir = new File(SHARED_DIR);
+        File dir = new File(sharedDir);
         if (!dir.exists()) dir.mkdirs();
 
         String ext = "";
@@ -47,22 +53,23 @@ public class OCRService {
     private String execTesseract(File imageFile) throws IOException, InterruptedException {
         List<String> cmd = new ArrayList<>(Arrays.asList(
                 "docker", "run", "--rm", "-v",
-                SHARED_DIR + ":" + CONTAINER_DATA_DIR,
+                sharedDir + ":" + CONTAINER_DATA_DIR,
                 DOCKER_IMAGE,
                 "tesseract",
                 CONTAINER_DATA_DIR + "/" + imageFile.getName(),
                 "stdout",
                 "-l", "chi_sim+eng",
+                // 页面分割模式：6=假设为统一的文本块（手机截图通常是单列列表布局）
+                // 注：模式3(全自动)对复杂布局更好，但模式6对手机设置页面的单列文本更稳定
                 "-c", "tessedit_pageseg_mode=6",
-                // 白名单：只允许数字和大小写字母
-                "-c", "tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
-                // 禁用系统词典和频率词典，避免自动修正
+                // 不设置白名单，允许识别中文关键字（如"序列号"、"型号"等）
+                // 禁用系统词典和频率词典，避免自动修正IMEI/SN中的字符
                 "-c", "load_system_dawg=false",
                 "-c", "load_freq_dawg=false",
-                // 保留有用的空格控制参数
-                "-c", "preserve_interword_spaces=0",
+                // 保留行间空格，有助于区分标签和值（如"序列号 JKQTP4LJ09"）
+                "-c", "preserve_interword_spaces=1",
                 "-c", "textord_space_size_is_variable=1",
-                // 引擎模式：使用LSTM+传统（OEM_DEFAULT）
+                // 引擎模式：使用LSTM+传统（OEM_DEFAULT），兼顾准确率和兼容性
                 "-c", "tessedit_ocr_engine_mode=3"
         ));
         // 移除了原来的 char_blacklist，因为白名单优先级更高且更明确
@@ -148,7 +155,7 @@ public class OCRService {
     // ================= 测试用 main 方法 =================
     public static void main(String[] args) {
         // 1. 准备测试图片路径（请修改为实际存在的图片文件）
-        String testImagePath = "D:\\ocr_shared\\imei.jpg";   // ⚠️ 替换成你的图片路径
+        String testImagePath = "/tmp/ocr_shared/imei.jpg";   // ⚠️ 替换成你的图片路径
         File imageFile = new File(testImagePath);
         if (!imageFile.exists()) {
             System.err.println("测试图片不存在: " + testImagePath);
@@ -160,7 +167,8 @@ public class OCRService {
 
         // 3. 创建 OCRService 实例并执行识别
         OCRService ocrService = new OCRService();
-        // 如果使用了 @Value 注入 timeout，main 中需手动设置（或直接使用默认值）
+        // main方法中需手动设置注入的值
+        ocrService.sharedDir = "/tmp/ocr_shared";
         ocrService.dockerTimeoutSeconds = 30;
 
         try {

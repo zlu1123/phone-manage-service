@@ -26,7 +26,7 @@ public class ImageOCRController extends BaseController {
     private DeviceInfoExtractorService extractorService;
 
     @ApiOperation("识别IMEI/SN")
-    @PostMapping("/deviceinfo")
+    @PostMapping("/imchect")
     public R<DeviceInfo> deviceInfo(@RequestParam("typeCode") String typeCode, @RequestParam("file") MultipartFile file) {
         String type = PhoneType.getValueByCode(typeCode);
         if (type == null) {

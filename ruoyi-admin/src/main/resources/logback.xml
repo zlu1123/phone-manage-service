@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
-    <!-- 日志存放路径 -->
-	<property name="log.path" value="/home/ruoyi/logs" />
+    <!-- 日志存放路径（使用相对路径，兼容本地开发和服务器部署） -->
+	<property name="log.path" value="./logs" />
     <!-- 日志输出格式 -->
 	<property name="log.pattern" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{20} - [%method,%line] - %msg%n" />
 
