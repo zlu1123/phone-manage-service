@@ -17,15 +17,15 @@
               </li>
               <li class="list-group-item">
                 <svg-icon icon-class="phone" />手机号码
-                <div class="pull-right">{{ user.phonenumber }}</div>
+                <div class="pull-right">{{ user.phonenumber || '暂未设置' }}</div>
               </li>
               <li class="list-group-item">
                 <svg-icon icon-class="email" />用户邮箱
-                <div class="pull-right">{{ user.email }}</div>
+                <div class="pull-right">{{ user.email || '暂未设置' }}</div>
               </li>
               <li class="list-group-item">
                 <svg-icon icon-class="tree" />所属部门
-                <div class="pull-right" v-if="user.dept">{{ user.dept.deptName }} / {{ postGroup }}</div>
+                <div class="pull-right" v-if="user.dept">{{ user.dept.deptName }}{{ postGroup ? ' / ' + postGroup : '' }}</div>
               </li>
               <li class="list-group-item">
                 <svg-icon icon-class="peoples" />所属角色
@@ -70,8 +70,8 @@ export default {
   data() {
     return {
       user: {},
-      roleGroup: {},
-      postGroup: {},
+      roleGroup: '',
+      postGroup: '',
       selectedTab: "userinfo"
     }
   },
@@ -92,4 +92,6 @@ export default {
     }
   }
 }
+</script>
+};
 </script>
