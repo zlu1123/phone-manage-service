@@ -17,11 +17,11 @@ spring:
                 username: 
                 password: 
             # 初始连接数
-            initialSize: 5
+            initialSize: 2
             # 最小连接池数量
-            minIdle: 10
+            minIdle: 2
             # 最大连接池数量
-            maxActive: 20
+            maxActive: 10
             # 配置获取连接等待超时的时间
             maxWait: 60000
             # 配置连接超时时间
@@ -40,9 +40,9 @@ spring:
             testOnBorrow: false
             testOnReturn: false
             webStatFilter: 
-                enabled: true
+                enabled: false
             statViewServlet:
-                enabled: true
+                enabled: false
                 # 设置白名单，不填则允许所有访问
                 allow:
                 url-pattern: /druid/*
