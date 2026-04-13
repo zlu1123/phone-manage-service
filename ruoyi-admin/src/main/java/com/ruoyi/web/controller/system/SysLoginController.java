@@ -58,6 +58,24 @@ public class SysLoginController
         String token = loginService.login(loginBody.getUsername(), loginBody.getPassword(), loginBody.getCode(),
                 loginBody.getUuid(), isWechat);
         ajax.put(Constants.TOKEN, token);
+        // 小程序登录时，额外返回用户信息供前端展示
+        if (StringUtils.isNotEmpty(isWechat))
+        {
+            LoginUser loginUser = tokenService.getLoginUser(token);
+            if (loginUser != null)
+            {
+                SysUser user = loginUser.getUser();
+                // 返回用户基本信息（脱敏处理，不返回密码等敏感字段）
+                ajax.put("userId", user.getUserId());
+                ajax.put("userName", user.getUserName());
+                ajax.put("nickName", user.getNickName());
+                ajax.put("avatar", user.getAvatar());
+                ajax.put("phonenumber", user.getPhonenumber());
+                // 返回角色信息
+                Set<String> roles = permissionService.getRolePermission(user);
+                ajax.put("roles", roles);
+            }
+        }
         return ajax;
     }
 
