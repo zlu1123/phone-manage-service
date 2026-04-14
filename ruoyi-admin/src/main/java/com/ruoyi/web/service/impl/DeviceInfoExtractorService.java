@@ -467,6 +467,8 @@ public class DeviceInfoExtractorService {
         Set<String> imeiSet = new HashSet<>();
         if (!imei1.isEmpty()) imeiSet.add(imei1);
         if (!imei2.isEmpty()) imeiSet.add(imei2);
+        int minExpectedLen = getSnMinExpectedLength(brandType);
+        Pattern brandPattern = getSnPattern(brandType);
 
         // 策略1：通过关键字行提取
         String sn = extractSnByKeyword(lines, brandType, imeiSet);
@@ -475,21 +477,61 @@ public class DeviceInfoExtractorService {
             return sn;
         }
 
-        // 策略2：根据品牌特定模式提取
+        // 策略2：根据品牌特定模式提取（带偏短拼接）
         sn = extractSnByBrandPattern(lines, brandType, imeiSet);
         if (sn != null && !sn.isEmpty()) {
+            // 如果策略2提取到的SN偏短，尝试在原始行中找到该SN并拼接后续行
+            if (sn.length() < minExpectedLen) {
+                String merged = tryMergeSnFromLines(sn, lines, brandPattern, imeiSet, minExpectedLen);
+                if (merged != null) {
+                    log.info("SN通过策略2（品牌模式）提取并拼接补全: {} -> {}", sn, merged);
+                    return merged;
+                }
+            }
             log.info("SN通过策略2（品牌模式）提取: {}", sn);
             return sn;
         }
 
-        // 策略3：通用模式扫描 + 评分排序
+        // 策略3：通用模式扫描 + 评分排序（带偏短拼接）
         sn = extractSnGeneric(lines, brandType, imeiSet);
         if (sn != null && !sn.isEmpty()) {
+            if (sn.length() < minExpectedLen) {
+                String merged = tryMergeSnFromLines(sn, lines, brandPattern, imeiSet, minExpectedLen);
+                if (merged != null) {
+                    log.info("SN通过策略3（通用评分）提取并拼接补全: {} -> {}", sn, merged);
+                    return merged;
+                }
+            }
             log.info("SN通过策略3（通用评分）提取: {}", sn);
             return sn;
         }
 
         return "";
+    }
+
+    /**
+     * 在所有行中找到包含偏短SN的行，尝试与后续行拼接补全
+     * 用于策略2/3提取到偏短SN时的补救措施
+     *
+     * @param shortSn       偏短的SN
+     * @param lines         所有文本行
+     * @param brandPattern  品牌SN正则
+     * @param imeiSet       已识别的IMEI集合
+     * @param minExpectedLen 期望的最小SN长度
+     * @return 拼接后的完整SN，如果拼接失败返回null
+     */
+    private String tryMergeSnFromLines(String shortSn, List<String> lines, Pattern brandPattern,
+                                       Set<String> imeiSet, int minExpectedLen) {
+        // 找到包含该SN的行
+        for (int i = 0; i < lines.size(); i++) {
+            String upper = lines.get(i).toUpperCase().replaceAll("\\s+", "");
+            if (upper.contains(shortSn)) {
+                // 从下一行开始尝试拼接
+                String merged = tryMergeSnWithNextLines(shortSn, lines, i + 1, brandPattern, imeiSet, minExpectedLen);
+                if (merged != null) return merged;
+            }
+        }
+        return null;
     }
 
     /**
@@ -657,9 +699,11 @@ public class DeviceInfoExtractorService {
      */
     private String extractSnByBrandPattern(List<String> lines, String brandType, Set<String> imeiSet) {
         Pattern brandPattern = getSnPattern(brandType);
+        int minExpectedLen = getSnMinExpectedLength(brandType);
         List<SnCandidate> candidates = new ArrayList<>();
 
-        for (String line : lines) {
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i);
             // 跳过包含IMEI关键字的行，避免从"IMEI353149596371672"中误提取SN
             if (isImeiLine(line)) continue;
 
@@ -668,6 +712,16 @@ public class DeviceInfoExtractorService {
             while (m.find()) {
                 String candidate = m.group();
                 if (isValidSn(candidate, imeiSet)) {
+                    // 如果候选偏短，尝试拼接后续行补全
+                    if (candidate.length() < minExpectedLen) {
+                        String merged = tryMergeSnWithNextLines(candidate, lines, i + 1, brandPattern, imeiSet, minExpectedLen);
+                        if (merged != null) {
+                            log.info("策略2 SN拼接补全: {} -> {}", candidate, merged);
+                            int score = scoreSnCandidate(merged, brandType);
+                            candidates.add(new SnCandidate(merged, score));
+                            continue;
+                        }
+                    }
                     int score = scoreSnCandidate(candidate, brandType);
                     candidates.add(new SnCandidate(candidate, score));
                 }
@@ -685,8 +739,11 @@ public class DeviceInfoExtractorService {
      * 注意：跳过包含IMEI关键字的行
      */
     private String extractSnGeneric(List<String> lines, String brandType, Set<String> imeiSet) {
+        int minExpectedLen = getSnMinExpectedLength(brandType);
+        Pattern brandPattern = getSnPattern(brandType);
         List<SnCandidate> candidates = new ArrayList<>();
-        for (String line : lines) {
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i);
             // 跳过包含IMEI关键字的行
             if (isImeiLine(line)) continue;
 
@@ -695,6 +752,16 @@ public class DeviceInfoExtractorService {
             while (m.find()) {
                 String token = m.group();
                 if (isValidSn(token, imeiSet)) {
+                    // 如果候选偏短，尝试拼接后续行补全
+                    if (token.length() < minExpectedLen) {
+                        String merged = tryMergeSnWithNextLines(token, lines, i + 1, brandPattern, imeiSet, minExpectedLen);
+                        if (merged != null) {
+                            log.info("策略3 SN拼接补全: {} -> {}", token, merged);
+                            int score = scoreSnCandidate(merged, brandType);
+                            candidates.add(new SnCandidate(merged, score));
+                            continue;
+                        }
+                    }
                     int score = scoreSnCandidate(token, brandType);
                     candidates.add(new SnCandidate(token, score));
                 }
