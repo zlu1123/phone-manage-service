@@ -1,12 +1,13 @@
 package com.ruoyi.quartz.task;
 
+import com.ruoyi.common.constant.CacheConstants;
 import com.ruoyi.common.constant.Constants;
+import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.system.domain.SysConfig;
 import com.ruoyi.system.service.ISysConfigService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
-import com.ruoyi.common.utils.StringUtils;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -43,7 +44,7 @@ public class RyTask
     public void updateSystemDate()
     {
         System.out.println("定时任务--------系统时间更新开始");
-        String systemDate = (String)redisTemplate.opsForValue().get(Constants.SYSTEM_TIME_CACHE_KEY);
+        String systemDate = (String)redisTemplate.opsForValue().get(CacheConstants.SYS_CONFIG_KEY + Constants.SYSTEM_TIME_CACHE_KEY);
         SysConfig config = new SysConfig();
         config.setConfigKey(Constants.SYSTEM_TIME_CACHE_KEY);
 

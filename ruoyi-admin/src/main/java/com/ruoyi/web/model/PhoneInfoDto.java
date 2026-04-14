@@ -26,5 +26,5 @@ public class PhoneInfoDto {
     private String coverage;
 
     @ApiModelProperty("系统时间")
-    private String systemTime;
+    private String sysTime;
 }

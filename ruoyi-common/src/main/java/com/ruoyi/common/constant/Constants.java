@@ -183,5 +183,5 @@ public class Constants
     /**
      * 系统时间缓存key
      */
-    public static final String SYSTEM_TIME_CACHE_KEY = "sys_config:sys.time";
+    public static final String SYSTEM_TIME_CACHE_KEY = "sys.time";
 }
