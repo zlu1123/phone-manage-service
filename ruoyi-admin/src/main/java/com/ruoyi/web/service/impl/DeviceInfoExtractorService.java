@@ -499,9 +499,11 @@ public class DeviceInfoExtractorService {
      * - "序列号：F17FV5GA0DYP"（iPhone关于本机，同行带冒号）
      * - "序列号\nF17FV5GA0DYP"（关键字和值分行）
      * - "SN: UDU0219C14000257"（华为，英文关键字）
+     * - "序列号 F17FV5GA\n0DYP"（OCR将SN断成两行，需要拼接）
      */
     private String extractSnByKeyword(List<String> lines, String brandType, Set<String> imeiSet) {
         Pattern brandPattern = getSnPattern(brandType);
+        int minExpectedLen = getSnMinExpectedLength(brandType);
 
         for (int i = 0; i < lines.size(); i++) {
             String line = lines.get(i);
@@ -514,7 +516,17 @@ public class DeviceInfoExtractorService {
 
             // 尝试从当前行提取（关键字和值在同一行）
             String candidate = extractSnFromKeywordLine(line, brandPattern, imeiSet);
-            if (candidate != null) return candidate;
+            if (candidate != null) {
+                // 如果提取到的SN偏短，尝试拼接后续行内容来补全
+                if (candidate.length() < minExpectedLen) {
+                    String merged = tryMergeSnWithNextLines(candidate, lines, i + 1, brandPattern, imeiSet, minExpectedLen);
+                    if (merged != null) {
+                        log.info("SN拼接补全: {} -> {}", candidate, merged);
+                        return merged;
+                    }
+                }
+                return candidate;
+            }
 
             // 向后最多查3行（关键字和值分行的情况）
             for (int j = i + 1; j <= Math.min(i + 3, lines.size() - 1); j++) {
@@ -523,10 +535,76 @@ public class DeviceInfoExtractorService {
                 // 如果下一行又是一个关键字行（如"版本类型"），停止查找
                 if (isLabelLine(nextLine)) break;
                 candidate = extractSnValueFromLine(nextLine, brandPattern, imeiSet);
-                if (candidate != null) return candidate;
+                if (candidate != null) {
+                    // 同样检查是否偏短，尝试拼接
+                    if (candidate.length() < minExpectedLen) {
+                        String merged = tryMergeSnWithNextLines(candidate, lines, j + 1, brandPattern, imeiSet, minExpectedLen);
+                        if (merged != null) {
+                            log.info("SN拼接补全: {} -> {}", candidate, merged);
+                            return merged;
+                        }
+                    }
+                    return candidate;
+                }
             }
         }
         return null;
+    }
+
+    /**
+     * 尝试将偏短的SN与后续行内容拼接，补全被OCR断行的序列号
+     * 场景：OCR将"F17FV5GA0DYP"识别成两行"F17FV5GA"和"0DYP"（或"ODYP"）
+     *
+     * @param currentSn     当前提取到的偏短SN
+     * @param lines         所有文本行
+     * @param startIdx      开始查找的行索引
+     * @param brandPattern  品牌SN正则
+     * @param imeiSet       已识别的IMEI集合
+     * @param minExpectedLen 期望的最小SN长度
+     * @return 拼接后的完整SN，如果拼接失败返回null
+     */
+    private String tryMergeSnWithNextLines(String currentSn, List<String> lines, int startIdx,
+                                            Pattern brandPattern, Set<String> imeiSet, int minExpectedLen) {
+        StringBuilder merged = new StringBuilder(currentSn);
+        for (int k = startIdx; k <= Math.min(startIdx + 2, lines.size() - 1); k++) {
+            String nextLine = lines.get(k).trim();
+            if (nextLine.isEmpty()) continue;
+            // 如果遇到标签行或IMEI行，停止拼接
+            if (isLabelLine(nextLine) || isImeiLine(nextLine)) break;
+
+            // 提取下一行中的字母数字部分，尝试拼接
+            String nextUpper = nextLine.toUpperCase().replaceAll("[^A-Z0-9]", "");
+            if (nextUpper.isEmpty()) continue;
+
+            merged.append(nextUpper);
+            String mergedStr = merged.toString();
+
+            // 检查拼接后是否匹配品牌模式且合法
+            Matcher m = brandPattern.matcher(mergedStr);
+            if (m.matches() && isValidSn(mergedStr, imeiSet) && mergedStr.length() >= minExpectedLen) {
+                return mergedStr;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 获取品牌SN的期望最小长度
+     * 用于判断提取到的SN是否偏短，需要尝试拼接补全
+     */
+    private int getSnMinExpectedLength(String brandType) {
+        if (brandType == null) return 10;
+        switch (brandType.toLowerCase()) {
+            case "apple":
+            case "apple_warranty":
+                return 10; // 苹果序列号通常10~12位
+            case "huawei":
+                return 14; // 华为SN通常16~20位
+            case "xiaomi":
+                return 12; // 小米SN通常12~20位
+            default:
+                return 10;
+        }
     }
 
     /**
@@ -699,9 +777,10 @@ public class DeviceInfoExtractorService {
 
         // 根据品牌特定特征加分
         if ("apple_warranty".equalsIgnoreCase(brandType) || "apple".equalsIgnoreCase(brandType)) {
-            // 苹果序列号：通常10~12位
+        // 苹果序列号：通常10~12位，8~9位的偏短候选降低评分
             if (token.length() >= 10 && token.length() <= 12) score += 25;
-            else if (token.length() >= 8 && token.length() <= 14) score += 15;
+            else if (token.length() >= 8 && token.length() <= 9) score += 5;
+            else if (token.length() > 12 && token.length() <= 14) score += 15;
             // 苹果序列号常见首字符：F/C/D/G/H/J/M/Q
             if (token.matches("^[FCDGHJMQ].*")) score += 15;
             // 苹果序列号不会太长
@@ -740,6 +819,7 @@ public class DeviceInfoExtractorService {
             case "apple_warranty":
                 // 苹果序列号：8~14位，大写字母+数字混合
                 // 例如：F17FV5GA0DYP（12位）、JKQTP4LJ09（10位）
+                // 注意：最小长度保持8位以兼容关键字行提取（偏短时会触发拼接补全逻辑）
                 return Pattern.compile("[A-Z0-9]{8,14}");
 
             case "huawei":
@@ -832,6 +912,9 @@ public class DeviceInfoExtractorService {
 
         System.out.println("\n========== 测试10：苹果只有IMEI没有SN（不应误提取SN） ==========");
         System.out.println(service.extractDeviceInfo(getOcrText("apple_imei_only"), "apple_warranty"));
+
+        System.out.println("\n========== 测试11：苹果序列号被OCR断行（F17FV5GA + 0DYP） ==========");
+        System.out.println(service.extractDeviceInfo(getOcrText("apple_sn_split"), "apple_warranty"));
     }
 
     /**
@@ -974,6 +1057,21 @@ public class DeviceInfoExtractorService {
                         "Detected 72 diacritics\n" +
                         "IMEI353149596371672\n" +
                         "IMEI2353149593886086";
+
+            case "apple_sn_split":
+                // 苹果序列号被OCR断成两行的场景
+                // 实际序列号：F17FV5GA0DYP（12位），OCR在GA和0DYP之间断行
+                return "Warning: Invalid resolution 0 dpi. Using 70 instead.\n" +
+                        "Estimating resolution as 448\n" +
+                        "iPhonexmg\n" +
+                        "146\n" +
+                        "iPhone12\n" +
+                        "MGGX3CHAA\n" +
+                        "序列号 F17FV5GA\n" +
+                        "0DYP\n" +
+                        "106\n" +
+                        "1232\n" +
+                        "128GB";
 
             default:
                 return "";
