@@ -143,6 +143,8 @@ public class DeviceInfoExtractorService {
             Pattern.compile(".*GCA30F.*", Pattern.CASE_INSENSITIVE),
             // 型号号码格式（如MGGX3CHAA，苹果型号号码OCR后的结果）
             Pattern.compile("^[A-Z]{2,4}\\d[A-Z0-9]{2,6}$"),
+            // MAC地址格式（如945C9A3ED1F0，去掉冒号后的12位十六进制）
+            Pattern.compile("^[0-9A-F]{12}$"),
             // 纯噪声短串（如eee、oO、zi、my、Had等）
             Pattern.compile("^.{1,3}$")
     );
@@ -524,7 +526,8 @@ public class DeviceInfoExtractorService {
                                        Set<String> imeiSet, int minExpectedLen) {
         // 找到包含该SN的行
         for (int i = 0; i < lines.size(); i++) {
-            String upper = lines.get(i).toUpperCase().replaceAll("\\s+", "");
+            String preFixed = preFixOcrErrors(lines.get(i));
+            String upper = preFixed.toUpperCase().replaceAll("[^A-Z0-9]", "");
             if (upper.contains(shortSn)) {
                 // 从下一行开始尝试拼接
                 String merged = tryMergeSnWithNextLines(shortSn, lines, i + 1, brandPattern, imeiSet, minExpectedLen);
@@ -542,6 +545,7 @@ public class DeviceInfoExtractorService {
      * - "序列号\nF17FV5GA0DYP"（关键字和值分行）
      * - "SN: UDU0219C14000257"（华为，英文关键字）
      * - "序列号 F17FV5GA\n0DYP"（OCR将SN断成两行，需要拼接）
+     * - "序列号 F17FV5GAODYP"（OCR将0识别为O，需要字符修正）
      */
     private String extractSnByKeyword(List<String> lines, String brandType, Set<String> imeiSet) {
         Pattern brandPattern = getSnPattern(brandType);
@@ -550,32 +554,33 @@ public class DeviceInfoExtractorService {
         for (int i = 0; i < lines.size(); i++) {
             String line = lines.get(i);
             // 将行内容去空格后转小写，用于关键字匹配
-            String lowerNoSpace = line.toLowerCase().replaceAll("\\s+", "");
+            String lowerNoSpace = line.toLowerCase().replaceAll("[^a-z0-9]", "");
 
             boolean hasKeyword = SN_KEYWORDS.stream()
-                    .anyMatch(kw -> lowerNoSpace.contains(kw.toLowerCase().replaceAll("\\s+", "")));
+                    .anyMatch(kw -> lowerNoSpace.contains(kw.toLowerCase().replaceAll("[^a-z0-9]", "")));
             if (!hasKeyword) continue;
 
             // 尝试从当前行提取（关键字和值在同一行）
             String candidate = extractSnFromKeywordLine(line, brandPattern, imeiSet);
+
             if (candidate != null) {
                 // 如果提取到的SN偏短，尝试拼接后续行内容来补全
                 if (candidate.length() < minExpectedLen) {
                     String merged = tryMergeSnWithNextLines(candidate, lines, i + 1, brandPattern, imeiSet, minExpectedLen);
                     if (merged != null) {
                         log.info("SN拼接补全: {} -> {}", candidate, merged);
-                        return merged;
+                        return fixSnChars(merged, brandType);
                     }
                 }
-                return candidate;
+                return fixSnChars(candidate, brandType);
             }
 
-            // 向后最多查3行（关键字和值分行的情况）
-            for (int j = i + 1; j <= Math.min(i + 3, lines.size() - 1); j++) {
+            // 向后最多查5行（关键字和值分行的情况）
+            for (int j = i + 1; j <= Math.min(i + 5, lines.size() - 1); j++) {
                 String nextLine = lines.get(j).trim();
                 if (nextLine.isEmpty()) continue;
-                // 如果下一行又是一个关键字行（如"版本类型"），停止查找
-                if (isLabelLine(nextLine)) break;
+                // 如果遇到IMEI行，停止查找
+                if (isImeiLine(nextLine)) break;
                 candidate = extractSnValueFromLine(nextLine, brandPattern, imeiSet);
                 if (candidate != null) {
                     // 同样检查是否偏短，尝试拼接
@@ -583,14 +588,92 @@ public class DeviceInfoExtractorService {
                         String merged = tryMergeSnWithNextLines(candidate, lines, j + 1, brandPattern, imeiSet, minExpectedLen);
                         if (merged != null) {
                             log.info("SN拼接补全: {} -> {}", candidate, merged);
-                            return merged;
+                            return fixSnChars(merged, brandType);
                         }
                     }
-                    return candidate;
+                    return fixSnChars(candidate, brandType);
                 }
             }
         }
         return null;
+    }
+
+    /**
+     * 预处理：将可能被正则误删的OCR易错字符替换为0
+     * 例如：()、@、Ø、ø 在后续的 [^A-Z0-9] 过滤中会被删除，导致SN丢失字符
+     * 所以在过滤前先将它们替换为0
+     */
+    private String preFixOcrErrors(String text) {
+        if (text == null) return null;
+        return text.replace("()", "0")
+                   .replace("@", "0")
+                   .replace("Ø", "0")
+                   .replace("ø", "0");
+    }
+
+    /**
+     * SN字符修正映射：OCR常见的字符误识别（用于SN上下文）
+     * O→0（SN中数字0常被识别为字母O）
+     * 注意：SN的修正比IMEI更保守，因为SN本身就包含字母
+     */
+    private static final Map<Character, Character> SN_CHAR_FIX = new HashMap<>();
+    static {
+        SN_CHAR_FIX.put('O', '0');
+        SN_CHAR_FIX.put('o', '0');
+    }
+
+    /**
+     * 对SN候选进行OCR字符修正
+     * 仅在特定上下文中使用（如苹果SN中O→0的修正）
+     * 返回修正后的字符串，如果无需修正则返回原字符串
+     */
+    private String fixSnChars(String sn, String brandType) {
+        if (sn == null || brandType == null) return sn;
+        // 目前仅对苹果设备做字符修正（苹果SN中不包含字母O，所以O一定是0的误识别）
+        if (!"apple".equalsIgnoreCase(brandType) && !"apple_warranty".equalsIgnoreCase(brandType)) {
+            return sn;
+        }
+        
+        StringBuilder sb = new StringBuilder();
+        boolean changed = false;
+        for (char c : sn.toCharArray()) {
+            if (SN_CHAR_FIX.containsKey(c)) {
+                sb.append(SN_CHAR_FIX.get(c));
+                changed = true;
+            } else {
+                sb.append(c);
+            }
+        }
+        if (changed) {
+            log.info("SN字符修正: {} -> {}", sn, sb.toString());
+        }
+        return sb.toString();
+    }
+
+    /**
+     * 判断候选SN是否带有明显的容量后缀，如128GB、1TB、2695GB
+     * 这类字符串通常来自"总容量/可用容量"等字段，不能作为SN
+     */
+    private boolean hasStorageCapacitySuffix(String token) {
+        if (token == null || token.isEmpty()) return false;
+        return token.toUpperCase().matches(".*\\d{1,4}[GT]B$");
+    }
+
+    /**
+     * 判断某个片段是否像SN的续写部分
+     * 用于避免将容量值等页面其他字段误拼接到SN后面
+     */
+    private boolean isLikelySnContinuationFragment(String fragment) {
+        if (fragment == null || fragment.isEmpty()) return false;
+        String upper = fragment.toUpperCase();
+
+        // 纯数字是统计值，不是SN片段
+        if (upper.matches("\\d+")) return false;
+
+        // 容量值（如128GB、1TB、2695GB）不是SN片段
+        if (hasStorageCapacitySuffix(upper)) return false;
+
+        return true;
     }
 
     /**
@@ -607,24 +690,44 @@ public class DeviceInfoExtractorService {
      */
     private String tryMergeSnWithNextLines(String currentSn, List<String> lines, int startIdx,
                                             Pattern brandPattern, Set<String> imeiSet, int minExpectedLen) {
-        StringBuilder merged = new StringBuilder(currentSn);
-        for (int k = startIdx; k <= Math.min(startIdx + 2, lines.size() - 1); k++) {
+        String merged = currentSn;
+        // 向后最多查10行，兼容OCR将SN拆分到后续几行的情况
+        for (int k = startIdx; k <= Math.min(startIdx + 9, lines.size() - 1); k++) {
             String nextLine = lines.get(k).trim();
             if (nextLine.isEmpty()) continue;
-            // 如果遇到标签行或IMEI行，停止拼接
-            if (isLabelLine(nextLine) || isImeiLine(nextLine)) break;
+            // 如果遇到IMEI行，停止拼接，避免把IMEI拼进SN
+            if (isImeiLine(nextLine)) break;
 
-            // 提取下一行中的字母数字部分，尝试拼接
-            String nextUpper = nextLine.toUpperCase().replaceAll("[^A-Z0-9]", "");
+            String preFixed = preFixOcrErrors(nextLine);
+            // 提取下一行中的字母数字部分
+            String nextUpper = preFixed.toUpperCase().replaceAll("[^A-Z0-9]", "");
             if (nextUpper.isEmpty()) continue;
 
-            merged.append(nextUpper);
-            String mergedStr = merged.toString();
+            // 跳过明显不是SN续写的片段
+            if (!isLikelySnContinuationFragment(nextUpper)) {
+                log.debug("拼接跳过非SN片段: {}", nextUpper);
+                continue;
+            }
+
+            String mergedStr = merged + nextUpper;
+
+            // 额外拦截：避免把容量字段误拼进SN，例如F17FV5GA128GB
+            if (hasStorageCapacitySuffix(mergedStr)) {
+                log.debug("拼接跳过容量后缀候选: {}", mergedStr);
+                continue;
+            }
+
+            merged = mergedStr;
 
             // 检查拼接后是否匹配品牌模式且合法
             Matcher m = brandPattern.matcher(mergedStr);
             if (m.matches() && isValidSn(mergedStr, imeiSet) && mergedStr.length() >= minExpectedLen) {
-                return mergedStr;
+                // 额外验证：拼接后的SN必须是字母数字混合的（不能是纯字母或纯数字）
+                boolean hasLetter = mergedStr.matches(".*[A-Z].*");
+                boolean hasDigit = mergedStr.matches(".*\\d.*");
+                if (hasLetter && hasDigit) {
+                    return mergedStr;
+                }
             }
         }
         return null;
@@ -652,6 +755,7 @@ public class DeviceInfoExtractorService {
     /**
      * 从包含关键字的行中提取SN值
      * 先定位关键字位置，截取关键字后面的部分作为值区域
+     * 对苹果设备会进行OCR字符修正（如O→0）
      */
     private String extractSnFromKeywordLine(String line, Pattern brandPattern, Set<String> imeiSet) {
         String valuePart = line;
@@ -668,8 +772,9 @@ public class DeviceInfoExtractorService {
 
         if (valuePart.isEmpty()) return null;
 
-        // 在值部分中匹配品牌模式
-        String upper = valuePart.toUpperCase().replaceAll("\\s+", "");
+        String preFixed = preFixOcrErrors(valuePart);
+        // 在值部分中匹配品牌模式，移除所有非字母数字字符（解决OCR识别出的特殊符号打断匹配的问题）
+        String upper = preFixed.toUpperCase().replaceAll("[^A-Z0-9]", "");
         Matcher m = brandPattern.matcher(upper);
         while (m.find()) {
             String candidate = m.group();
@@ -682,7 +787,8 @@ public class DeviceInfoExtractorService {
      * 从普通行中提取SN值（用于关键字下一行的情况）
      */
     private String extractSnValueFromLine(String line, Pattern brandPattern, Set<String> imeiSet) {
-        String upper = line.toUpperCase().replaceAll("\\s+", "");
+        String preFixed = preFixOcrErrors(line);
+        String upper = preFixed.toUpperCase().replaceAll("[^A-Z0-9]", "");
         Matcher m = brandPattern.matcher(upper);
         while (m.find()) {
             String candidate = m.group();
@@ -696,6 +802,7 @@ public class DeviceInfoExtractorService {
      * 适用于OCR未能识别出"序列号"等关键字的情况
      * 使用品牌特定的正则模式 + 评分排序
      * 注意：跳过包含IMEI关键字的行，避免从IMEI行中误提取SN
+     * 对苹果设备会进行OCR字符修正（如O→0）
      */
     private String extractSnByBrandPattern(List<String> lines, String brandType, Set<String> imeiSet) {
         Pattern brandPattern = getSnPattern(brandType);
@@ -707,7 +814,9 @@ public class DeviceInfoExtractorService {
             // 跳过包含IMEI关键字的行，避免从"IMEI353149596371672"中误提取SN
             if (isImeiLine(line)) continue;
 
-            String upper = line.toUpperCase().replaceAll("\\s+", "");
+            String preFixed = preFixOcrErrors(line);
+            String upper = preFixed.toUpperCase().replaceAll("[^A-Z0-9]", "");
+
             Matcher m = brandPattern.matcher(upper);
             while (m.find()) {
                 String candidate = m.group();
@@ -716,14 +825,16 @@ public class DeviceInfoExtractorService {
                     if (candidate.length() < minExpectedLen) {
                         String merged = tryMergeSnWithNextLines(candidate, lines, i + 1, brandPattern, imeiSet, minExpectedLen);
                         if (merged != null) {
-                            log.info("策略2 SN拼接补全: {} -> {}", candidate, merged);
-                            int score = scoreSnCandidate(merged, brandType);
-                            candidates.add(new SnCandidate(merged, score));
+                            String fixedMerged = fixSnChars(merged, brandType);
+                            log.info("策略2 SN拼接补全: {} -> {}", candidate, fixedMerged);
+                            int score = scoreSnCandidate(fixedMerged, brandType);
+                            candidates.add(new SnCandidate(fixedMerged, score));
                             continue;
                         }
                     }
-                    int score = scoreSnCandidate(candidate, brandType);
-                    candidates.add(new SnCandidate(candidate, score));
+                    String fixedCandidate = fixSnChars(candidate, brandType);
+                    int score = scoreSnCandidate(fixedCandidate, brandType);
+                    candidates.add(new SnCandidate(fixedCandidate, score));
                 }
             }
         }
@@ -737,6 +848,7 @@ public class DeviceInfoExtractorService {
      * 策略3：通用模式扫描 + 评分排序（兜底策略）
      * 扫描所有符合通用SN格式的字符串，通过多维度评分选出最可能的SN
      * 注意：跳过包含IMEI关键字的行
+     * 对苹果设备会进行OCR字符修正（如O→0）
      */
     private String extractSnGeneric(List<String> lines, String brandType, Set<String> imeiSet) {
         int minExpectedLen = getSnMinExpectedLength(brandType);
@@ -747,7 +859,9 @@ public class DeviceInfoExtractorService {
             // 跳过包含IMEI关键字的行
             if (isImeiLine(line)) continue;
 
-            String upper = line.toUpperCase();
+            String preFixed = preFixOcrErrors(line);
+            String upper = preFixed.toUpperCase().replaceAll("[^A-Z0-9]", "");
+
             Matcher m = SN_GENERIC.matcher(upper);
             while (m.find()) {
                 String token = m.group();
@@ -756,14 +870,16 @@ public class DeviceInfoExtractorService {
                     if (token.length() < minExpectedLen) {
                         String merged = tryMergeSnWithNextLines(token, lines, i + 1, brandPattern, imeiSet, minExpectedLen);
                         if (merged != null) {
-                            log.info("策略3 SN拼接补全: {} -> {}", token, merged);
-                            int score = scoreSnCandidate(merged, brandType);
-                            candidates.add(new SnCandidate(merged, score));
+                            String fixedMerged = fixSnChars(merged, brandType);
+                            log.info("策略3 SN拼接补全: {} -> {}", token, fixedMerged);
+                            int score = scoreSnCandidate(fixedMerged, brandType);
+                            candidates.add(new SnCandidate(fixedMerged, score));
                             continue;
                         }
                     }
-                    int score = scoreSnCandidate(token, brandType);
-                    candidates.add(new SnCandidate(token, score));
+                    String fixedToken = fixSnChars(token, brandType);
+                    int score = scoreSnCandidate(fixedToken, brandType);
+                    candidates.add(new SnCandidate(fixedToken, score));
                 }
             }
         }
@@ -790,6 +906,9 @@ public class DeviceInfoExtractorService {
 
         // 排除纯数字
         if (upper.matches("\\d+")) return false;
+
+        // 排除容量后缀类候选，如128GB、F17FV5GA128GB
+        if (hasStorageCapacitySuffix(upper)) return false;
 
         // 排除包含"IMEI"关键字的候选
         // 场景：OCR识别出"IMEI353149596371672"，品牌模式截取到"IMEI3531495963"，这不是SN
@@ -911,29 +1030,12 @@ public class DeviceInfoExtractorService {
      */
     private boolean isImeiLine(String line) {
         if (line == null) return false;
-        String lower = line.toLowerCase().replaceAll("\\s+", "");
+        String lower = line.toLowerCase().replaceAll("[^a-z0-9]", "");
         // 包含imei关键字的行
         if (lower.contains("imei") || lower.contains("meid")) return true;
         // 包含中文IMEI关键字的行
         for (String cnKw : IMEI_CN_KEYWORDS) {
             if (line.contains(cnKw)) return true;
-        }
-        return false;
-    }
-
-    /**
-     * 判断一行是否为标签行（包含中文标签关键字）
-     * 用于在向下查找SN值时，遇到新标签行时停止
-     */
-    private boolean isLabelLine(String line) {
-        // 常见的手机信息标签
-        List<String> labels = Arrays.asList(
-                "版本类型", "入网型号", "是否正品", "激活状态", "激活日期", "保修状态",
-                "型号", "处理器", "内存", "存储", "电池", "系统版本",
-                "IMEI", "MEID", "蓝牙地址", "WiFi地址", "MAC地址"
-        );
-        for (String label : labels) {
-            if (line.contains(label)) return true;
         }
         return false;
     }
@@ -982,6 +1084,18 @@ public class DeviceInfoExtractorService {
 
         System.out.println("\n========== 测试11：苹果序列号被OCR断行（F17FV5GA + 0DYP） ==========");
         System.out.println(service.extractDeviceInfo(getOcrText("apple_sn_split"), "apple_warranty"));
+
+        System.out.println("\n========== 测试12：苹果序列号后半部分丢失（不应错误拼接纯数字） ==========");
+        System.out.println(service.extractDeviceInfo(getOcrText("apple_sn_lost"), "apple_warranty"));
+
+        System.out.println("\n========== 测试13：iPhone关于本机页面（OCR将0识别为O） ==========");
+        System.out.println(service.extractDeviceInfo(getOcrText("apple_about_ocr_fix"), "apple_warranty"));
+
+        System.out.println("\n========== 测试14：iPhone关于本机完整OCR（含序列号关键字） ==========");
+        System.out.println(service.extractDeviceInfo(getOcrText("apple_about_full"), "apple_warranty"));
+
+        System.out.println("\n========== 测试15：iPhone关于本机容量字段不应拼入SN ==========");
+        System.out.println(service.extractDeviceInfo(getOcrText("apple_about_capacity_suffix"), "apple_warranty"));
     }
 
     /**
@@ -1128,6 +1242,7 @@ public class DeviceInfoExtractorService {
             case "apple_sn_split":
                 // 苹果序列号被OCR断成两行的场景
                 // 实际序列号：F17FV5GA0DYP（12位），OCR在GA和0DYP之间断行
+                // 场景A：0DYP被正确识别在下一行（可以拼接补全）
                 return "Warning: Invalid resolution 0 dpi. Using 70 instead.\n" +
                         "Estimating resolution as 448\n" +
                         "iPhonexmg\n" +
@@ -1139,6 +1254,71 @@ public class DeviceInfoExtractorService {
                         "106\n" +
                         "1232\n" +
                         "128GB";
+
+            case "apple_sn_lost":
+                // 苹果序列号后半部分被OCR丢失的场景
+                // 实际序列号：F17FV5GA0DYP（12位），OCR只识别出F17FV5GA，0DYP丢失
+                // 后面紧跟的是纯数字行（106、1232），不应被错误拼接
+                return "Warning: Invalid resolution 0 dpi. Using 70 instead.\n" +
+                        "Estimating resolution as 448\n" +
+                        "iPhonexmg\n" +
+                        "146\n" +
+                        "iPhone12\n" +
+                        "MGGX3CHAA\n" +
+                        "序列号 F17FV5GA\n" +
+                        "106\n" +
+                        "1232\n" +
+                        "128GB";
+
+            case "apple_about_ocr_fix":
+                // iPhone关于本机页面，OCR将序列号中的0识别为O
+                // 实际序列号：F17FV5GA0DYP，OCR识别为F17FV5GAODYP
+                // 应通过字符修正（O→0）得到正确的SN
+                return "通用\n" +
+                        "关于本机\n" +
+                        "iPhonexmg\n" +
+                        "146\n" +
+                        "iPhone12\n" +
+                        "MGGX3CH/A\n" +
+                        "序列号 F17FV5GAODYP\n" +
+                        "保障不适用\n" +
+                        "歌曲 0\n" +
+                        "视频 106\n" +
+                        "照片 1232\n" +
+                        "128GB";
+
+            case "apple_about_full":
+                // iPhone关于本机页面完整OCR（序列号被断行，后半部分在下一行）
+                // 实际序列号：F17FV5GA0DYP，OCR断成F17FV5GA和ODYP两行
+                return "通用\n" +
+                        "关于本机\n" +
+                        "iPhonexmg\n" +
+                        "146\n" +
+                        "iPhone12\n" +
+                        "MGGX3CH/A\n" +
+                        "序列号 F17FV5GA\n" +
+                        "ODYP\n" +
+                        "保障不适用\n" +
+                        "歌曲 0\n" +
+                        "视频 106";
+
+            case "apple_about_capacity_suffix":
+                // 当前图片对应的回归场景：OCR丢失了序列号后半段，只剩F17FV5GA
+                // 后面出现照片、应用程序、总容量等字段，不能把128GB拼进SN
+                return "通用\n" +
+                        "关于本机\n" +
+                        "名称 iPhonexmg\n" +
+                        "软件版本 14.6\n" +
+                        "型号名称 iPhone 12\n" +
+                        "型号号码 MGGX3CH/A\n" +
+                        "序列号 F17FV5GA\n" +
+                        "保障不适用\n" +
+                        "歌曲 0\n" +
+                        "视频 106\n" +
+                        "照片 1232\n" +
+                        "应用程序 51\n" +
+                        "总容量 128 GB\n" +
+                        "可用容量 26.95 GB";
 
             default:
                 return "";
