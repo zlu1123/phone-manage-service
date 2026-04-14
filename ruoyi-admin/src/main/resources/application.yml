@@ -20,6 +20,11 @@ server:
   servlet:
     # 应用的访问路径
     context-path: /
+    # 强制HTTP响应编码为UTF-8，解决中文乱码问题
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
   tomcat:
     # tomcat的URI编码
     uri-encoding: UTF-8
