@@ -644,10 +644,23 @@ public class DeviceInfoExtractorService {
                 sb.append(c);
             }
         }
-        if (changed) {
-            log.info("SN字符修正: {} -> {}", sn, sb.toString());
+        
+        String fixedSn = sb.toString();
+        
+        // 针对苹果SN的特定长度修正
+        // 苹果SN通常是10位或12位。如果提取到11位，很可能是OCR插入了多余字符
+        if (fixedSn.length() == 11) {
+            // 常见错误：J9 被识别为 J09（由于反光或字体间距导致）
+            if (fixedSn.startsWith("J09")) {
+                fixedSn = "J9" + fixedSn.substring(3);
+                changed = true;
+            }
         }
-        return sb.toString();
+        
+        if (changed) {
+            log.info("SN字符修正: {} -> {}", sn, fixedSn);
+        }
+        return fixedSn;
     }
 
     /**
