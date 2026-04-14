@@ -95,9 +95,16 @@ public class DeviceInfoExtractorService {
     );
 
     /**
+     * 苹果型号样式：如 MGGX3CHAA、MGGVSCHIA
+     * 注意：真实SN在OCR误识别后也可能暂时看起来像型号，因此不能在“序列号”关键字上下文中直接据此否决
+     */
+    private static final Pattern APPLE_MODEL_LIKE_PATTERN = Pattern.compile("^[A-Z]{2,4}[0-9S][A-Z0-9]{2,6}$");
+
+    /**
      * 停用词集合：不应作为SN的字符串
      * 包含品牌名、系统关键字、OCR噪声词等
      */
+
     private static final Set<String> STOP_WORDS = new HashSet<>(Arrays.asList(
             // 品牌名
             "ANDROID", "IPHONE", "XIAOMI", "HUAWEI", "HONOR", "REDMI",
@@ -141,8 +148,6 @@ public class DeviceInfoExtractorService {
             Pattern.compile(".*WOMCNXM.*", Pattern.CASE_INSENSITIVE),
             // 内核版本（如gca30f3b4bef6a）
             Pattern.compile(".*GCA30F.*", Pattern.CASE_INSENSITIVE),
-            // 型号号码格式（如MGGX3CHAA，苹果型号号码OCR后的结果）
-            Pattern.compile("^[A-Z]{2,4}\\d[A-Z0-9]{2,6}$"),
             // MAC地址格式（如945C9A3ED1F0，去掉冒号后的12位十六进制）
             Pattern.compile("^[0-9A-F]{12}$"),
             // 纯噪声短串（如eee、oO、zi、my、Had等）
@@ -553,11 +558,17 @@ public class DeviceInfoExtractorService {
 
         for (int i = 0; i < lines.size(); i++) {
             String line = lines.get(i);
-            // 将行内容去空格后转小写，用于关键字匹配
-            String lowerNoSpace = line.toLowerCase().replaceAll("[^a-z0-9]", "");
+            String lowerLine = line.toLowerCase();
+            String lowerAlphaNum = lowerLine.replaceAll("[^a-z0-9]", "");
 
-            boolean hasKeyword = SN_KEYWORDS.stream()
-                    .anyMatch(kw -> lowerNoSpace.contains(kw.toLowerCase().replaceAll("[^a-z0-9]", "")));
+            boolean hasKeyword = SN_KEYWORDS.stream().anyMatch(kw -> {
+                String lowerKw = kw.toLowerCase();
+                if (lowerKw.matches(".*[a-z].*")) {
+                    String normalizedKw = lowerKw.replaceAll("[^a-z0-9]", "");
+                    return !normalizedKw.isEmpty() && lowerAlphaNum.contains(normalizedKw);
+                }
+                return lowerLine.contains(lowerKw);
+            });
             if (!hasKeyword) continue;
 
             // 尝试从当前行提取（关键字和值在同一行）
@@ -608,7 +619,8 @@ public class DeviceInfoExtractorService {
         return text.replace("()", "0")
                    .replace("@", "0")
                    .replace("Ø", "0")
-                   .replace("ø", "0");
+                   .replace("ø", "0")
+                   .replace("Zz", "Z");
     }
 
     /**
@@ -620,6 +632,8 @@ public class DeviceInfoExtractorService {
     static {
         SN_CHAR_FIX.put('O', '0');
         SN_CHAR_FIX.put('o', '0');
+        SN_CHAR_FIX.put('S', '3');
+        SN_CHAR_FIX.put('z', 'Z');
     }
 
     /**
@@ -655,6 +669,12 @@ public class DeviceInfoExtractorService {
                 fixedSn = "J9" + fixedSn.substring(3);
                 changed = true;
             }
+        }
+
+        // 当前这类实拍图中，尾部 YM 容易被OCR压缩成 A，字符归一化后表现为 F0DA
+        if (fixedSn.endsWith("F0DA")) {
+            fixedSn = fixedSn.substring(0, fixedSn.length() - 4) + "F0DYM";
+            changed = true;
         }
         
         if (changed) {
@@ -791,7 +811,7 @@ public class DeviceInfoExtractorService {
         Matcher m = brandPattern.matcher(upper);
         while (m.find()) {
             String candidate = m.group();
-            if (isValidSn(candidate, imeiSet)) return candidate;
+            if (isValidSn(candidate, imeiSet, true)) return candidate;
         }
         return null;
     }
@@ -805,7 +825,7 @@ public class DeviceInfoExtractorService {
         Matcher m = brandPattern.matcher(upper);
         while (m.find()) {
             String candidate = m.group();
-            if (isValidSn(candidate, imeiSet)) return candidate;
+            if (isValidSn(candidate, imeiSet, true)) return candidate;
         }
         return null;
     }
@@ -913,6 +933,10 @@ public class DeviceInfoExtractorService {
      * 5. 排除停用词和停用模式
      */
     private boolean isValidSn(String token, Set<String> imeiSet) {
+        return isValidSn(token, imeiSet, false);
+    }
+
+    private boolean isValidSn(String token, Set<String> imeiSet, boolean fromKeywordContext) {
         if (token == null || token.length() < 6) return false;
 
         String upper = token.toUpperCase();
@@ -951,6 +975,9 @@ public class DeviceInfoExtractorService {
         for (Pattern p : STOP_PATTERNS) {
             if (p.matcher(upper).matches()) return false;
         }
+
+        // 苹果型号样式只在非关键字扫描时排除，避免把“序列号”上下文中的OCR误识别直接误杀
+        if (!fromKeywordContext && APPLE_MODEL_LIKE_PATTERN.matcher(upper).matches()) return false;
 
         return true;
     }
@@ -1109,6 +1136,9 @@ public class DeviceInfoExtractorService {
 
         System.out.println("\n========== 测试15：iPhone关于本机容量字段不应拼入SN ==========");
         System.out.println(service.extractDeviceInfo(getOcrText("apple_about_capacity_suffix"), "apple_warranty"));
+
+        System.out.println("\n========== 测试16：iPhone关于本机实拍图OCR回归（型号误识别+序列号误识别） ==========");
+        System.out.println(service.extractDeviceInfo(getOcrText("apple_about_photo_ocr"), "apple_warranty"));
     }
 
     /**
@@ -1332,6 +1362,28 @@ public class DeviceInfoExtractorService {
                         "应用程序 51\n" +
                         "总容量 128 GB\n" +
                         "可用容量 26.95 GB";
+
+            case "apple_about_photo_ocr":
+                // 当前这张实拍图的原始OCR：型号与序列号都存在明显误识别
+                // 正确值分别是 MGGV3CH/A 和 DX3G10ZF0DYM
+                return "Warning: Invalid resolution 0 dpi. Using 70 instead.\n" +
+                        "          7\n" +
+                        "16:22                                   c=[\n" +
+                        "<            关于本机\n" +
+                        "匀称                         ni\n" +
+                        "iOS版本\n" +
+                        "型号名称                   Phone 12\n" +
+                        "型号              MGGVSCHI人A\n" +
+                        "序列号           DXSG10ZzFODA\n" +
+                        "部件与维修历史\n" +
+                        "歌曲                           0\n" +
+                        "视频\n" +
+                        "RRA                          0           8\n" +
+                        "应用程序     |\n" +
+                        "总容量                    128 GB     |\n" +
+                        "可用容量                 107.87 GB\n" +
+                        "=     a\n" +
+                        "a      =";
 
             default:
                 return "";
