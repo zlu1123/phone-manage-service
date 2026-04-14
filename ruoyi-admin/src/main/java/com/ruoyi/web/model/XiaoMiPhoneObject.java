@@ -7,7 +7,8 @@ import lombok.Data;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class XiaoMiPhoneObject {
 
-    private String imei;
+    private String imei1;
+    private String imei2;
     private String model;
     private String storage;
     private Boolean activated;

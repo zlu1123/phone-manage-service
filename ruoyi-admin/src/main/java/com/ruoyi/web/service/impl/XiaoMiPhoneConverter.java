@@ -11,6 +11,8 @@ public class XiaoMiPhoneConverter implements PhoneInfoConverter {
         if (source instanceof XiaoMiPhoneObject) {
             XiaoMiPhoneObject obj = (XiaoMiPhoneObject) source;
             target.setSn(obj.getSn());
+            target.setImei1(obj.getImei1());
+            target.setImei2(obj.getImei2());
             target.setModel(obj.getModel());
             target.setCoverage(obj.getCoverage());
             target.setActivated(obj.getActivated());
