@@ -123,6 +123,7 @@ public class WechatApiController extends BaseController {
     }
 
     private void saveActiveInfo(PhoneInfoDto dto, String rawJson, String typeCode) {
+        log.info("开始保存信息，{}", dto);
         PhoneActiveInfo info = new PhoneActiveInfo();
         info.setSn(dto.getSn());
         info.setImei1(dto.getImei1());
