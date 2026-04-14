@@ -11,6 +11,7 @@ public class HuaWeiPhoneConverter implements PhoneInfoConverter {
         if (source instanceof HuaWeiPhoneObject) {
             HuaWeiPhoneObject obj = (HuaWeiPhoneObject) source;
             target.setSn(obj.getSn());
+            target.setImei1(obj.getImei());
             target.setModel(obj.getModel());
             target.setCoverage(obj.getCoverage());
             target.setActivated(obj.isActivated());

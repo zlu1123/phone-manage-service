@@ -3,9 +3,11 @@ package com.ruoyi.web.model;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
+import lombok.ToString;
 
 @ApiModel(value = "PhoneInfoDto", description = "手机信息实体")
 @Data
+@ToString
 public class PhoneInfoDto {
 
     @ApiModelProperty("sn号")
