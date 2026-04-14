@@ -20,7 +20,7 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
     @Override
     @Transactional
     public void saveOrUpdateActiveInfo(PhoneActiveInfo info) {
-        if (info == null || info.getSn() == null) {
+        if (info == null) {
             return;
         }
         PhoneActiveInfo exist = phoneActiveInfoMapper.selectBySn(info.getSn());
