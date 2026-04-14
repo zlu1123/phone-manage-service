@@ -69,17 +69,17 @@
     <el-table v-loading="loading" :data="orderList">
       <el-table-column label="ID" align="center" prop="id" width="60" />
       <el-table-column
-        label="序列号"
-        align="center"
-        prop="sn"
-        min-width="130"
-        :show-overflow-tooltip="true"
-      />
-      <el-table-column
         label="型号"
         align="center"
         prop="model"
         min-width="120"
+        :show-overflow-tooltip="true"
+      />
+      <el-table-column
+        label="序列号"
+        align="center"
+        prop="sn"
+        min-width="130"
         :show-overflow-tooltip="true"
       />
       <el-table-column
