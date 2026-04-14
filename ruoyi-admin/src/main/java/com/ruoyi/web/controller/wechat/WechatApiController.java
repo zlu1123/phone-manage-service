@@ -44,22 +44,39 @@ public class WechatApiController extends BaseController {
     private RedisTemplate redisTemplate;
 
     /**
-     * @param type 手机类型编号
-     * @param code sn码
-     * @return
+     * 查询激活信息
+     * 查询策略：先用SN码查询，如果失败再用IMEI查询，两次都失败返回匹配失败
+     *
+     * @param typeCode 手机类型编号
+     * @param code     SN码
+     * @param imei     IMEI码（可选，用于SN查询失败时的重试）
+     * @return 激活信息
      */
     @ApiOperation("查询激活信息")
     @GetMapping("/queryActiveInfo")
-    public R queryActiveInfo(@RequestParam("typeCode") String typeCode, @RequestParam("code") String code) {
+    public R queryActiveInfo(@RequestParam("typeCode") String typeCode,
+                             @RequestParam("code") String code,
+                             @RequestParam(value = "imei", required = false) String imei) {
         String type = PhoneType.getValueByCode(typeCode);
         if (type == null) {
             return R.fail("查询失败，无效的手机类型！");
-        };
-        // 通过传入类型code
-        ExternalApiService.ApiResult apiResult = externalApiService.fetchDataFromExternalApi(type, code);
-        if (!apiResult.getSuccess()) {
-            return R.fail("查询失败，请检查序号是否正确，或设备型号与序号是否匹配！");
         }
+
+        // 第一次：用SN码查询
+        log.info("第一次查询：使用SN码={}, type={}", code, type);
+        ExternalApiService.ApiResult apiResult = externalApiService.fetchDataFromExternalApi(type, code);
+
+        // 第二次：SN查询失败且有IMEI时，用IMEI重试
+        if (!apiResult.getSuccess() && imei != null && !imei.trim().isEmpty()) {
+            log.info("SN查询失败，第二次查询：使用IMEI={}, type={}", imei, type);
+            apiResult = externalApiService.fetchDataFromExternalApi(type, imei.trim());
+        }
+
+        // 两次都失败，返回匹配失败
+        if (!apiResult.getSuccess()) {
+            return R.fail("查询失败，SN和IMEI均未匹配到设备信息，请检查输入是否正确！");
+        }
+
         // 存库，封装（需要的信息返回，其他原始数据以json形式存库）
         PhoneInfoDto phoneInfoDto = handleObject(typeCode, apiResult.getData());
         if (phoneInfoDto == null) {

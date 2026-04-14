@@ -22,9 +22,9 @@ public class ExternalApiService {
     @Value("${06api.test_flag:1}")
     private Boolean testFlag;
 
-    public ApiResult fetchDataFromExternalApi(String type, String sn) {
-        // 拼接请求地址：url + type + sn
-        String reqUrl = url + "key=" + key + "&type=" + type + "&sn=" + sn;
+    public ApiResult fetchDataFromExternalApi(String type, String code) {
+        // 拼接请求地址：url + type + code（code可以是SN或IMEI）
+        String reqUrl = url + "key=" + key + "&type=" + type + "&sn=" + code;
         log.info("reqUrl: {}", reqUrl);
         String jsonString;
         if (testFlag) {
@@ -46,6 +46,8 @@ public class ExternalApiService {
                 result.setData(response.getData());
                 result.setSuccess(true);
             } else {
+                result.setSuccess(false);
+                result.setData(response.getMessage());
                 log.warn("查询失败，错误码: {}, 信息: {}", response.getCode(), response.getMessage());
             }
         } catch (Exception e) {
@@ -66,6 +68,6 @@ public class ExternalApiService {
     public static class ApiResult {
         private Object data;
         private String rawJson;
-        private Boolean success;
+        private Boolean success = false;
     }
 }
