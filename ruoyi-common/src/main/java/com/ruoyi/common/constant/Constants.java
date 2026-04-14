@@ -179,4 +179,9 @@ public class Constants
      * 指定 Tesseract 的语言数据文件路径
      */
     public static final String TESSERACT_OCR_PATH_LINUX = "tesseract_ocr_path_linux";
+
+    /**
+     * 系统时间缓存key
+     */
+    public static final String SYSTEM_TIME_CACHE_KEY = "sys_config:sys.time";
 }

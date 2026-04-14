@@ -1,9 +1,9 @@
 package com.ruoyi.web.controller.wechat;
 
+import com.ruoyi.common.constant.Constants;
 import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.R;
 import com.ruoyi.system.domain.SysConfig;
-import com.ruoyi.web.common.Constants;
 import com.ruoyi.web.core.config.PhoneInfoConverterContext;
 import com.ruoyi.web.enums.PhoneType;
 import com.ruoyi.web.domain.PhoneActiveInfo;
