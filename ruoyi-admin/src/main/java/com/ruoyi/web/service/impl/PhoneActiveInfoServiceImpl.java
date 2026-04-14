@@ -23,18 +23,22 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
         if (info == null) {
             return;
         }
-        PhoneActiveInfo exist = phoneActiveInfoMapper.selectBySn(info.getSn());
-        if (exist != null) {
-            info.setId(exist.getId());
-            info.setCreateTime(exist.getCreateTime());
-            info.setCreateBy(exist.getCreateBy());
-            info.setUpdateTime(new Date());
-            phoneActiveInfoMapper.updateById(info);
-        } else {
-            info.setCreateTime(new Date());
-            info.setUpdateTime(new Date());
-            phoneActiveInfoMapper.insert(info);
-        }
+        info.setCreateTime(new Date());
+        info.setUpdateTime(new Date());
+        phoneActiveInfoMapper.insert(info);
+//        PhoneActiveInfo exist = phoneActiveInfoMapper.selectBySn(info.getSn());
+//        if (exist != null) {
+//            info.setId(exist.getId());
+//            info.setCreateTime(exist.getCreateTime());
+//            info.setCreateBy(exist.getCreateBy());
+//            info.setUpdateTime(new Date());
+//            phoneActiveInfoMapper.updateById(info);
+//        } else {
+//            info.setCreateTime(new Date());
+//            info.setUpdateTime(new Date());
+//            phoneActiveInfoMapper.insert(info);
+//        }
+
     }
 
     @Override
