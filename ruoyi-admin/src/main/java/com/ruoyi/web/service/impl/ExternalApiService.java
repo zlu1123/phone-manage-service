@@ -58,11 +58,11 @@ public class ExternalApiService {
             ApiResponse response = objectMapper.readValue(jsonString, ApiResponse.class);
             if (response.getCode() == 0) {
                 log.info("查询成功，data: {}", response.getData());
-                result.setData(response.getData());
                 result.setSuccess(true);
+                result.setData(response.getData());
             } else {
                 result.setSuccess(false);
-                result.setData(response.getMessage());
+                result.setData("错误码：" + response.getCode() + "，错误信息：" + response.getMessage());
                 log.warn("查询失败，错误码: {}, 信息: {}", response.getCode(), response.getMessage());
             }
         } catch (Exception e) {

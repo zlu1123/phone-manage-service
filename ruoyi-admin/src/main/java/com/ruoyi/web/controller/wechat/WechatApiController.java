@@ -77,7 +77,7 @@ public class WechatApiController extends BaseController {
 
         // 两次都失败，返回匹配失败
         if (!apiResult.getSuccess()) {
-            return R.fail("查询失败，SN和IMEI均未匹配到设备信息，请检查输入是否正确！");
+            return R.fail("查询失败，请检查输入是否正确！" + apiResult.getData());
         }
 
         // 存库，封装（需要的信息返回，其他原始数据以json形式存库）
