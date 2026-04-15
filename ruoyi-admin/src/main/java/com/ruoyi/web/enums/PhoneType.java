@@ -1,5 +1,11 @@
 package com.ruoyi.web.enums;
 
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
 public enum PhoneType {
     APPLE("1", "苹果", "apple_warranty"),
     XIAOMI("2", "小米/红米", "xiaomi"),
@@ -43,5 +49,16 @@ public enum PhoneType {
             }
         }
         return null;
+    }
+
+    public static List<Map<String, String>> toMapList() {
+        return Arrays.stream(PhoneType.values())
+                .map(type -> {
+                    Map<String, String> map = new HashMap<>();
+                    map.put("code", type.getCode());
+                    map.put("name", type.getName());
+                    return map;
+                })
+                .collect(Collectors.toList());
     }
 }

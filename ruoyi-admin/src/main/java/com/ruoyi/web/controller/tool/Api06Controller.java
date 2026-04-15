@@ -2,6 +2,7 @@ package com.ruoyi.web.controller.tool;
 
 import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.R;
+import com.ruoyi.web.enums.PhoneType;
 import com.ruoyi.web.service.impl.ExternalApiService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -27,4 +28,9 @@ public class Api06Controller extends BaseController {
         return R.ok(result.getData());
     }
 
+    @ApiOperation("查询手机型号列表")
+    @GetMapping("/queryPhoneTypeList")
+    public R queryPhoneTypeList() {
+        return R.ok(PhoneType.toMapList());
+    }
 }
