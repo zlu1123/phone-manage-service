@@ -29,6 +29,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 
+import static com.ruoyi.common.utils.SecurityUtils.getNickName;
+
 
 @Api("小程序接口")
 @Slf4j
@@ -141,6 +143,7 @@ public class WechatApiController extends BaseController {
         // 设置创建人/更新人
         info.setCreateBy(getUsername());
         info.setUpdateBy(getUsername());
+        info.setNickName(getNickName());
         phoneActiveInfoService.saveOrUpdateActiveInfo(info);
     }
 
