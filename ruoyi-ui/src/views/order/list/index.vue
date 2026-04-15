@@ -39,6 +39,14 @@
           @keyup.enter.native="handleQuery"
         />
       </el-form-item>
+      <el-form-item label="昵称" prop="nickName">
+        <el-input
+          v-model="queryParams.nickName"
+          placeholder="请输入昵称"
+          clearable
+          @keyup.enter.native="handleQuery"
+        />
+      </el-form-item>
       <el-form-item label="激活状态" prop="activated">
         <el-select
           v-model="queryParams.activated"
@@ -73,12 +81,12 @@
 
     <!-- 表格 -->
     <el-table v-loading="loading" :data="orderList">
-      <el-table-column label="ID" align="center" prop="id" width="60" />
+      <el-table-column label="ID" align="center" prop="id" width="50" />
       <el-table-column
         label="手机品牌"
         align="center"
         prop="phoneType"
-        min-width="120"
+        min-width="80"
         :show-overflow-tooltip="true"
       >
         <template slot-scope="scope">
@@ -89,7 +97,7 @@
         label="手机型号"
         align="center"
         prop="model"
-        min-width="120"
+        min-width="80"
         :show-overflow-tooltip="true"
       >
         <template slot-scope="scope">
@@ -100,14 +108,14 @@
         label="序列号"
         align="center"
         prop="sn"
-        min-width="130"
+        min-width="110"
         :show-overflow-tooltip="true"
       />
       <el-table-column
         label="IMEI1"
         align="center"
         prop="imei1"
-        min-width="130"
+        min-width="110"
         :show-overflow-tooltip="true"
       >
         <template slot-scope="scope">
@@ -118,7 +126,7 @@
         label="IMEI2"
         align="center"
         prop="imei2"
-        min-width="130"
+        min-width="110"
         :show-overflow-tooltip="true"
       >
         <template slot-scope="scope">
@@ -144,13 +152,13 @@
         width="110"
       />
       <el-table-column
-        label="保修到期"
+        label="保修到期时间"
         align="center"
         prop="coverage"
         width="110"
       />
       <el-table-column
-        label="系统时间"
+        label="查询时系统时间"
         align="center"
         prop="sysTime"
         width="110"
@@ -159,6 +167,12 @@
         label="创建者"
         align="center"
         prop="createBy"
+        width="100"
+      />
+      <el-table-column
+        label="昵称"
+        align="center"
+        prop="nickName"
         width="100"
       />
       <el-table-column
@@ -208,11 +222,16 @@ export default {
         sn: undefined,
         phoneType: undefined,
         createBy: undefined,
+        nickName: undefined,
         activated: undefined,
       },
     };
   },
   created() {
+    // 从路由参数中读取 sn（快速查询跳转时携带）
+    if (this.$route.query.sn) {
+      this.queryParams.sn = this.$route.query.sn;
+    }
     this.getPhoneTypeList();
     this.getList();
   },

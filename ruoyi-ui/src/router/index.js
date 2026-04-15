@@ -87,6 +87,20 @@ export const constantRoutes = [
         meta: { title: '个人中心', icon: 'user' }
       }
     ]
+  },
+  {
+    path: '/order',
+    component: Layout,
+    hidden: true,
+    redirect: 'noredirect',
+    children: [
+      {
+        path: 'list',
+        component: () => import('@/views/order/list/index'),
+        name: 'OrderList',
+        meta: { title: '订单列表', icon: 'list' }
+      }
+    ]
   }
 ]
 

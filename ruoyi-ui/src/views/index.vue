@@ -1,5 +1,33 @@
 <template>
   <div class="app-container dashboard">
+    <!-- 06API 余额卡片（仅管理员可见） -->
+    <el-row v-if="isAdmin" :gutter="16" class="balance-row">
+      <el-col :span="24">
+        <el-card class="balance-card" shadow="hover">
+          <div class="balance-body">
+            <div class="balance-left">
+              <div class="balance-icon-wrapper">
+                <i class="el-icon-wallet"></i>
+              </div>
+              <div class="balance-info">
+                <div class="balance-label">06API 账户余额</div>
+                <div class="balance-value">
+                  <span class="balance-symbol">¥</span>
+                  <span class="balance-amount">{{ apiBalance }}</span>
+                </div>
+              </div>
+            </div>
+            <div class="balance-right">
+              <el-tag :type="balanceTagType" size="medium" effect="plain">
+                <i :class="balanceTagIcon"></i>
+                {{ balanceStatusText }}
+              </el-tag>
+            </div>
+          </div>
+        </el-card>
+      </el-col>
+    </el-row>
+
     <!-- ==================== 管理员视图 ==================== -->
     <template v-if="isAdmin">
       <!-- 顶部统计卡片 -->
@@ -11,10 +39,10 @@
                 <div class="stat-label">订单总数</div>
                 <div class="stat-value">{{ statistics.totalOrders }}</div>
                 <div class="stat-desc">
-                  <span class="stat-trend up"
-                    ><i class="el-icon-top"></i> 12.5%</span
+                  <span :class="['stat-trend', statistics.totalOrdersTrend]"
+                    ><i :class="statistics.totalOrdersTrend === 'down' ? 'el-icon-bottom' : 'el-icon-top'"></i>
+                    {{ statistics.totalOrdersGrowthLabel }}</span
                   >
-                  较上月
                 </div>
               </div>
               <div
@@ -33,10 +61,10 @@
                 <div class="stat-label">今日新增</div>
                 <div class="stat-value">{{ statistics.todayOrders }}</div>
                 <div class="stat-desc">
-                  <span class="stat-trend up"
-                    ><i class="el-icon-top"></i> 8.2%</span
+                  <span :class="['stat-trend', statistics.todayOrdersTrend]"
+                    ><i :class="statistics.todayOrdersTrend === 'down' ? 'el-icon-bottom' : 'el-icon-top'"></i>
+                    {{ statistics.todayOrdersGrowthLabel }}</span
                   >
-                  较昨日
                 </div>
               </div>
               <div
@@ -55,10 +83,10 @@
                 <div class="stat-label">已激活设备</div>
                 <div class="stat-value">{{ statistics.activatedDevices }}</div>
                 <div class="stat-desc">
-                  <span class="stat-trend up"
-                    ><i class="el-icon-top"></i> 5.7%</span
+                  <span :class="['stat-trend', statistics.activationRateTrend]"
+                    ><i :class="statistics.activationRateTrend === 'down' ? 'el-icon-bottom' : 'el-icon-top'"></i>
+                    {{ statistics.activationRateLabel }}</span
                   >
-                  激活率 74%
                 </div>
               </div>
               <div
@@ -77,10 +105,10 @@
                 <div class="stat-label">待处理订单</div>
                 <div class="stat-value">{{ statistics.pendingOrders }}</div>
                 <div class="stat-desc">
-                  <span class="stat-trend down"
-                    ><i class="el-icon-bottom"></i> 3.1%</span
+                  <span :class="['stat-trend', statistics.pendingRateTrend]"
+                    ><i :class="statistics.pendingRateTrend === 'down' ? 'el-icon-bottom' : 'el-icon-top'"></i>
+                    {{ statistics.pendingRateLabel }}</span
                   >
-                  较昨日
                 </div>
               </div>
               <div
@@ -99,7 +127,9 @@
         <el-col :xs="24" :sm="24" :md="16" :lg="16">
           <el-card class="chart-card" shadow="hover">
             <div slot="header" class="chart-header">
-              <span class="chart-title">订单趋势（近7天）</span>
+              <span class="chart-title">
+                {{ trendType === "week" ? "订单趋势（近7天）" : "订单趋势（近30天）" }}
+              </span>
               <el-button-group>
                 <el-button
                   size="mini"
@@ -208,6 +238,15 @@
                 align="center"
               />
               <el-table-column
+                label="业务日期"
+                min-width="120"
+                align="center"
+              >
+                <template slot-scope="scope">
+                  {{ formatBusinessDate(scope.row) }}
+                </template>
+              </el-table-column>
+              <el-table-column
                 prop="createTime"
                 label="创建时间"
                 min-width="160"
@@ -244,7 +283,12 @@
               <div class="stat-info">
                 <div class="stat-label">我的订单</div>
                 <div class="stat-value">{{ userStatistics.myTotalOrders }}</div>
-                <div class="stat-desc">累计提交</div>
+                <div class="stat-desc">
+                  <span :class="['stat-trend', userStatistics.myTotalOrdersTrend]"
+                    ><i :class="userStatistics.myTotalOrdersTrend === 'down' ? 'el-icon-bottom' : 'el-icon-top'"></i>
+                    {{ userStatistics.myTotalOrdersGrowthLabel }}</span
+                  >
+                </div>
               </div>
               <div
                 class="stat-icon"
@@ -261,7 +305,12 @@
               <div class="stat-info">
                 <div class="stat-label">今日提交</div>
                 <div class="stat-value">{{ userStatistics.myTodayOrders }}</div>
-                <div class="stat-desc">今日新增</div>
+                <div class="stat-desc">
+                  <span :class="['stat-trend', userStatistics.myTodayOrdersTrend]"
+                    ><i :class="userStatistics.myTodayOrdersTrend === 'down' ? 'el-icon-bottom' : 'el-icon-top'"></i>
+                    {{ userStatistics.myTodayOrdersGrowthLabel }}</span
+                  >
+                </div>
               </div>
               <div
                 class="stat-icon"
@@ -280,7 +329,12 @@
                 <div class="stat-value">
                   {{ userStatistics.myActivatedDevices }}
                 </div>
-                <div class="stat-desc">设备已激活</div>
+                <div class="stat-desc">
+                  <span :class="['stat-trend', userStatistics.myActivationRateTrend]"
+                    ><i :class="userStatistics.myActivationRateTrend === 'down' ? 'el-icon-bottom' : 'el-icon-top'"></i>
+                    {{ userStatistics.myActivationRateLabel }}</span
+                  >
+                </div>
               </div>
               <div
                 class="stat-icon"
@@ -299,7 +353,12 @@
                 <div class="stat-value">
                   {{ userStatistics.myPendingOrders }}
                 </div>
-                <div class="stat-desc">等待处理</div>
+                <div class="stat-desc">
+                  <span :class="['stat-trend', userStatistics.myPendingRateTrend]"
+                    ><i :class="userStatistics.myPendingRateTrend === 'down' ? 'el-icon-bottom' : 'el-icon-top'"></i>
+                    {{ userStatistics.myPendingRateLabel }}</span
+                  >
+                </div>
               </div>
               <div
                 class="stat-icon"
@@ -359,7 +418,8 @@
                 </div>
                 <span class="shortcut-text">快速查询</span>
               </div>
-              <div class="shortcut-item" @click="$router.push('/order/list')">
+              <!-- 新建订单功能暂未开放，先屏蔽 -->
+              <!-- <div class="shortcut-item" @click="$router.push('/order/list')">
                 <div
                   class="shortcut-icon"
                   style="background: linear-gradient(135deg, #f56c6c, #f78989)"
@@ -367,7 +427,7 @@
                   <i class="el-icon-document-add"></i>
                 </div>
                 <span class="shortcut-text">新建订单</span>
-              </div>
+              </div> -->
             </div>
           </el-card>
         </el-col>
@@ -411,6 +471,15 @@
                 </template>
               </el-table-column>
               <el-table-column
+                label="业务日期"
+                min-width="120"
+                align="center"
+              >
+                <template slot-scope="scope">
+                  {{ formatBusinessDate(scope.row) }}
+                </template>
+              </el-table-column>
+              <el-table-column
                 prop="createTime"
                 label="创建时间"
                 min-width="160"
@@ -438,19 +507,32 @@ import {
   getUserStatistics,
   getUserOrderTrend,
   getUserRecentOrders,
+  getApiBalance,
 } from "@/api/dashboard";
 
 export default {
   name: "Index",
   data() {
     return {
+      // ===== 公共数据 =====
+      apiBalance: "--",
+
       // ===== 管理员数据 =====
       statistics: {
         totalOrders: 0,
         todayOrders: 0,
         activatedDevices: 0,
         pendingOrders: 0,
+        totalOrdersGrowthLabel: "0.0% 较上月",
+        todayOrdersGrowthLabel: "0.0% 较昨日",
+        activationRateLabel: "激活率 0.0%",
+        pendingRateLabel: "待处理占比 0.0%",
+        totalOrdersTrend: "up",
+        todayOrdersTrend: "up",
+        activationRateTrend: "up",
+        pendingRateTrend: "down",
       },
+
       trendType: "week",
       recentOrders: [],
       // 图表实例（管理员）
@@ -465,7 +547,16 @@ export default {
         myTodayOrders: 0,
         myActivatedDevices: 0,
         myPendingOrders: 0,
+        myTotalOrdersGrowthLabel: "0.0% 近7天较前7天",
+        myTodayOrdersGrowthLabel: "0.0% 较昨日",
+        myActivationRateLabel: "激活率 0.0%",
+        myPendingRateLabel: "待处理占比 0.0%",
+        myTotalOrdersTrend: "up",
+        myTodayOrdersTrend: "up",
+        myActivationRateTrend: "up",
+        myPendingRateTrend: "down",
       },
+
       userRecentOrders: [],
       // 图表实例（普通用户）
       userOrderTrendChart: null,
@@ -481,6 +572,30 @@ export default {
       const roles = this.$store.getters.roles || [];
       const adminRoles = ["admin", "user"];
       return adminRoles.some((role) => roles.includes(role));
+    },
+    /** 余额状态标签类型 */
+    balanceTagType() {
+      const val = parseFloat(this.apiBalance);
+      if (isNaN(val)) return "info";
+      if (val <= 1) return "danger";
+      if (val <= 5) return "warning";
+      return "success";
+    },
+    /** 余额状态文字 */
+    balanceStatusText() {
+      const val = parseFloat(this.apiBalance);
+      if (isNaN(val)) return "查询中...";
+      if (val <= 1) return "余额不足";
+      if (val <= 5) return "余额偏低";
+      return "余额充足";
+    },
+    /** 余额状态图标 */
+    balanceTagIcon() {
+      const val = parseFloat(this.apiBalance);
+      if (isNaN(val)) return "el-icon-loading";
+      if (val <= 1) return "el-icon-warning";
+      if (val <= 5) return "el-icon-info";
+      return "el-icon-circle-check";
     },
     /** 获取用户昵称 */
     nickName() {
@@ -499,6 +614,13 @@ export default {
       if (hour < 14) return "中午好";
       if (hour < 18) return "下午好";
       return "晚上好";
+    },
+  },
+  watch: {
+    trendType() {
+      if (this.isAdmin && this.$refs.orderTrendChart) {
+        this.initOrderTrendChart();
+      }
     },
   },
   mounted() {
@@ -522,6 +644,8 @@ export default {
     /** 初始化所有数据（根据角色区分） */
     async initData() {
       if (this.isAdmin) {
+        // 余额接口仅管理员调用
+        this.fetchApiBalance();
         await this.initAdminData();
       } else {
         await this.initUserData();
@@ -564,12 +688,11 @@ export default {
     /** 初始化订单趋势折线图 */
     async initOrderTrendChart() {
       try {
-        const res = await getOrderTrend();
+        const res = await getOrderTrend(this.trendType);
         const { dates, newOrders, completedOrders } = res.data;
-        this.orderTrendChart = echarts.init(
-          this.$refs.orderTrendChart,
-          "macarons"
-        );
+        this.orderTrendChart =
+          this.orderTrendChart ||
+          echarts.init(this.$refs.orderTrendChart, "macarons");
         this.orderTrendChart.setOption({
           tooltip: {
             trigger: "axis",
@@ -900,6 +1023,33 @@ export default {
 
     // ==================== 公共方法 ====================
 
+    /** 获取06API余额 */
+    async fetchApiBalance() {
+      try {
+        const res = await getApiBalance();
+        if (res.code === 200 && res.data) {
+          this.apiBalance = res.data.balance;
+        }
+      } catch (e) {
+        console.error("获取API余额失败：", e);
+        this.apiBalance = "--";
+      }
+    },
+
+    /** 格式化业务日期 */
+    formatBusinessDate(row) {
+      if (!row) {
+        return "-";
+      }
+      if (row.sysTime) {
+        return row.sysTime;
+      }
+      if (row.createTime) {
+        return String(row.createTime).slice(0, 10);
+      }
+      return "-";
+    },
+
     /** 监听窗口 resize */
     initListener() {
       this.$_resizeHandler = debounce(() => {
@@ -1062,6 +1212,75 @@ export default {
     font-weight: 500;
   }
 
+  /* 余额卡片 */
+  .balance-row {
+    margin-bottom: 16px;
+  }
+
+  .balance-card {
+    ::v-deep .el-card__body {
+      padding: 20px 24px;
+    }
+  }
+
+  .balance-body {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .balance-left {
+    display: flex;
+    align-items: center;
+  }
+
+  .balance-icon-wrapper {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #8b5cf6, #a78bfa);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 16px;
+    flex-shrink: 0;
+
+    i {
+      font-size: 24px;
+      color: #fff;
+    }
+  }
+
+  .balance-label {
+    font-size: 13px;
+    color: #909399;
+    margin-bottom: 4px;
+  }
+
+  .balance-value {
+    display: flex;
+    align-items: baseline;
+  }
+
+  .balance-symbol {
+    font-size: 18px;
+    font-weight: 600;
+    color: #303133;
+    margin-right: 2px;
+  }
+
+  .balance-amount {
+    font-size: 28px;
+    font-weight: 700;
+    color: #303133;
+    font-family: "DIN Alternate", "Helvetica Neue", sans-serif;
+  }
+
+  .balance-right {
+    flex-shrink: 0;
+    margin-left: 16px;
+  }
+
   /* 统计卡片 */
   .stat-cards {
     margin-bottom: 16px;
@@ -1116,6 +1335,57 @@ export default {
       color: #f56c6c;
     }
   }
+
+  .stat-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+
+    i {
+      font-size: 28px;
+      color: #fff;
+    }
+  }
+
+  /* 图表区域 */
+  .chart-row {
+    margin-bottom: 16px;
+  }
+
+  .chart-card {
+    margin-bottom: 12px;
+
+    ::v-deep .el-card__header {
+      padding: 14px 20px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    ::v-deep .el-card__body {
+      padding: 16px;
+    }
+  }
+
+  .chart-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .chart-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #303133;
+  }
+
+  .chart-container {
+    width: 100%;
+  }
+}
+</style>
 
   .stat-icon {
     width: 56px;
