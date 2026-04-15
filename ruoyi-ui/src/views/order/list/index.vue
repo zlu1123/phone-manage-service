@@ -104,6 +104,18 @@
           <span>{{ scope.row.model || "-" }}</span>
         </template>
       </el-table-column>
+      <el-table-column label="图片" align="center" prop="imageUrl" width="80">
+        <template slot-scope="scope">
+          <el-image
+            v-if="scope.row.imageUrl"
+            :src="scope.row.imageUrl"
+            :preview-src-list="[scope.row.imageUrl]"
+            style="width: 40px; height: 40px"
+            fit="cover"
+          />
+          <span v-else>-</span>
+        </template>
+      </el-table-column>
       <el-table-column
         label="序列号"
         align="center"
