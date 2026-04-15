@@ -7,6 +7,7 @@
     <resultMap id="BaseResultMap" type="com.ruoyi.web.domain.PhoneActiveInfo">
         <id column="id" property="id"/>
         <result column="sn" property="sn"/>
+        <result column="phone_type" property="phoneType"/>
         <result column="imei1" property="imei1"/>
         <result column="imei2" property="imei2"/>
         <result column="model" property="model"/>
@@ -22,12 +23,12 @@
     </resultMap>
 
     <sql id="Base_Column_List">
-        id, sn, imei1, imei2, model, activated, activate_date, coverage, active_info, sys_time,
+        id, sn, phone_type, imei1, imei2, model, activated, activate_date, coverage, active_info, sys_time,
         create_time, create_by, update_time, update_by
     </sql>
 
     <sql id="Base_Column_List_Q">
-        id, sn, imei1, imei2, model, activated, activate_date, coverage, sys_time,
+        id, sn, phone_type, imei1, imei2, model, activated, activate_date, coverage, sys_time,
         create_time, create_by, update_time, update_by
     </sql>
 
@@ -39,10 +40,10 @@
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO phone_active_info (
-            sn, imei1, imei2, model, activated, activate_date, coverage, active_info, sys_time,
+            sn, phone_type, imei1, imei2, model, activated, activate_date, coverage, active_info, sys_time,
             create_time, create_by, update_time, update_by
         ) VALUES (
-                     #{sn}, #{imei1}, #{imei2}, #{model}, #{activated}, #{activateDate}, #{coverage}, #{activeInfo}, #{sysTime},
+                     #{sn}, #{phoneType}, #{imei1}, #{imei2}, #{model}, #{activated}, #{activateDate}, #{coverage}, #{activeInfo}, #{sysTime},
                      #{createTime}, #{createBy}, #{updateTime}, #{updateBy}
                  )
     </insert>
@@ -50,6 +51,7 @@
     <update id="updateById">
         UPDATE phone_active_info
         <set>
+            <if test="phoneType != null">phone_type = #{phoneType},</if>
             <if test="imei1 != null">imei1 = #{imei1},</if>
             <if test="imei2 != null">imei2 = #{imei2},</if>
             <if test="model != null">model = #{model},</if>
@@ -74,6 +76,7 @@
         <where>
             <if test="id != null"> AND id = #{id}</if>
             <if test="sn != null and sn != ''"> AND sn = #{sn}</if>
+            <if test="phoneType != null and phoneType != ''"> AND phone_type = #{phoneType}</if>
             <if test="imei1 != null and imei1 != ''"> AND imei1 = #{imei1}</if>
             <if test="imei2 != null and imei2 != ''"> AND imei2 = #{imei2}</if>
             <if test="model != null and model != ''"> AND model = #{model}</if>

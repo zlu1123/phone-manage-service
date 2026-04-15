@@ -129,6 +129,7 @@ public class WechatApiController extends BaseController {
         log.info("开始保存信息，{}", dto);
         PhoneActiveInfo info = new PhoneActiveInfo();
         info.setSn(dto.getSn());
+        info.setPhoneType(typeCode);
         info.setImei1(dto.getImei1());
         info.setImei2(dto.getImei2());
         info.setModel(dto.getModel());
@@ -137,9 +138,9 @@ public class WechatApiController extends BaseController {
         info.setCoverage(dto.getCoverage());
         info.setActiveInfo(rawJson); // 原始完整 JSON
         info.setSysTime(dto.getSysTime());
-        // 设置创建人/更新人（如果自动填充未配置，可以手动设置）
-         info.setCreateBy(getUsername());
-         info.setUpdateBy(getUsername());
+        // 设置创建人/更新人
+        info.setCreateBy(getUsername());
+        info.setUpdateBy(getUsername());
         phoneActiveInfoService.saveOrUpdateActiveInfo(info);
     }
 

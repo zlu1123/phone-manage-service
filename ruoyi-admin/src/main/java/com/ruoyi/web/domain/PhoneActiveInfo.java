@@ -8,7 +8,7 @@ import java.util.Date;
 public class PhoneActiveInfo extends BaseEntity {
 
     private Long id;
-
+    private String phoneType;
     private String sn;
     private String imei1;
     private String imei2;
