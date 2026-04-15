@@ -34,7 +34,22 @@ public class ExternalApiService {
             jsonString = restTemplate.getForObject(reqUrl, String.class);
         }
         log.info("原始响应: {}", jsonString);
+        return handleData(jsonString);
+    }
 
+    /**
+     * 查询账户余额
+     * @return
+     */
+    public ApiResult getBalance() {
+        String reqUrl = url + "key=" + key + "&type=balance";
+        log.info("reqUrl: {}", reqUrl);
+        String jsonString = restTemplate.getForObject(reqUrl, String.class);
+        log.info("原始响应: {}", jsonString);
+        return handleData(jsonString);
+    }
+
+    private ApiResult handleData(String jsonString){
         ApiResult result = new ApiResult();
         result.setRawJson(jsonString);
         // 手动反序列化

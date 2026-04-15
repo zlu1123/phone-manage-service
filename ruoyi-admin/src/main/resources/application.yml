@@ -145,7 +145,10 @@ xss:
   urlPatterns: /system/*,/monitor/*,/tool/*
 
 06api:
+  # 测试key
   key: 1ca2be180e9a6be8a838dff865e9d470
+  # 生产key
+#  key: 665beeda34c229a920eb14aff2b7e0bb
   url: https://data.06api.com/api.php?
   # 是否测试， 1：是，直接返回固定数据，0：请求远程接口
   test_flag: 0
