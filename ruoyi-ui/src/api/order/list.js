@@ -8,3 +8,11 @@ export function queryOrderList(query) {
     params: query
   })
 }
+
+// 查询手机品牌列表
+export function queryPhoneTypeList() {
+  return request({
+    url: '/06/api/queryPhoneTypeList',
+    method: 'get'
+  })
+}

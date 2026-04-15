@@ -17,13 +17,19 @@
           @keyup.enter.native="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="型号" prop="model">
-        <el-input
-          v-model="queryParams.model"
-          placeholder="请输入型号"
+      <el-form-item label="手机品牌" prop="phoneType">
+        <el-select
+          v-model="queryParams.phoneType"
+          placeholder="请选择手机品牌"
           clearable
-          @keyup.enter.native="handleQuery"
-        />
+        >
+          <el-option
+            v-for="item in phoneTypeList"
+            :key="item.code"
+            :label="item.name"
+            :value="item.code"
+          />
+        </el-select>
       </el-form-item>
       <el-form-item label="创建者" prop="createBy">
         <el-input
@@ -69,12 +75,27 @@
     <el-table v-loading="loading" :data="orderList">
       <el-table-column label="ID" align="center" prop="id" width="60" />
       <el-table-column
-        label="型号"
+        label="手机品牌"
+        align="center"
+        prop="phoneType"
+        min-width="120"
+        :show-overflow-tooltip="true"
+      >
+        <template slot-scope="scope">
+          <span>{{ getPhoneTypeName(scope.row.phoneType) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column
+        label="手机型号"
         align="center"
         prop="model"
         min-width="120"
         :show-overflow-tooltip="true"
-      />
+      >
+        <template slot-scope="scope">
+          <span>{{ scope.row.model || "-" }}</span>
+        </template>
+      </el-table-column>
       <el-table-column
         label="序列号"
         align="center"
@@ -144,21 +165,10 @@
         label="创建时间"
         align="center"
         prop="createTime"
-        width="160"
+        width="180"
       >
         <template slot-scope="scope">
           <span>{{ parseTime(scope.row.createTime) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column
-        label="备注"
-        align="center"
-        prop="remark"
-        min-width="120"
-        :show-overflow-tooltip="true"
-      >
-        <template slot-scope="scope">
-          <span>{{ scope.row.remark || "-" }}</span>
         </template>
       </el-table-column>
     </el-table>
@@ -175,7 +185,7 @@
 </template>
 
 <script>
-import { queryOrderList } from "@/api/order/list";
+import { queryOrderList, queryPhoneTypeList } from "@/api/order/list";
 
 export default {
   name: "Order",
@@ -189,18 +199,21 @@ export default {
       total: 0,
       // 订单表格数据
       orderList: [],
+      // 手机品牌列表
+      phoneTypeList: [],
       // 查询参数
       queryParams: {
         pageNum: 1,
         pageSize: 10,
         sn: undefined,
-        model: undefined,
+        phoneType: undefined,
         createBy: undefined,
         activated: undefined,
       },
     };
   },
   created() {
+    this.getPhoneTypeList();
     this.getList();
   },
   methods: {
@@ -229,6 +242,22 @@ export default {
     handleResetQuery() {
       this.resetForm("queryForm");
       this.handleQuery();
+    },
+    /** 获取手机品牌列表 */
+    getPhoneTypeList() {
+      queryPhoneTypeList()
+        .then((response) => {
+          this.phoneTypeList = response.data || [];
+        })
+        .catch((err) => {
+          console.error("获取手机品牌列表失败：", err);
+        });
+    },
+    /** 根据品牌code获取品牌名称 */
+    getPhoneTypeName(code) {
+      if (!code) return "-";
+      const item = this.phoneTypeList.find((t) => t.code === code);
+      return item ? item.name : code;
     },
   },
 };
