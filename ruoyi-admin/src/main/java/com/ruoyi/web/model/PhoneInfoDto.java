@@ -25,6 +25,10 @@ public class PhoneInfoDto {
     @ApiModelProperty("保修结束日期")
     private String coverage;
 
+    @ApiModelProperty("上传图片相对路径")
+    private String imagePath;
+    @ApiModelProperty("上传图片完整访问链接")
+    private String imageUrl;
     @ApiModelProperty("系统时间")
     private String sysTime;
 }

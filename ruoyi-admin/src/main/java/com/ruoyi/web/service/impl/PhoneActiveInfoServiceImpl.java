@@ -1,5 +1,7 @@
 package com.ruoyi.web.service.impl;
 
+import com.ruoyi.common.utils.StringUtils;
+import com.ruoyi.framework.config.ServerConfig;
 import com.ruoyi.web.domain.PhoneActiveInfo;
 import com.ruoyi.web.mapper.PhoneActiveInfoMapper;
 import com.ruoyi.web.service.IPhoneActiveInfoService;
@@ -27,12 +29,16 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
     @Autowired
     private PhoneActiveInfoMapper phoneActiveInfoMapper;
 
+    @Autowired
+    private ServerConfig serverConfig;
+
     @Override
     @Transactional
     public void saveOrUpdateActiveInfo(PhoneActiveInfo info) {
         if (info == null) {
             return;
         }
+        info.setImagePath(normalizeImagePath(info.getImagePath()));
         info.setCreateTime(new Date());
         info.setUpdateTime(new Date());
         phoneActiveInfoMapper.insert(info);
@@ -53,7 +59,7 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
 
     @Override
     public List<PhoneActiveInfo> queryActiveList(PhoneActiveInfo info) {
-        return phoneActiveInfoMapper.selectByExample(info);
+        return fillImageUrls(phoneActiveInfoMapper.selectByExample(info));
     }
 
     @Override
@@ -230,7 +236,89 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
 
     @Override
     public List<PhoneActiveInfo> getRecentOrders(String createBy, int limit) {
-        return phoneActiveInfoMapper.selectRecentOrders(createBy, limit);
+        return fillImageUrls(phoneActiveInfoMapper.selectRecentOrders(createBy, limit));
+    }
+
+    private List<PhoneActiveInfo> fillImageUrls(List<PhoneActiveInfo> list) {
+        if (list == null || list.isEmpty()) {
+            return list;
+        }
+        for (PhoneActiveInfo item : list) {
+            fillImageUrl(item);
+        }
+        return list;
+    }
+
+    private void fillImageUrl(PhoneActiveInfo info) {
+        if (info == null) {
+            return;
+        }
+        String normalizedImagePath = normalizeImagePath(info.getImagePath());
+        info.setImagePath(normalizedImagePath);
+        info.setImageUrl(buildImageUrl(normalizedImagePath));
+    }
+
+    private String normalizeImagePath(String imagePath) {
+        if (StringUtils.isEmpty(imagePath)) {
+            return null;
+        }
+        List<String> normalizedPaths = new ArrayList<>();
+        for (String item : imagePath.split(",")) {
+            String normalizedPath = normalizeSingleImagePath(item);
+            if (!StringUtils.isEmpty(normalizedPath)) {
+                normalizedPaths.add(normalizedPath);
+            }
+        }
+        return normalizedPaths.isEmpty() ? null : String.join(",", normalizedPaths);
+    }
+
+    private String normalizeSingleImagePath(String imagePath) {
+        if (StringUtils.isEmpty(imagePath)) {
+            return null;
+        }
+        String trimmedPath = imagePath.trim();
+        if (trimmedPath.isEmpty()) {
+            return null;
+        }
+        int profileIndex = trimmedPath.indexOf("/profile/");
+        if (profileIndex >= 0) {
+            return trimmedPath.substring(profileIndex);
+        }
+        return trimmedPath;
+    }
+
+    private String buildImageUrl(String imagePath) {
+        if (StringUtils.isEmpty(imagePath)) {
+            return null;
+        }
+        List<String> imageUrls = new ArrayList<>();
+        for (String item : imagePath.split(",")) {
+            String imageUrl = buildSingleImageUrl(item);
+            if (!StringUtils.isEmpty(imageUrl)) {
+                imageUrls.add(imageUrl);
+            }
+        }
+        return imageUrls.isEmpty() ? null : String.join(",", imageUrls);
+    }
+
+    private String buildSingleImageUrl(String imagePath) {
+        String normalizedImagePath = normalizeSingleImagePath(imagePath);
+        if (StringUtils.isEmpty(normalizedImagePath)) {
+            return null;
+        }
+        if (isExternalUrl(normalizedImagePath)) {
+            return normalizedImagePath;
+        }
+        try {
+            return serverConfig.getUrl() + normalizedImagePath;
+        } catch (Exception e) {
+            return normalizedImagePath;
+        }
+    }
+
+    private boolean isExternalUrl(String value) {
+        String lowerValue = value.toLowerCase();
+        return lowerValue.startsWith("http://") || lowerValue.startsWith("https://");
     }
 
     private Map<String, Object> buildNameValue(String name, long value) {
