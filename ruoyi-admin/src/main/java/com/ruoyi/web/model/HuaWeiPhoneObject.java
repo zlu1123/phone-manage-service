@@ -35,14 +35,18 @@ public class HuaWeiPhoneObject {
 
     // 内部类 Type
     @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Type {
+        private String code;
         private boolean demo;
+        private boolean second;
         private boolean refurbished;
         private boolean retail;
     }
 
     // 内部类 Purchase
     @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Purchase {
         private String date;
         private String country;
@@ -51,6 +55,7 @@ public class HuaWeiPhoneObject {
 
     // 内部类 Right
     @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Right {
         private String startDate;
         private String endDate;
