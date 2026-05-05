@@ -63,7 +63,8 @@ public class WechatApiController extends BaseController {
      *
      * @param typeCode 手机类型编号
      * @param code     SN码
-     * @param imei     IMEI码（可选，用于SN查询失败时的重试）
+     * @param imei     IMEI码（可选，用于SN查询失败时的重试，同时作为 imei1 返回）
+     * @param imei2    IMEI2 码（可选，双卡设备的第二个 IMEI）
      * @return 激活信息
      */
     @ApiOperation("查询激活信息")
@@ -71,6 +72,7 @@ public class WechatApiController extends BaseController {
     public R queryActiveInfo(@RequestParam("typeCode") String typeCode,
                              @RequestParam("code") String code,
                              @RequestParam(value = "imei", required = false) String imei,
+                             @RequestParam(value = "imei2", required = false) String imei2,
                              @RequestParam(value = "imagePath", required = false) String imagePath,
                              @RequestParam(value = "imageUrl", required = false) String imageUrl,
                              @RequestParam(value = "img", required = false) MultipartFile img,
@@ -108,6 +110,8 @@ public class WechatApiController extends BaseController {
         if (phoneInfoDto == null) {
             return R.fail("数据解析失败");
         }
+        // 前端传入的 sn/imei/imei2 优先级高于第三方 API 返回（因为第三方 API 对部分机型不返回 imei 或字段不可靠）
+        overrideIdentifiersFromRequest(phoneInfoDto, code, imei, imei2);
         try {
             phoneInfoDto.setSysTime((String) redisTemplate.opsForValue().get(CacheConstants.SYS_CONFIG_KEY + Constants.SYSTEM_TIME_CACHE_KEY));
             phoneInfoDto.setImagePath(normalizeImagePath(resolvedImagePath));
@@ -149,6 +153,35 @@ public class WechatApiController extends BaseController {
             log.warn("No converter found for type: {}", type);
         }
         return dto;
+    }
+
+    /**
+     * 使用前端传入的 sn/imei/imei2 覆盖 DTO 中的值。
+     * 规则：
+     * 1. imei 参数不为空则覆盖 imei1
+     * 2. imei2 参数不为空则覆盖 imei2
+     * 3. code 参数若与 imei/imei2 都不相同，则认为 code 是 SN，用其覆盖 sn
+     * 4. 前端未传的字段保留 Converter 原填充值作兜底
+     */
+    private void overrideIdentifiersFromRequest(PhoneInfoDto dto, String code, String imei, String imei2) {
+        if (dto == null) {
+            return;
+        }
+        String trimmedCode = code == null ? null : code.trim();
+        String trimmedImei = imei == null ? null : imei.trim();
+        String trimmedImei2 = imei2 == null ? null : imei2.trim();
+
+        if (!StringUtils.isEmpty(trimmedImei)) {
+            dto.setImei1(trimmedImei);
+        }
+        if (!StringUtils.isEmpty(trimmedImei2)) {
+            dto.setImei2(trimmedImei2);
+        }
+        if (!StringUtils.isEmpty(trimmedCode)
+                && !trimmedCode.equals(trimmedImei)
+                && !trimmedCode.equals(trimmedImei2)) {
+            dto.setSn(trimmedCode);
+        }
     }
 
     private void saveActiveInfo(PhoneInfoDto dto, String rawJson, String typeCode, String imagePath) {
