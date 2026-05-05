@@ -542,6 +542,56 @@ public class DeviceInfoExtractorService {
         return null;
     }
 
+    private int findSnKeywordEnd(String line) {
+        if (line == null || line.isEmpty()) return -1;
+
+        String lowerLine = line.toLowerCase();
+        String normalizedLine = lowerLine.replaceAll("[^a-z0-9]", "");
+        List<Integer> normalizedIndexMap = new ArrayList<>();
+        for (int i = 0; i < lowerLine.length(); i++) {
+            char c = lowerLine.charAt(i);
+            if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) {
+                normalizedIndexMap.add(i);
+            }
+        }
+
+        int bestIdx = Integer.MAX_VALUE;
+        int bestEnd = -1;
+        for (String kw : SN_KEYWORDS) {
+            String lowerKw = kw.toLowerCase();
+            if (lowerKw.matches(".*[a-z].*")) {
+                String normalizedKw = lowerKw.replaceAll("[^a-z0-9]", "");
+                if (normalizedKw.isEmpty()) continue;
+
+                int normalizedIdx = normalizedLine.indexOf(normalizedKw);
+                if (normalizedIdx >= 0 && normalizedIdx < normalizedIndexMap.size()) {
+                    int normalizedEndIdx = normalizedIdx + normalizedKw.length() - 1;
+                    if (normalizedEndIdx < normalizedIndexMap.size()) {
+                        int originalStart = normalizedIndexMap.get(normalizedIdx);
+                        int originalEnd = normalizedIndexMap.get(normalizedEndIdx) + 1;
+                        if (originalStart < bestIdx) {
+                            bestIdx = originalStart;
+                            bestEnd = originalEnd;
+                        }
+                    }
+                }
+                continue;
+            }
+
+            int idx = lowerLine.indexOf(lowerKw);
+            if (idx >= 0 && idx < bestIdx) {
+                bestIdx = idx;
+                bestEnd = idx + lowerKw.length();
+            }
+        }
+
+        return bestEnd;
+    }
+
+    private boolean containsSnKeyword(String line) {
+        return findSnKeywordEnd(line) >= 0;
+    }
+
     /**
      * 策略1：通过关键字行提取SN
      * 支持以下场景：
@@ -558,18 +608,7 @@ public class DeviceInfoExtractorService {
 
         for (int i = 0; i < lines.size(); i++) {
             String line = lines.get(i);
-            String lowerLine = line.toLowerCase();
-            String lowerAlphaNum = lowerLine.replaceAll("[^a-z0-9]", "");
-
-            boolean hasKeyword = SN_KEYWORDS.stream().anyMatch(kw -> {
-                String lowerKw = kw.toLowerCase();
-                if (lowerKw.matches(".*[a-z].*")) {
-                    String normalizedKw = lowerKw.replaceAll("[^a-z0-9]", "");
-                    return !normalizedKw.isEmpty() && lowerAlphaNum.contains(normalizedKw);
-                }
-                return lowerLine.contains(lowerKw);
-            });
-            if (!hasKeyword) continue;
+            if (!containsSnKeyword(line)) continue;
 
             // 尝试从当前行提取（关键字和值在同一行）
             String candidate = extractSnFromKeywordLine(line, brandPattern, imeiSet);
@@ -791,29 +830,19 @@ public class DeviceInfoExtractorService {
      * 对苹果设备会进行OCR字符修正（如O→0）
      */
     private String extractSnFromKeywordLine(String line, Pattern brandPattern, Set<String> imeiSet) {
-        String valuePart = line;
-        // 找到关键字并截取其后面的内容
-        for (String kw : SN_KEYWORDS) {
-            int idx = valuePart.toLowerCase().indexOf(kw.toLowerCase());
-            if (idx >= 0) {
-                valuePart = valuePart.substring(idx + kw.length());
-                break;
-            }
-        }
-        // 去除前导的冒号、空格等分隔符
-        valuePart = valuePart.replaceAll("^[\\s:：/]+", "").trim();
-
+        String valuePart = extractSnValuePart(line);
         if (valuePart.isEmpty()) return null;
+        return extractSnValueFromLine(valuePart, brandPattern, imeiSet);
+    }
 
-        String preFixed = preFixOcrErrors(valuePart);
-        // 在值部分中匹配品牌模式，移除所有非字母数字字符（解决OCR识别出的特殊符号打断匹配的问题）
-        String upper = preFixed.toUpperCase().replaceAll("[^A-Z0-9]", "");
-        Matcher m = brandPattern.matcher(upper);
-        while (m.find()) {
-            String candidate = m.group();
-            if (isValidSn(candidate, imeiSet, true)) return candidate;
+    private String extractSnValuePart(String line) {
+        if (line == null || line.isEmpty()) return "";
+
+        int keywordEnd = findSnKeywordEnd(line);
+        if (keywordEnd < 0 || keywordEnd > line.length()) {
+            return line.replaceAll("^[\\s:：/]+", "").trim();
         }
-        return null;
+        return line.substring(keywordEnd).replaceAll("^[\\s:：/]+", "").trim();
     }
 
     /**
@@ -822,10 +851,18 @@ public class DeviceInfoExtractorService {
     private String extractSnValueFromLine(String line, Pattern brandPattern, Set<String> imeiSet) {
         String preFixed = preFixOcrErrors(line);
         String upper = preFixed.toUpperCase().replaceAll("[^A-Z0-9]", "");
-        Matcher m = brandPattern.matcher(upper);
-        while (m.find()) {
-            String candidate = m.group();
-            if (isValidSn(candidate, imeiSet, true)) return candidate;
+
+        List<String> candidates = new ArrayList<>();
+        Matcher genericMatcher = SN_GENERIC.matcher(upper);
+        while (genericMatcher.find()) {
+            candidates.add(genericMatcher.group());
+        }
+
+        candidates.sort((a, b) -> Integer.compare(b.length(), a.length()));
+        for (String candidate : candidates) {
+            if (brandPattern.matcher(candidate).matches() && isValidSn(candidate, imeiSet, true)) {
+                return candidate;
+            }
         }
         return null;
     }
@@ -847,13 +884,16 @@ public class DeviceInfoExtractorService {
             // 跳过包含IMEI关键字的行，避免从"IMEI353149596371672"中误提取SN
             if (isImeiLine(line)) continue;
 
-            String preFixed = preFixOcrErrors(line);
+            String scanLine = containsSnKeyword(line) ? extractSnValuePart(line) : line;
+            if (scanLine.isEmpty()) continue;
+
+            String preFixed = preFixOcrErrors(scanLine);
             String upper = preFixed.toUpperCase().replaceAll("[^A-Z0-9]", "");
 
             Matcher m = brandPattern.matcher(upper);
             while (m.find()) {
                 String candidate = m.group();
-                if (isValidSn(candidate, imeiSet)) {
+                if (isValidSn(candidate, imeiSet, containsSnKeyword(line))) {
                     // 如果候选偏短，尝试拼接后续行补全
                     if (candidate.length() < minExpectedLen) {
                         String merged = tryMergeSnWithNextLines(candidate, lines, i + 1, brandPattern, imeiSet, minExpectedLen);
@@ -892,13 +932,16 @@ public class DeviceInfoExtractorService {
             // 跳过包含IMEI关键字的行
             if (isImeiLine(line)) continue;
 
-            String preFixed = preFixOcrErrors(line);
+            String scanLine = containsSnKeyword(line) ? extractSnValuePart(line) : line;
+            if (scanLine.isEmpty()) continue;
+
+            String preFixed = preFixOcrErrors(scanLine);
             String upper = preFixed.toUpperCase().replaceAll("[^A-Z0-9]", "");
 
             Matcher m = SN_GENERIC.matcher(upper);
             while (m.find()) {
                 String token = m.group();
-                if (isValidSn(token, imeiSet)) {
+                if (isValidSn(token, imeiSet, containsSnKeyword(line))) {
                     // 如果候选偏短，尝试拼接后续行补全
                     if (token.length() < minExpectedLen) {
                         String merged = tryMergeSnWithNextLines(token, lines, i + 1, brandPattern, imeiSet, minExpectedLen);
@@ -1012,7 +1055,7 @@ public class DeviceInfoExtractorService {
             // 苹果序列号不会太长
             if (token.length() > 14) score -= 10;
         } else if ("huawei".equalsIgnoreCase(brandType)) {
-            // 华为SN：通常16~20位，首字母大写
+            // 华为SN：通常16~20位，允许字母或数字开头
             if (token.length() >= 16 && token.length() <= 20) score += 25;
             else if (token.length() >= 14 && token.length() <= 22) score += 15;
         } else if ("xiaomi".equalsIgnoreCase(brandType)) {
@@ -1049,9 +1092,9 @@ public class DeviceInfoExtractorService {
                 return Pattern.compile("[A-Z0-9]{8,14}");
 
             case "huawei":
-                // 华为/荣耀SN：通常16~20位，首字母大写
-                // 例如：UDU0219C14000257（16位）
-                return Pattern.compile("[A-Z][A-Z0-9]{13,19}");
+                // 华为/荣耀SN：通常16~20位，允许字母或数字开头
+                // 例如：UDU0219C14000257（16位）、6XE0226105040994（16位）
+                return Pattern.compile("[A-Z0-9]{14,20}");
 
             case "xiaomi":
                 // 小米/红米SN：通常12~22位，全大写字母数字
