@@ -211,7 +211,8 @@
                 AND create_by = #{createBy}
             </if>
         </where>
-        ORDER BY STR_TO_DATE(COALESCE(NULLIF(sys_time, ''), DATE_FORMAT(create_time, '%Y-%m-%d')), '%Y-%m-%d') DESC,
+        ORDER BY
+<!--        STR_TO_DATE(COALESCE(NULLIF(sys_time, ''), DATE_FORMAT(create_time, '%Y-%m-%d')), '%Y-%m-%d') DESC,  -->
                  create_time DESC
         LIMIT #{limit}
     </select>
