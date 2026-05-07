@@ -135,7 +135,6 @@ public class ContractController extends BaseController {
         try {
             Contract contract = new Contract();
             contract.setId(id);
-
             int rows = contractService.delete(contract);
             if (rows > 0) {
                 return R.ok();
@@ -147,7 +146,7 @@ public class ContractController extends BaseController {
         }
     }
     /**
-     * 删除协议（根据ID）
+     * 生效/失效（根据ID）
      *
      * @param id 协议ID
      * @return 操作结果
@@ -155,9 +154,15 @@ public class ContractController extends BaseController {
     @PostMapping("/updateStatus")
     public R updateStatus(@RequestBody(required = false) Map<String, String> map) {
         try {
+
             Integer id = Integer.parseInt(map.get("id"));
             Boolean status = Boolean.parseBoolean(map.get("status"));
-            int rows = contractService.updateStatus(id,status);
+            if (status) {
+                // 如果是修改当前协议为生效，则修改其他的协议为失效
+                int batchUpdateStatus = contractService.batchUpdateStatus(id, getUsername());
+            }
+
+            int rows = contractService.updateStatus(id,status,getUsername());
             if (rows > 0) {
                 return R.ok();
             } else {

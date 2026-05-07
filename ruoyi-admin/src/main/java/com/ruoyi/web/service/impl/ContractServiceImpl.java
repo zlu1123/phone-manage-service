@@ -230,7 +230,7 @@ public class ContractServiceImpl implements ContractService {
      * @return 影响行数
      */
     @Transactional(rollbackFor = Exception.class)
-    public int updateStatus(Integer id, Boolean status) {
+    public int updateStatus(Integer id, Boolean status, String updateBy) {
         if (id == null) {
             throw new IllegalArgumentException("协议ID不能为空");
         }
@@ -245,9 +245,24 @@ public class ContractServiceImpl implements ContractService {
         }
 
         // 更新状态
-        return contractMapper.updateStatus(id, status);
+        return contractMapper.updateStatus(id, status, updateBy);
     }
 
+    /**
+     * 批量更新协议状态为失效
+     * @param id 排除的协议ID
+     * @param status 状态值
+     * @return 影响行数
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public int batchUpdateStatus(Integer id, String updateBy) {
+        if (id == null) {
+            throw new IllegalArgumentException("协议ID不能为空");
+        }
+
+        // 更新状态
+        return contractMapper.batchUpdateStatus(id, updateBy);
+    }
     /**
      * 批量删除协议
      * @param ids 协议ID数组
@@ -286,7 +301,7 @@ public class ContractServiceImpl implements ContractService {
      */
     @Transactional(rollbackFor = Exception.class)
     public int enableContract(Integer id) {
-        return updateStatus(id, true);
+        return updateStatus(id, true, null);
     }
 
     /**
@@ -296,6 +311,6 @@ public class ContractServiceImpl implements ContractService {
      */
     @Transactional(rollbackFor = Exception.class)
     public int disableContract(Integer id) {
-        return updateStatus(id, false);
+        return updateStatus(id, false, null);
     }
 }

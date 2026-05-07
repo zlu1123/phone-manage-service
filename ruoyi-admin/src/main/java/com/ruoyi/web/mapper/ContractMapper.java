@@ -108,7 +108,15 @@ public interface ContractMapper {
      * @param status 状态值
      * @return 影响行数
      */
-    int updateStatus(@Param("id") Integer id, @Param("status") Boolean status);
+    int updateStatus(@Param("id") Integer id, @Param("status") Boolean status, @Param("updateBy") String updateBy);
+    /**
+     * 批量更新协议状态为失效
+     *
+     * @param id     排除的协议ID
+     * @param status 状态值
+     * @return 影响行数
+     */
+    int batchUpdateStatus(@Param("id") Integer id, @Param("updateBy") String updateBy);
 
     /**
      * 根据ID删除协议

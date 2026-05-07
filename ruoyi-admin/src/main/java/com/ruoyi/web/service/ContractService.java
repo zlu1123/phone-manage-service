@@ -18,5 +18,7 @@ public interface ContractService {
 
     int enableContract(Integer id);
 
-    int updateStatus(Integer id, Boolean status);
+    int updateStatus(Integer id, Boolean status, String updateBy);
+
+    int batchUpdateStatus(Integer id, String updateBy);
 }

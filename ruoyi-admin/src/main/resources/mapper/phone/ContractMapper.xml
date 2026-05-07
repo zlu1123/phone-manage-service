@@ -152,8 +152,18 @@
     <update id="updateStatus">
         UPDATE contract
         SET status = #{status},
-            update_time = NOW()
+            update_time = NOW(),
+            update_by = #{updateBy}
         WHERE id = #{id}
+    </update>
+
+    <!-- 更新协议状态 -->
+    <update id="batchUpdateStatus">
+        UPDATE contract
+        SET status = 0,
+            update_time = NOW(),
+            update_by = #{updateBy}
+        WHERE id != #{id} and status = 1
     </update>
 
     <!-- 根据ID删除协议 -->
