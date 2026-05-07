@@ -11,9 +11,12 @@ import com.ruoyi.framework.config.ServerConfig;
 import com.ruoyi.system.domain.SysConfig;
 import com.ruoyi.system.service.ISysConfigService;
 import com.ruoyi.web.core.config.PhoneInfoConverterContext;
+import com.ruoyi.web.domain.Contract;
 import com.ruoyi.web.domain.PhoneActiveInfo;
 import com.ruoyi.web.enums.PhoneType;
+import com.ruoyi.web.model.ContractDto;
 import com.ruoyi.web.model.PhoneInfoDto;
+import com.ruoyi.web.service.ContractService;
 import com.ruoyi.web.service.IPhoneActiveInfoService;
 import com.ruoyi.web.service.MapToObjectConverter;
 import com.ruoyi.web.service.PhoneInfoConverter;
@@ -21,6 +24,7 @@ import com.ruoyi.web.service.impl.ExternalApiService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -269,6 +273,25 @@ public class WechatApiController extends BaseController {
         phoneActiveInfo.setCreateBy(userName);
         List<PhoneActiveInfo> list = phoneActiveInfoService.queryActiveList(phoneActiveInfo);
         return R.ok(getDataTable(list));
+    }
+
+    @Autowired
+    private ContractService contractService;
+
+    /**
+     * @param ContractDto 查询条件
+     * @return 订单分页列表
+     */
+    @ApiOperation("查询协议信息")
+    @GetMapping("/getContract")
+    public R getContract() {
+        Contract contract = new Contract();
+        contract.setStatus(true);
+        List<Contract> list = contractService.queryContractsByCondition(contract);
+        if (list != null && list.size() > 0) {
+            R.ok(list.get(0));
+        }
+        return R.ok();
     }
 
     @Autowired
