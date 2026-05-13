@@ -158,7 +158,7 @@ public class ContractController extends BaseController {
             Integer id = Integer.parseInt(map.get("id"));
             Boolean status = Boolean.parseBoolean(map.get("status"));
             if (status) {
-                // 如果是修改当前协议为生效，则修改其他的协议为失效
+                // 如果是修改当前协议为生效，则修改其他的协议未失效
                 int batchUpdateStatus = contractService.batchUpdateStatus(id, getUsername());
             }
 

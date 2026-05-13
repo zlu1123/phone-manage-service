@@ -295,7 +295,7 @@ public class WechatApiController extends BaseController {
         contract.setStatus(true);
         List<Contract> list = contractService.queryContractsByCondition(contract);
         if (list != null && list.size() > 0) {
-            R.ok(list.get(0));
+            return R.ok(list.get(0));
         }
         return R.ok();
     }

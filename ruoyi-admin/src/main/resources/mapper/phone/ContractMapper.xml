@@ -81,7 +81,7 @@
                 AND status = #{status}
             </if>
             <if test="createBy != null and createBy != ''">
-                AND create_by = #{createBy}
+                AND create_by LIKE CONCAT('%', #{createBy}, '%')
             </if>
         </where>
         ORDER BY update_time DESC
