@@ -40,7 +40,7 @@ public class ContractController extends BaseController {
      * @return 订单分页列表
      */
     @ApiOperation("查询协议信息")
-    @GetMapping("/getContract")
+    @GetMapping("/getList")
     public R getContract(ContractDto contractDto) {
         startPage();
         Contract contract = new Contract();

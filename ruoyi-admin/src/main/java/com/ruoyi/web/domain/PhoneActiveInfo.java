@@ -20,4 +20,6 @@ public class PhoneActiveInfo extends BaseEntity {
     private String activeInfo;  // 原始查询结果 JSON
     private String sysTime;     // 系统内置时间
     private String nickName;    // 创建人昵称
+    private Long contractId; //协议id
+    private String contractPath; //协议内容相对路径
 }

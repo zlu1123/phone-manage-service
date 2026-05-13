@@ -7,9 +7,11 @@ spring:
             # 主库数据源
             master:
                 url: jdbc:mysql://localhost:3306/phone-manage?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8&maxAllowedPacket=16777216
+#                url: jdbc:mysql://localhost:3306/ry-vue?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8&maxAllowedPacket=16777216
 #                url: jdbc:mysql://43.164.129.96:3306/ry-vue?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&serverTimezone=GMT%2B8&maxAllowedPacket=16777216
                 username: root
                 password: Ry_root!@#
+#                password: 123456
             # 从库数据源
             slave:
                 # 从数据源开关/默认关闭

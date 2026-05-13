@@ -31,4 +31,8 @@ public class PhoneInfoDto {
     private String imageUrl;
     @ApiModelProperty("系统时间")
     private String sysTime;
+    @ApiModelProperty("协议id")
+    private Long contractId;
+    @ApiModelProperty("协议文件相对路径")
+    private String contractPath;
 }
