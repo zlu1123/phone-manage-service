@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 public interface IPhoneActiveInfoService {
-    void saveOrUpdateActiveInfo(PhoneActiveInfo info);
+    Long saveOrUpdateActiveInfo(PhoneActiveInfo info);
 
     List<PhoneActiveInfo> queryActiveList(PhoneActiveInfo info);
 

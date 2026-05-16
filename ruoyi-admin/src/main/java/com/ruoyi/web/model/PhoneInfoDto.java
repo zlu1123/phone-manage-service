@@ -10,6 +10,8 @@ import lombok.ToString;
 @ToString
 public class PhoneInfoDto {
 
+    @ApiModelProperty("订单id")
+    private Long id;
     @ApiModelProperty("sn号")
     private String sn;
     @ApiModelProperty("imei1号")

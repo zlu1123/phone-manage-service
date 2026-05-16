@@ -47,7 +47,7 @@
             sn, phone_type, imei1, imei2, model, activated, activate_date, coverage, image_path, active_info, sys_time, contract_id, contract_path,
             create_time, create_by, nick_name, update_time, update_by
         ) VALUES (
-                     #{sn}, #{phoneType}, #{imei1}, #{imei2}, #{model}, #{activated}, #{activateDate}, #{coverage}, #{imagePath}, #{activeInfo}, #{sysTime}, #{contractId}, #{contractPath}
+                     #{sn}, #{phoneType}, #{imei1}, #{imei2}, #{model}, #{activated}, #{activateDate}, #{coverage}, #{imagePath}, #{activeInfo}, #{sysTime}, #{contractId}, #{contractPath},
                      #{createTime}, #{createBy}, #{nickName}, #{updateTime}, #{updateBy}
                  )
     </insert>

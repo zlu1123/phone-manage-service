@@ -79,8 +79,6 @@ public class WechatApiController extends BaseController {
                              @RequestParam(value = "imei2", required = false) String imei2,
                              @RequestParam(value = "imagePath", required = false) String imagePath,
                              @RequestParam(value = "imageUrl", required = false) String imageUrl,
-                             @RequestParam(value = "contractId", required = false) Long contractId,
-                             @RequestParam(value = "contractPath", required = false) String contractPath,
                              @RequestParam(value = "img", required = false) MultipartFile img,
                              @RequestParam(value = "file", required = false) MultipartFile file) {
         String type = PhoneType.getValueByCode(typeCode);
@@ -122,9 +120,8 @@ public class WechatApiController extends BaseController {
             phoneInfoDto.setSysTime((String) redisTemplate.opsForValue().get(CacheConstants.SYS_CONFIG_KEY + Constants.SYSTEM_TIME_CACHE_KEY));
             phoneInfoDto.setImagePath(normalizeImagePath(resolvedImagePath));
             phoneInfoDto.setImageUrl(buildImageUrl(phoneInfoDto.getImagePath()));
-            phoneInfoDto.setContractPath(contractPath);
-            phoneInfoDto.setContractId(contractId);
-            saveActiveInfo(phoneInfoDto, apiResult.getRawJson(), typeCode, phoneInfoDto.getImagePath());
+            Long id = saveActiveInfo(phoneInfoDto, apiResult.getRawJson(), typeCode, phoneInfoDto.getImagePath());
+            phoneInfoDto.setId(id);
         } catch (Exception e) {
             log.error("保存数据失败", e);
             return R.fail("保存数据失败：" + e.getMessage());
@@ -132,6 +129,24 @@ public class WechatApiController extends BaseController {
         return R.ok(phoneInfoDto);
     }
 
+    /**
+     * 协议签订
+     */
+    @ApiOperation("协议签订")
+    @PostMapping("/signContract")
+    public R signContract(@RequestParam(value = "id", required = false) Long id,
+                             @RequestParam(value = "contractId", required = false) Long contractId,
+                             @RequestParam(value = "contractPath", required = false) String contractPath) {
+        PhoneActiveInfo info = new PhoneActiveInfo();
+        info.setId(id);
+        info.setContractId(contractId);
+        info.setContractPath(contractPath);
+        Long l = phoneActiveInfoService.saveOrUpdateActiveInfo(info);
+        if (l == null) {
+            R.fail("协议签订失败，请稍后重试");
+        }
+        return R.ok();
+    }
     /**
      * 处理不同厂商手机类型数据
      * @param type 手机类型
@@ -192,7 +207,7 @@ public class WechatApiController extends BaseController {
         }
     }
 
-    private void saveActiveInfo(PhoneInfoDto dto, String rawJson, String typeCode, String imagePath) {
+    private Long saveActiveInfo(PhoneInfoDto dto, String rawJson, String typeCode, String imagePath) {
         log.info("开始保存信息，{}", dto);
         PhoneActiveInfo info = new PhoneActiveInfo();
         info.setSn(dto.getSn());
@@ -206,13 +221,11 @@ public class WechatApiController extends BaseController {
         info.setActiveInfo(rawJson); // 原始完整 JSON
         info.setSysTime(dto.getSysTime());
         info.setImagePath(imagePath);
-        info.setContractId(dto.getContractId());
-        info.setContractPath(dto.getContractPath());
         // 设置创建人/更新人
         info.setCreateBy(getUsername());
         info.setUpdateBy(getUsername());
         info.setNickName(getNickName());
-        phoneActiveInfoService.saveOrUpdateActiveInfo(info);
+        return phoneActiveInfoService.saveOrUpdateActiveInfo(info);
     }
 
     private String resolveImagePath(String imagePath, String imageUrl, MultipartFile img, MultipartFile file) throws Exception {

@@ -34,14 +34,20 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
 
     @Override
     @Transactional
-    public void saveOrUpdateActiveInfo(PhoneActiveInfo info) {
+    public Long saveOrUpdateActiveInfo(PhoneActiveInfo info) {
         if (info == null) {
-            return;
+            return null;
+        }
+        if (info.getId() != null) {
+            info.setUpdateTime(new Date());
+            int i = phoneActiveInfoMapper.updateById(info);
+            return (long) i;
         }
         info.setImagePath(normalizeImagePath(info.getImagePath()));
         info.setCreateTime(new Date());
         info.setUpdateTime(new Date());
         phoneActiveInfoMapper.insert(info);
+        System.out.println("生成的主键ID: " + info.getId());
 //        PhoneActiveInfo exist = phoneActiveInfoMapper.selectBySn(info.getSn());
 //        if (exist != null) {
 //            info.setId(exist.getId());
@@ -54,7 +60,7 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
 //            info.setUpdateTime(new Date());
 //            phoneActiveInfoMapper.insert(info);
 //        }
-
+        return info.getId();
     }
 
     @Override
