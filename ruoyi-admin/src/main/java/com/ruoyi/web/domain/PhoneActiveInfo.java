@@ -22,4 +22,5 @@ public class PhoneActiveInfo extends BaseEntity {
     private String nickName;    // 创建人昵称
     private Long contractId; //协议id
     private String contractPath; //协议内容相对路径
+    private String signaturePath; //手写签名图片相对路径
 }

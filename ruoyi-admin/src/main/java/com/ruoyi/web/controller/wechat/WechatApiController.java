@@ -136,14 +136,27 @@ public class WechatApiController extends BaseController {
     @PostMapping("/signContract")
     public R signContract(@RequestParam(value = "id", required = false) Long id,
                              @RequestParam(value = "contractId", required = false) Long contractId,
-                             @RequestParam(value = "contractPath", required = false) String contractPath) {
+                             @RequestParam(value = "contractPath", required = false) String contractPath,
+                             @RequestParam(value = "signatureFile", required = false) MultipartFile signatureFile,
+                             @RequestParam(value = "signaturePath", required = false) String signaturePath) {
         PhoneActiveInfo info = new PhoneActiveInfo();
         info.setId(id);
         info.setContractId(contractId);
         info.setContractPath(contractPath);
+        
+        // 处理手写签名图片
+        String resolvedSignaturePath = null;
+        try {
+            resolvedSignaturePath = resolveSignaturePath(signatureFile, signaturePath);
+        } catch (Exception e) {
+            log.error("处理手写签名图片失败", e);
+            return R.fail("签名图片处理失败：" + e.getMessage());
+        }
+        info.setSignaturePath(resolvedSignaturePath);
+        
         Long l = phoneActiveInfoService.saveOrUpdateActiveInfo(info);
         if (l == null) {
-            R.fail("协议签订失败，请稍后重试");
+            return R.fail("协议签订失败，请稍后重试");
         }
         return R.ok();
     }
@@ -238,6 +251,18 @@ public class WechatApiController extends BaseController {
         }
         if (!StringUtils.isEmpty(imageUrl)) {
             return imageUrl.trim();
+        }
+        return null;
+    }
+
+    private String resolveSignaturePath(MultipartFile signatureFile, String signaturePath) throws Exception {
+        // 优先使用上传的签名文件
+        if (signatureFile != null && !signatureFile.isEmpty()) {
+            return FileUploadUtils.upload(RuoYiConfig.getUploadPath(), signatureFile);
+        }
+        // 其次使用传入的签名路径
+        if (!StringUtils.isEmpty(signaturePath)) {
+            return signaturePath.trim();
         }
         return null;
     }
