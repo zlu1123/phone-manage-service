@@ -77,6 +77,32 @@
       </el-tag>
     </template>
 
+    <!-- 自定义列：用户协议 -->
+    <template #contract="{ row }">
+      <el-link
+        v-if="row.contractPath"
+        type="primary"
+        :href="baseApi + row.contractPath"
+        target="_blank"
+        :underline="false"
+      >
+        查看协议
+      </el-link>
+      <span v-else>-</span>
+    </template>
+
+    <!-- 自定义列：用户签名 -->
+    <template #signature="{ row }">
+      <el-image
+        v-if="row.signaturePath"
+        :src="baseApi + row.signaturePath"
+        :preview-src-list="[baseApi + row.signaturePath]"
+        style="width: 40px; height: 40px"
+        fit="contain"
+      />
+      <span v-else>-</span>
+    </template>
+
     <!-- 自定义列：创建时间 -->
     <template #createTime="{ row }">
       <span>{{ parseTime(row.createTime) }}</span>
@@ -155,6 +181,20 @@ export default {
         { label: "查询时系统时间", prop: "sysTime", width: "110" },
         { label: "创建者", prop: "createBy", width: "100" },
         { label: "昵称", prop: "nickName", width: "100" },
+        {
+          label: "用户协议",
+          prop: "contractPath",
+          slot: "contract",
+          width: "100",
+          showOverflowTooltip: false,
+        },
+        {
+          label: "用户签名",
+          prop: "signaturePath",
+          slot: "signature",
+          width: "90",
+          showOverflowTooltip: false,
+        },
         {
           label: "创建时间",
           prop: "createTime",
@@ -246,6 +286,20 @@ export default {
               { label: "查询时系统时间", prop: "sysTime" },
               { label: "创建者", prop: "createBy" },
               { label: "昵称", prop: "nickName" },
+              {
+                label: "用户协议",
+                prop: "contractPath",
+                formatter: (row) =>
+                  row.contractPath ? this.baseApi + row.contractPath : "-",
+                width: 40,
+              },
+              {
+                label: "用户签名",
+                prop: "signaturePath",
+                formatter: (row) =>
+                  row.signaturePath ? this.baseApi + row.signaturePath : "-",
+                width: 40,
+              },
               { label: "创建时间", prop: "createTime", width: 20 },
             ],
             fileName: "订单数据",
