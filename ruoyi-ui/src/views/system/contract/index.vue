@@ -189,7 +189,7 @@
             :before-upload="handleBeforeUpload"
             :on-exceed="handleExceed"
             :limit="1"
-            accept=".pdf,.doc,.docx"
+            accept=".pdf"
             :show-file-list="true"
             :auto-upload="false"
             :on-change="handleFileChange"
@@ -198,9 +198,7 @@
             <el-button slot="trigger" size="small" type="primary"
               >选取文件</el-button
             >
-            <div slot="tip" class="el-upload__tip">
-              支持上传 pdf、doc、docx 格式文件
-            </div>
+            <div slot="tip" class="el-upload__tip">仅支持上传 PDF 格式文件</div>
           </el-upload>
           <div v-if="form.filePath" style="margin-top: 10px">
             <el-link
@@ -437,11 +435,9 @@ export default {
     handleFileChange(file, fileList) {
       if (fileList.length > 0) {
         const fileName = file.name.toLowerCase();
-        const isTypeOk = ["pdf", "doc", "docx"].some((ext) =>
-          fileName.endsWith("." + ext)
-        );
+        const isTypeOk = fileName.endsWith(".pdf");
         if (!isTypeOk) {
-          this.$modal.msgError("只支持上传 pdf、doc、docx 格式文件!");
+          this.$modal.msgError("仅支持上传 PDF 格式文件!");
           this.$refs.fileUpload.clearFiles();
           return;
         }
@@ -455,9 +451,9 @@ export default {
     /** 上传前校检 */
     handleBeforeUpload(file) {
       const fileExt = file.name.split(".").pop().toLowerCase();
-      const isTypeOk = ["pdf", "doc", "docx"].indexOf(fileExt) >= 0;
+      const isTypeOk = fileExt === "pdf";
       if (!isTypeOk) {
-        this.$modal.msgError("只支持上传 pdf、doc、docx 格式文件!");
+        this.$modal.msgError("仅支持上传 PDF 格式文件!");
         return false;
       }
       this.uploadFile = file;
