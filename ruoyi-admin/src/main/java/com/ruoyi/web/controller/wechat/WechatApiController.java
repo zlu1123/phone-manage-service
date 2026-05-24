@@ -27,11 +27,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
@@ -54,6 +50,9 @@ public class WechatApiController extends BaseController {
     private PhoneInfoConverterContext converterContext;
     @Autowired
     private IPhoneActiveInfoService phoneActiveInfoService;
+
+    @Autowired
+    private ContractService contractService;
 
     @Autowired
     private RedisTemplate redisTemplate;
@@ -135,15 +134,30 @@ public class WechatApiController extends BaseController {
     @ApiOperation("协议签订")
     @PostMapping("/signContract")
     public R signContract(@RequestParam(value = "id", required = false) Long id,
-                             @RequestParam(value = "contractId", required = false) Long contractId,
-                             @RequestParam(value = "contractPath", required = false) String contractPath,
-                             @RequestParam(value = "signatureFile", required = false) MultipartFile signatureFile,
-                             @RequestParam(value = "signaturePath", required = false) String signaturePath) {
+                          @RequestParam(value = "contractId", required = false) Long contractId,
+                          @RequestParam(value = "contractPath", required = false) String contractPath,
+                          @RequestParam(value = "signatureFile", required = false) MultipartFile signatureFile,
+                          @RequestParam(value = "signaturePath", required = false) String signaturePath,
+                          @RequestParam(value = "signatureModel", required = false) String signatureModel,
+                          @RequestParam(value = "signatureImei", required = false) String signatureImei,
+                          @RequestParam(value = "signatureDate", required = false) String signatureDate) {
         PhoneActiveInfo info = new PhoneActiveInfo();
+        // 根据协议id查询协议
+        Contract contract = new Contract();
+        contract.setId(contractId.intValue());
+        Contract contract1 = contractService.queryContractById(contract);
+        if (contract1 != null && contract1.getStatus()) {
+            info.setContractContent(contract1.getContent());
+        } else {
+            return R.fail("协议不存在或不是生效中协议，请检查后重试");
+        }
         info.setId(id);
         info.setContractId(contractId);
         info.setContractPath(contractPath);
-        
+        info.setSignatureModel(signatureModel);
+        info.setSignatureImei(signatureImei);
+        info.setSignatureDate(signatureDate);
+
         // 处理手写签名图片
         String resolvedSignaturePath = null;
         try {
@@ -153,7 +167,7 @@ public class WechatApiController extends BaseController {
             return R.fail("签名图片处理失败：" + e.getMessage());
         }
         info.setSignaturePath(resolvedSignaturePath);
-        
+
         Long l = phoneActiveInfoService.saveOrUpdateActiveInfo(info);
         if (l == null) {
             return R.fail("协议签订失败，请稍后重试");
@@ -318,9 +332,6 @@ public class WechatApiController extends BaseController {
         List<PhoneActiveInfo> list = phoneActiveInfoService.queryActiveList(phoneActiveInfo);
         return R.ok(getDataTable(list));
     }
-
-    @Autowired
-    private ContractService contractService;
 
     /**
      * @param ContractDto 查询条件

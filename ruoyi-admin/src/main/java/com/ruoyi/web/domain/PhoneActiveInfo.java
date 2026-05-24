@@ -23,4 +23,9 @@ public class PhoneActiveInfo extends BaseEntity {
     private Long contractId; //协议id
     private String contractPath; //协议内容相对路径
     private String signaturePath; //手写签名图片相对路径
+    private String contractContent; //协议内容（富文本）
+    private String signatureModel; //协议签订设备型号
+    private String signatureImei; //协议签订设备IMEI
+    private String signatureDate; //协议签订日期
+
 }

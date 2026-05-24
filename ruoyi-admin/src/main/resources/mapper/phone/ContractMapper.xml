@@ -9,6 +9,7 @@
         <id column="id" property="id" jdbcType="INTEGER"/>
         <result column="name" property="name" jdbcType="VARCHAR"/>
         <result column="version" property="version" jdbcType="VARCHAR"/>
+        <result column="content" property="content" jdbcType="VARCHAR"/>
         <result column="file_path" property="filePath" jdbcType="VARCHAR"/>
         <result column="status" property="status" jdbcType="TINYINT"/>
         <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
@@ -19,7 +20,7 @@
 
     <!-- 基础字段列表 -->
     <sql id="Base_Column_List">
-        id, name, version, file_path, status, create_time, create_by, update_time, update_by
+        id, name, version, content, file_path, status, create_time, create_by, update_time, update_by
     </sql>
 
     <!-- 根据ID查询协议 -->
@@ -90,9 +91,9 @@
     <!-- 新增协议 -->
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO contract (
-            name, version, file_path, status, create_time, create_by, update_time, update_by
+            name, version, content, file_path, status, create_time, create_by, update_time, update_by
         ) VALUES (
-                     #{name}, #{version}, #{filePath}, #{status}, #{createTime},
+                     #{name}, #{version}, #{content}, #{filePath}, #{status}, #{createTime},
                      #{createBy}, #{updateTime}, #{updateBy}
                  )
     </insert>
@@ -103,6 +104,7 @@
         <trim prefix="(" suffix=")" suffixOverrides=",">
             <if test="name != null and name != ''">name,</if>
             <if test="version != null and version != ''">version,</if>
+            <if test="content != null and content != ''">content,</if>
             <if test="filePath != null and filePath != ''">file_path,</if>
             <if test="status != null">status,</if>
             <if test="createTime != null">create_time,</if>
@@ -113,6 +115,7 @@
         <trim prefix="VALUES (" suffix=")" suffixOverrides=",">
             <if test="name != null and name != ''">#{name},</if>
             <if test="version != null and version != ''">#{version},</if>
+            <if test="content != null and content != ''">#{content},</if>
             <if test="filePath != null and filePath != ''">#{filePath},</if>
             <if test="status != null">#{status},</if>
             <if test="createTime != null">#{createTime},</if>
@@ -127,6 +130,7 @@
         UPDATE contract
         SET name = #{name},
             version = #{version},
+            content = #{content},
             file_path = #{filePath},
             status = #{status},
             update_time = #{updateTime},
@@ -140,6 +144,7 @@
         <set>
             <if test="name != null and name != ''">name = #{name},</if>
             <if test="version != null and version != ''">version = #{version},</if>
+            <if test="content != null and content != ''">content = #{content},</if>
             <if test="filePath != null and filePath != ''">file_path = #{filePath},</if>
             <if test="status != null">status = #{status},</if>
             <if test="updateTime != null">update_time = #{updateTime},</if>

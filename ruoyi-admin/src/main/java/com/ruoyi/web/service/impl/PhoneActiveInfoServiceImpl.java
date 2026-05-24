@@ -48,18 +48,6 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
         info.setUpdateTime(new Date());
         phoneActiveInfoMapper.insert(info);
         System.out.println("生成的主键ID: " + info.getId());
-//        PhoneActiveInfo exist = phoneActiveInfoMapper.selectBySn(info.getSn());
-//        if (exist != null) {
-//            info.setId(exist.getId());
-//            info.setCreateTime(exist.getCreateTime());
-//            info.setCreateBy(exist.getCreateBy());
-//            info.setUpdateTime(new Date());
-//            phoneActiveInfoMapper.updateById(info);
-//        } else {
-//            info.setCreateTime(new Date());
-//            info.setUpdateTime(new Date());
-//            phoneActiveInfoMapper.insert(info);
-//        }
         return info.getId();
     }
 

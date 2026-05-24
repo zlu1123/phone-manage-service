@@ -42,6 +42,11 @@ public class ContractDto extends BaseEntity {
     private String filePath;
 
     /**
+     * 协议内容（富文本）
+     */
+    private String content;
+
+    /**
      * 是否生效（0：未生效，1：生效中）
      * 新增时默认为false，可为null
      */
