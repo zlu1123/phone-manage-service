@@ -10,7 +10,7 @@ export function getContractList(query) {
   })
 }
 
-// 新增协议（form-data提交）
+// 新增协议
 export function addContract(data) {
   return request({
     url: '/system/contract/insert',
@@ -22,7 +22,7 @@ export function addContract(data) {
   })
 }
 
-// 修改协议（form-data提交）
+// 修改协议
 export function updateContract(data) {
   return request({
     url: '/system/contract/update',
