@@ -64,6 +64,11 @@ module.exports = {
         '@': resolve('src')
       }
     },
+    // 使用 contenthash 确保文件内容不变则文件名不变（增量部署核心）
+    output: {
+      filename: 'static/js/[name].[contenthash:8].js',
+      chunkFilename: 'static/js/[name].[contenthash:8].js'
+    },
     plugins: [
       // http://doc.ruoyi.vip/ruoyi-vue/other/faq.html#使用gzip解压缩静态文件
       new CompressionPlugin({
@@ -73,7 +78,9 @@ module.exports = {
         algorithm: 'gzip',                             // 使用gzip压缩
         minRatio: 0.8,                                 // 压缩比例，小于 80% 的文件不会被压缩
         deleteOriginalAssets: false                    // 压缩后删除原文件
-      })
+      }),
+      // 固定模块 ID，避免因模块顺序变化导致 hash 变化
+      new (require('webpack')).HashedModuleIdsPlugin()
     ],
   },
   chainWebpack(config) {
@@ -107,24 +114,62 @@ module.exports = {
         }])
         .end()
 
+      // CSS 使用 contenthash
+      config.plugin('extract-css').tap(args => {
+        if (args[0]) {
+          args[0].filename = 'static/css/[name].[contenthash:8].css'
+          args[0].chunkFilename = 'static/css/[name].[contenthash:8].css'
+        }
+        return args
+      })
+
+      // 细粒度 splitChunks：将稳定的第三方库独立拆分，确保业务代码变更不影响它们的 hash
       config.optimization.splitChunks({
         chunks: 'all',
+        maxInitialRequests: Infinity,
+        minSize: 20000,
         cacheGroups: {
+          // Vue 全家桶（vue、vue-router、vuex）—— 极少变化
+          vue: {
+            name: 'chunk-vue',
+            test: /[\\/]node_modules[\\/](vue|vue-router|vuex)[\\/]/,
+            priority: 40,
+            reuseExistingChunk: true
+          },
+          // Element UI —— 版本固定后不会变化
+          elementUI: {
+            name: 'chunk-elementUI',
+            test: /[\\/]node_modules[\\/]_?element-ui(.*)/,
+            priority: 30,
+            reuseExistingChunk: true
+          },
+          // Echarts —— 体积大，单独拆分
+          echarts: {
+            name: 'chunk-echarts',
+            test: /[\\/]node_modules[\\/](echarts|zrender)(.*)/,
+            priority: 30,
+            reuseExistingChunk: true
+          },
+          // WangEditor 富文本编辑器
+          wangeditor: {
+            name: 'chunk-wangeditor',
+            test: /[\\/]node_modules[\\/]@wangeditor(.*)/,
+            priority: 30,
+            reuseExistingChunk: true
+          },
+          // 其他第三方库
           libs: {
             name: 'chunk-libs',
             test: /[\\/]node_modules[\\/]/,
             priority: 10,
-            chunks: 'initial' // only package third parties that are initially dependent
+            chunks: 'initial',
+            reuseExistingChunk: true
           },
-          elementUI: {
-            name: 'chunk-elementUI', // split elementUI into a single package
-            test: /[\\/]node_modules[\\/]_?element-ui(.*)/, // in order to adapt to cnpm
-            priority: 20 // the weight needs to be larger than libs and app or it will be packaged into libs or app
-          },
+          // 公共组件
           commons: {
             name: 'chunk-commons',
-            test: resolve('src/components'), // can customize your rules
-            minChunks: 3, //  minimum common number
+            test: resolve('src/components'),
+            minChunks: 3,
             priority: 5,
             reuseExistingChunk: true
           }
