@@ -1,113 +1,145 @@
 <template>
-  <pro-table
-    ref="proTable"
-    :fetch-api="queryOrderList"
-    :search-fields="searchFields"
-    :columns="columns"
-    :extra-params="extraParams"
-  >
-    <!-- 工具栏：导出按钮 -->
-    <template #toolbar>
-      <el-col :span="1.5">
-        <el-tooltip
-          content="导出时会按照当前筛选条件导出数据"
-          placement="top"
-          :open-delay="500"
-        >
-          <el-button
-            type="warning"
-            plain
-            icon="el-icon-download"
-            size="mini"
-            @click="handleExport"
-            :loading="exportLoading"
-            v-hasRole="['admin', 'user']"
-            >导出</el-button
+  <div class="app-container">
+    <pro-table
+      ref="proTable"
+      :fetch-api="queryOrderList"
+      :search-fields="searchFields"
+      :columns="columns"
+      :extra-params="extraParams"
+    >
+      <!-- 工具栏：导出按钮 -->
+      <template #toolbar>
+        <el-col :span="1.5">
+          <el-tooltip
+            content="导出时会按照当前筛选条件导出数据"
+            placement="top"
+            :open-delay="500"
           >
-        </el-tooltip>
-      </el-col>
-    </template>
+            <el-button
+              type="warning"
+              plain
+              icon="el-icon-download"
+              size="mini"
+              @click="handleExport"
+              :loading="exportLoading"
+              v-hasRole="['admin', 'user']"
+              >导出</el-button
+            >
+          </el-tooltip>
+        </el-col>
+      </template>
 
-    <!-- 自定义列：手机品牌 -->
-    <template #phoneType="{ row }">
-      <span>{{ getPhoneTypeName(row.phoneType) }}</span>
-    </template>
+      <!-- 自定义列：手机品牌 -->
+      <template #phoneType="{ row }">
+        <span>{{ getPhoneTypeName(row.phoneType) }}</span>
+      </template>
 
-    <!-- 自定义列：手机型号 -->
-    <template #model="{ row }">
-      <span>{{ row.model || "-" }}</span>
-    </template>
+      <!-- 自定义列：手机型号 -->
+      <template #model="{ row }">
+        <span>{{ row.model || "-" }}</span>
+      </template>
 
-    <!-- 自定义列：图片 -->
-    <template #imagePath="{ row }">
-      <el-image
-        v-if="row.imagePath"
-        :src="baseApi + row.imagePath"
-        :preview-src-list="[baseApi + row.imagePath]"
-        style="width: 40px; height: 40px"
-        fit="cover"
-      />
-      <span v-else>-</span>
-    </template>
+      <!-- 自定义列：图片 -->
+      <template #imagePath="{ row }">
+        <el-image
+          v-if="row.imagePath"
+          :src="baseApi + row.imagePath"
+          :preview-src-list="[baseApi + row.imagePath]"
+          style="width: 40px; height: 40px"
+          fit="cover"
+        />
+        <span v-else>-</span>
+      </template>
 
-    <!-- 自定义列：IMEI1 -->
-    <template #imei1="{ row }">
-      <span>{{ row.imei1 || "-" }}</span>
-    </template>
+      <!-- 自定义列：IMEI1 -->
+      <template #imei1="{ row }">
+        <span>{{ row.imei1 || "-" }}</span>
+      </template>
 
-    <!-- 自定义列：IMEI2 -->
-    <template #imei2="{ row }">
-      <span>{{ row.imei2 || "-" }}</span>
-    </template>
+      <!-- 自定义列：IMEI2 -->
+      <template #imei2="{ row }">
+        <span>{{ row.imei2 || "-" }}</span>
+      </template>
 
-    <!-- 自定义列：激活状态 -->
-    <template #activated="{ row }">
-      <el-tag :type="row.activated ? 'success' : 'info'" size="small">
-        {{ row.activated ? "已激活" : "未激活" }}
-      </el-tag>
-    </template>
+      <!-- 自定义列：激活状态 -->
+      <template #activated="{ row }">
+        <el-tag :type="row.activated ? 'success' : 'info'" size="small">
+          {{ row.activated ? "已激活" : "未激活" }}
+        </el-tag>
+      </template>
 
-    <!-- 自定义列：是否过期 -->
-    <template #expired="{ row }">
-      <el-tag
-        :type="isExpired(row.coverage) ? 'danger' : 'success'"
-        size="small"
-      >
-        {{ isExpired(row.coverage) ? "已过期" : "未过期" }}
-      </el-tag>
-    </template>
+      <!-- 自定义列：是否过期 -->
+      <template #expired="{ row }">
+        <el-tag
+          :type="isExpired(row.coverage) ? 'danger' : 'success'"
+          size="small"
+        >
+          {{ isExpired(row.coverage) ? "已过期" : "未过期" }}
+        </el-tag>
+      </template>
 
-    <!-- 自定义列：用户协议 -->
-    <template #contract="{ row }">
-      <el-link
-        v-if="row.contractPath"
-        type="primary"
-        :href="baseApi + row.contractPath"
-        target="_blank"
-        :underline="false"
-      >
-        查看协议
-      </el-link>
-      <span v-else>-</span>
-    </template>
+      <!-- 自定义列：用户协议 -->
+      <template #contract="{ row }">
+        <el-button
+          v-if="row.contractContent"
+          size="mini"
+          type="text"
+          icon="el-icon-view"
+          @click="handleViewContract(row)"
+          >查看协议</el-button
+        >
+        <el-link
+          v-else-if="row.contractPath"
+          type="primary"
+          :href="baseApi + row.contractPath"
+          target="_blank"
+          :underline="false"
+        >
+          查看协议
+        </el-link>
+        <span v-else>-</span>
+      </template>
 
-    <!-- 自定义列：用户签名 -->
-    <template #signature="{ row }">
-      <el-image
-        v-if="row.signaturePath"
-        :src="baseApi + row.signaturePath"
-        :preview-src-list="[baseApi + row.signaturePath]"
-        style="width: 40px; height: 40px"
-        fit="contain"
-      />
-      <span v-else>-</span>
-    </template>
+      <!-- 自定义列：用户签名 -->
+      <template #signature="{ row }">
+        <el-image
+          v-if="row.signaturePath"
+          :src="baseApi + row.signaturePath"
+          :preview-src-list="[baseApi + row.signaturePath]"
+          style="width: 40px; height: 40px"
+          fit="contain"
+        />
+        <span v-else>-</span>
+      </template>
 
-    <!-- 自定义列：创建时间 -->
-    <template #createTime="{ row }">
-      <span>{{ parseTime(row.createTime) }}</span>
-    </template>
-  </pro-table>
+      <!-- 自定义列：创建时间 -->
+      <template #createTime="{ row }">
+        <span>{{ parseTime(row.createTime) }}</span>
+      </template>
+    </pro-table>
+
+    <!-- 协议内容预览抽屉 -->
+    <el-drawer
+      :title="drawerTitle"
+      :visible.sync="drawerVisible"
+      direction="rtl"
+      size="50%"
+      append-to-body
+    >
+      <div class="drawer-toolbar">
+        <el-button
+          type="primary"
+          size="small"
+          icon="el-icon-printer"
+          @click="handlePrint"
+          >打印协议</el-button
+        >
+      </div>
+      <div id="printArea" ref="printArea" class="contract-content-wrapper">
+        <div v-html="drawerContent"></div>
+      </div>
+    </el-drawer>
+  </div>
 </template>
 
 <script>
@@ -128,6 +160,11 @@ export default {
       queryOrderList,
       // 额外参数（如从路由携带的 sn）
       extraParams: {},
+      // 抽屉相关
+      drawerVisible: false,
+      drawerTitle: "",
+      drawerContent: "",
+      currentRow: null,
       // 搜索字段配置
       searchFields: [
         { prop: "sn", label: "序列号", type: "input" },
@@ -195,6 +232,9 @@ export default {
           width: "90",
           showOverflowTooltip: false,
         },
+        { label: "签名型号", prop: "signatureModel", width: "120" },
+        { label: "签名IMEI", prop: "signatureImei", width: "140" },
+        { label: "签名日期", prop: "signatureDate", width: "110" },
         {
           label: "创建时间",
           prop: "createTime",
@@ -244,6 +284,163 @@ export default {
       const coverageDate = new Date(coverage);
       const now = new Date();
       return coverageDate < now;
+    },
+    /** 生成水印Canvas */
+    generateWatermark(text) {
+      const canvas = document.createElement("canvas");
+      canvas.width = 200;
+      canvas.height = 200;
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.font = "16px Microsoft YaHei";
+      ctx.fillStyle = "rgba(180, 180, 180, 0.3)";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.translate(100, 100);
+      ctx.rotate((-30 * Math.PI) / 180);
+      ctx.fillText(text, 0, 0);
+      return canvas.toDataURL();
+    },
+    /** 查看协议内容（抽屉展示） */
+    handleViewContract(row) {
+      this.drawerTitle = "用户协议内容";
+      this.currentRow = row;
+      // 将签名数据填充到协议HTML中对应的占位符位置
+      let content = row.contractContent || "";
+      // 替换设备型号占位符
+      if (row.signatureModel) {
+        content = content.replace(
+          /(<strong>设备型号：<\/strong>)_+/,
+          `$1<span style="text-decoration:underline;padding:0 4px;">${row.signatureModel}</span>`
+        );
+      }
+      // 替换设备IMEI占位符
+      if (row.signatureImei) {
+        content = content.replace(
+          /(<strong>设备IMEI：<\/strong>)_+/,
+          `$1<span style="text-decoration:underline;padding:0 4px;">${row.signatureImei}</span>`
+        );
+      }
+      // 替换签字确认占位符（插入签名图片）
+      if (row.signaturePath) {
+        content = content.replace(
+          /(<strong>签字确认：<\/strong>)_+/,
+          `$1<img src="${
+            this.baseApi + row.signaturePath
+          }" style="max-width:200px;max-height:80px;vertical-align:middle;" />`
+        );
+      }
+      // 替换日期占位符
+      if (row.signatureDate) {
+        content = content.replace(
+          /(<strong>日(?:\s|&nbsp;)*期：<\/strong>)_+/,
+          `$1<span style="text-decoration:underline;padding:0 4px;">${row.signatureDate}</span>`
+        );
+      }
+      this.drawerContent = content;
+      this.drawerVisible = true;
+      // 设置水印（以当前行的昵称为水印）
+      this.$nextTick(() => {
+        const watermarkText = row.nickName || row.createBy || "用户";
+        const watermarkUrl = this.generateWatermark(watermarkText);
+        if (this.$refs.printArea) {
+          this.$refs.printArea.style.backgroundImage = `url(${watermarkUrl})`;
+        }
+      });
+    },
+    /** 打印协议 */
+    handlePrint() {
+      // 获取协议正文内容
+      const contentDiv = this.$refs.printArea.querySelector("div");
+      const printContent = contentDiv
+        ? contentDiv.innerHTML
+        : this.$refs.printArea.innerHTML;
+      // 打印时以当前登录用户昵称作为水印
+      const currentUserName =
+        this.$store.getters.nickName || this.$store.getters.name || "用户";
+      const watermarkUrl = this.generateWatermark(currentUserName);
+      const printWindow = window.open("", "_blank");
+      if (!printWindow) {
+        this.$message.warning("请允许弹出窗口后重试");
+        return;
+      }
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <title>用户协议</title>
+          <style>
+            body {
+              padding: 40px;
+              font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+              line-height: 1.8;
+              font-size: 14px;
+              color: #333;
+              position: relative;
+            }
+            .watermark {
+              position: fixed;
+              top: 0;
+              left: 0;
+              width: 100%;
+              height: 100%;
+              background-image: url(${watermarkUrl});
+              background-repeat: repeat;
+              pointer-events: none;
+              z-index: 9999;
+            }
+            h2, h3 {
+              margin: 16px 0 8px;
+              color: #1a1a1a;
+            }
+            p {
+              margin: 8px 0;
+            }
+            img {
+              max-width: 200px;
+              max-height: 80px;
+              vertical-align: middle;
+            }
+            @media print {
+              body { padding: 20px; }
+              .watermark {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-image: url(${watermarkUrl});
+                background-repeat: repeat;
+                pointer-events: none;
+                z-index: 9999;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="watermark"></div>
+          <div class="content">${printContent}</div>
+        </body>
+        </html>
+      `;
+      printWindow.document.open();
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+      // 等待内容和图片加载完成后再打印
+      printWindow.onload = function () {
+        setTimeout(() => {
+          printWindow.print();
+        }, 300);
+      };
+      // 兜底：如果 onload 没触发，3秒后强制打印
+      setTimeout(() => {
+        if (!printWindow.closed) {
+          printWindow.print();
+        }
+      }, 3000);
     },
     /** 导出按钮操作 */
     handleExport() {
@@ -300,6 +497,9 @@ export default {
                   row.signaturePath ? this.baseApi + row.signaturePath : "-",
                 width: 40,
               },
+              { label: "签名型号", prop: "signatureModel" },
+              { label: "签名IMEI", prop: "signatureImei", width: 18 },
+              { label: "签名日期", prop: "signatureDate" },
               { label: "创建时间", prop: "createTime", width: 20 },
             ],
             fileName: "订单数据",
@@ -324,3 +524,28 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+.drawer-toolbar {
+  padding: 0 20px 10px;
+  border-bottom: 1px solid #ebeef5;
+}
+.contract-content-wrapper {
+  padding: 20px;
+  line-height: 1.8;
+  font-size: 14px;
+  color: #333;
+  overflow-y: auto;
+  height: calc(100% - 60px);
+  position: relative;
+  background-repeat: repeat;
+}
+.contract-content-wrapper h2,
+.contract-content-wrapper h3 {
+  margin: 16px 0 8px;
+  color: #1a1a1a;
+}
+.contract-content-wrapper p {
+  margin: 8px 0;
+}
+</style>

@@ -166,7 +166,10 @@ export default {
           showOverflowTooltip: false,
           attrs: { "class-name": "small-padding fixed-width" },
         },
-      ], // 是否显示弹出层
+      ],
+      // 弹出层标题
+      title: "",
+      // 是否显示弹出层
       open: false,
       // 抽屉相关
       drawerVisible: false,
