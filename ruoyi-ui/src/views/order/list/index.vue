@@ -402,6 +402,20 @@ export default {
               max-height: 80px;
               vertical-align: middle;
             }
+            table {
+              border-collapse: collapse;
+              width: 100%;
+              margin: 16px 0;
+            }
+            table th, table td {
+              border: 1px solid #ccc;
+              padding: 8px 12px;
+              text-align: left;
+            }
+            table th {
+              background-color: #f5f5f5;
+              font-weight: bold;
+            }
             @media print {
               body { padding: 20px; }
               .watermark {
@@ -547,5 +561,21 @@ export default {
 }
 .contract-content-wrapper p {
   margin: 8px 0;
+}
+/* 穿透 v-html 中的表格样式 */
+.contract-content-wrapper /deep/ table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 16px 0;
+}
+.contract-content-wrapper /deep/ table th,
+.contract-content-wrapper /deep/ table td {
+  border: 1px solid #ccc;
+  padding: 8px 12px;
+  text-align: left;
+}
+.contract-content-wrapper /deep/ table th {
+  background-color: #f5f5f5;
+  font-weight: bold;
 }
 </style>

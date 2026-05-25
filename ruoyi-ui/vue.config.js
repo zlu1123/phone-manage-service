@@ -57,19 +57,24 @@ module.exports = {
       }
     }
   },
-  configureWebpack: {
-    name: name,
-    resolve: {
+  configureWebpack: config => {
+    config.name = name
+    config.resolve = {
+      ...config.resolve,
       alias: {
+        ...((config.resolve && config.resolve.alias) || {}),
         '@': resolve('src')
       }
-    },
-    // 使用 contenthash 确保文件内容不变则文件名不变（增量部署核心）
-    output: {
-      filename: 'static/js/[name].[contenthash:8].js',
-      chunkFilename: 'static/js/[name].[contenthash:8].js'
-    },
-    plugins: [
+    }
+
+    // 生产环境：使用 contenthash 确保文件内容不变则文件名不变（增量部署核心）
+    if (process.env.NODE_ENV === 'production') {
+      config.output.filename = 'static/js/[name].[contenthash:8].js'
+      config.output.chunkFilename = 'static/js/[name].[contenthash:8].js'
+    }
+
+    config.plugins = [
+      ...(config.plugins || []),
       // http://doc.ruoyi.vip/ruoyi-vue/other/faq.html#使用gzip解压缩静态文件
       new CompressionPlugin({
         cache: false,                                  // 不启用文件缓存
@@ -81,7 +86,7 @@ module.exports = {
       }),
       // 固定模块 ID，避免因模块顺序变化导致 hash 变化
       new (require('webpack')).HashedModuleIdsPlugin()
-    ],
+    ]
   },
   chainWebpack(config) {
     config.plugins.delete('preload') // TODO: need test

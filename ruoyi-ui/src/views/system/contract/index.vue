@@ -120,7 +120,6 @@ import {
 } from "@/api/system/contract";
 import ProTable from "@/components/ProTable/index.vue";
 import WangEditor from "@/components/WangEditor/index.vue";
-import { defaultContractContent } from "./defaultContract";
 
 export default {
   name: "Contract",
@@ -215,9 +214,6 @@ export default {
     /** 新增按钮操作 */
     handleAdd() {
       this.reset();
-      this.form.name = "全心宝保障服务协议";
-      this.form.version = "v1.0.0";
-      this.form.content = defaultContractContent;
       this.open = true;
       this.title = "添加协议";
     },
@@ -336,5 +332,29 @@ export default {
 }
 .contract-content-wrapper p {
   margin: 8px 0;
+}
+.editor-tip {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #909399;
+}
+</style>
+
+<style scoped>
+/* 穿透 v-html 中的表格样式 */
+.contract-content-wrapper /deep/ table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 16px 0;
+}
+.contract-content-wrapper /deep/ table th,
+.contract-content-wrapper /deep/ table td {
+  border: 1px solid #ccc;
+  padding: 8px 12px;
+  text-align: left;
+}
+.contract-content-wrapper /deep/ table th {
+  background-color: #f5f5f5;
+  font-weight: bold;
 }
 </style>
