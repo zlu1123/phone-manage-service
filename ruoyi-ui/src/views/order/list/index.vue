@@ -307,33 +307,33 @@ export default {
       this.currentRow = row;
       // 将签名数据填充到协议HTML中对应的占位符位置
       let content = row.contractContent || "";
-      // 替换设备型号占位符
+      // 替换设备型号占位符（确保匹配表格末尾位置）
       if (row.signatureModel) {
         content = content.replace(
-          /(<strong>设备型号：<\/strong>)_+/,
+          /(设备型号：(?:<\/[^>]+>)?)_*(?=<\/|$)/,
           `$1<span style="text-decoration:underline;padding:0 4px;">${row.signatureModel}</span>`
         );
       }
-      // 替换设备IMEI占位符
+      // 替换设备IMEI占位符（确保匹配表格末尾位置）
       if (row.signatureImei) {
         content = content.replace(
-          /(<strong>设备IMEI：<\/strong>)_+/,
+          /(设备IMEI：(?:<\/[^>]+>)?)_*(?=<\/|$)/,
           `$1<span style="text-decoration:underline;padding:0 4px;">${row.signatureImei}</span>`
         );
       }
-      // 替换签字确认占位符（插入签名图片）
+      // 替换签字确认占位符（插入签名图片，确保匹配表格末尾位置）
       if (row.signaturePath) {
         content = content.replace(
-          /(<strong>签字确认：<\/strong>)_+/,
+          /(签字确认：(?:<\/[^>]+>)?)_*(?=<\/|$)/,
           `$1<img src="${
             this.baseApi + row.signaturePath
           }" style="max-width:200px;max-height:80px;vertical-align:middle;" />`
         );
       }
-      // 替换日期占位符
+      // 替换日期占位符（确保匹配表格末尾位置）
       if (row.signatureDate) {
         content = content.replace(
-          /(<strong>日(?:\s|&nbsp;)*期：<\/strong>)_+/,
+          /(日(?:\s|&nbsp;)*期(?:\s|&nbsp;)*：(?:<\/[^>]+>)?)(?:\s|&nbsp;)*_*(?=<\/|$)/,
           `$1<span style="text-decoration:underline;padding:0 4px;">${row.signatureDate}</span>`
         );
       }
