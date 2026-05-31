@@ -102,12 +102,12 @@
           <el-card class="stat-card" shadow="hover">
             <div class="stat-card-body">
               <div class="stat-info">
-                <div class="stat-label">待处理订单</div>
-                <div class="stat-value">{{ statistics.pendingOrders }}</div>
+                <div class="stat-label">已签约</div>
+                <div class="stat-value">{{ statistics.signedOrders }}</div>
                 <div class="stat-desc">
-                  <span :class="['stat-trend', statistics.pendingRateTrend]"
-                    ><i :class="statistics.pendingRateTrend === 'down' ? 'el-icon-bottom' : 'el-icon-top'"></i>
-                    {{ statistics.pendingRateLabel }}</span
+                  <span :class="['stat-trend', statistics.signedRateTrend]"
+                    ><i :class="statistics.signedRateTrend === 'down' ? 'el-icon-bottom' : 'el-icon-top'"></i>
+                    {{ statistics.signedRateLabel }}</span
                   >
                 </div>
               </div>
@@ -115,7 +115,7 @@
                 class="stat-icon"
                 style="background: linear-gradient(135deg, #f56c6c, #f78989)"
               >
-                <i class="el-icon-time"></i>
+                <i class="el-icon-edit-outline"></i>
               </div>
             </div>
           </el-card>
@@ -349,14 +349,14 @@
           <el-card class="stat-card" shadow="hover">
             <div class="stat-card-body">
               <div class="stat-info">
-                <div class="stat-label">待处理</div>
+                <div class="stat-label">我的签约</div>
                 <div class="stat-value">
-                  {{ userStatistics.myPendingOrders }}
+                  {{ userStatistics.mySignedOrders }}
                 </div>
                 <div class="stat-desc">
-                  <span :class="['stat-trend', userStatistics.myPendingRateTrend]"
-                    ><i :class="userStatistics.myPendingRateTrend === 'down' ? 'el-icon-bottom' : 'el-icon-top'"></i>
-                    {{ userStatistics.myPendingRateLabel }}</span
+                  <span :class="['stat-trend', userStatistics.mySignedRateTrend]"
+                    ><i :class="userStatistics.mySignedRateTrend === 'down' ? 'el-icon-bottom' : 'el-icon-top'"></i>
+                    {{ userStatistics.mySignedRateLabel }}</span
                   >
                 </div>
               </div>
@@ -364,7 +364,7 @@
                 class="stat-icon"
                 style="background: linear-gradient(135deg, #f56c6c, #f78989)"
               >
-                <i class="el-icon-time"></i>
+                <i class="el-icon-edit-outline"></i>
               </div>
             </div>
           </el-card>
@@ -523,14 +523,17 @@ export default {
         todayOrders: 0,
         activatedDevices: 0,
         pendingOrders: 0,
+        signedOrders: 0,
         totalOrdersGrowthLabel: "0.0% 较上月",
         todayOrdersGrowthLabel: "0.0% 较昨日",
         activationRateLabel: "激活率 0.0%",
         pendingRateLabel: "待处理占比 0.0%",
+        signedRateLabel: "签约率 0.0%",
         totalOrdersTrend: "up",
         todayOrdersTrend: "up",
         activationRateTrend: "up",
         pendingRateTrend: "down",
+        signedRateTrend: "up",
       },
 
       trendType: "week",
@@ -547,14 +550,17 @@ export default {
         myTodayOrders: 0,
         myActivatedDevices: 0,
         myPendingOrders: 0,
+        mySignedOrders: 0,
         myTotalOrdersGrowthLabel: "0.0% 近7天较前7天",
         myTodayOrdersGrowthLabel: "0.0% 较昨日",
         myActivationRateLabel: "激活率 0.0%",
         myPendingRateLabel: "待处理占比 0.0%",
+        mySignedRateLabel: "签约率 0.0%",
         myTotalOrdersTrend: "up",
         myTodayOrdersTrend: "up",
         myActivationRateTrend: "up",
         myPendingRateTrend: "down",
+        mySignedRateTrend: "up",
       },
 
       userRecentOrders: [],
@@ -689,7 +695,7 @@ export default {
     async initOrderTrendChart() {
       try {
         const res = await getOrderTrend(this.trendType);
-        const { dates, newOrders, completedOrders } = res.data;
+        const { dates, newOrders, completedOrders, signedOrders } = res.data;
         this.orderTrendChart =
           this.orderTrendChart ||
           echarts.init(this.$refs.orderTrendChart, "macarons");
@@ -700,7 +706,7 @@ export default {
             padding: [5, 10],
           },
           legend: {
-            data: ["新增订单", "完成订单"],
+            data: ["新增订单", "完成订单", "签约订单"],
             right: 10,
           },
           grid: {
@@ -750,6 +756,23 @@ export default {
                 ]),
               },
               data: completedOrders,
+              animationDuration: 2000,
+              animationEasing: "cubicInOut",
+            },
+            {
+              name: "签约订单",
+              type: "line",
+              smooth: true,
+              symbol: "circle",
+              symbolSize: 8,
+              itemStyle: { color: "#F56C6C" },
+              areaStyle: {
+                color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                  { offset: 0, color: "rgba(245,108,108,0.3)" },
+                  { offset: 1, color: "rgba(245,108,108,0.05)" },
+                ]),
+              },
+              data: signedOrders,
               animationDuration: 2000,
               animationEasing: "cubicInOut",
             },
@@ -855,7 +878,7 @@ export default {
     async initMonthlyChart() {
       try {
         const res = await getMonthlyOrderStats();
-        const { months, orderCounts, activatedCounts } = res.data;
+        const { months, orderCounts, activatedCounts, signedCounts } = res.data;
         this.monthlyChart = echarts.init(this.$refs.monthlyChart, "macarons");
         this.monthlyChart.setOption({
           tooltip: {
@@ -863,7 +886,7 @@ export default {
             axisPointer: { type: "shadow" },
           },
           legend: {
-            data: ["订单数量", "激活数量"],
+            data: ["订单数量", "激活数量", "签约数量"],
             right: 10,
           },
           grid: {
@@ -886,7 +909,7 @@ export default {
             {
               name: "订单数量",
               type: "bar",
-              barWidth: "30%",
+              barWidth: "22%",
               itemStyle: {
                 color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
                   { offset: 0, color: "#409EFF" },
@@ -900,7 +923,7 @@ export default {
             {
               name: "激活数量",
               type: "bar",
-              barWidth: "30%",
+              barWidth: "22%",
               itemStyle: {
                 color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
                   { offset: 0, color: "#67C23A" },
@@ -909,6 +932,20 @@ export default {
                 borderRadius: [4, 4, 0, 0],
               },
               data: activatedCounts,
+              animationDuration: 2000,
+            },
+            {
+              name: "签约数量",
+              type: "bar",
+              barWidth: "22%",
+              itemStyle: {
+                color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                  { offset: 0, color: "#F56C6C" },
+                  { offset: 1, color: "#f78989" },
+                ]),
+                borderRadius: [4, 4, 0, 0],
+              },
+              data: signedCounts,
               animationDuration: 2000,
             },
           ],

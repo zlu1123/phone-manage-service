@@ -39,15 +39,24 @@
         <span>{{ row.model || "-" }}</span>
       </template>
 
-      <!-- 自定义列：图片 -->
+      <!-- 自定义列：图片（默认不加载，点击查看再请求，节省流量） -->
       <template #imagePath="{ row }">
         <el-image
-          v-if="row.imagePath"
+          v-if="row.imagePath && loadedImageRows.includes(row.id)"
+          :ref="`imageRef_${row.id}`"
           :src="baseApi + row.imagePath"
           :preview-src-list="[baseApi + row.imagePath]"
           style="width: 40px; height: 40px"
           fit="cover"
         />
+        <el-button
+          v-else-if="row.imagePath"
+          size="mini"
+          type="text"
+          icon="el-icon-picture-outline"
+          @click="handleViewImage(row, 'image')"
+          >查看</el-button
+        >
         <span v-else>-</span>
       </template>
 
@@ -100,15 +109,24 @@
         <span v-else>-</span>
       </template>
 
-      <!-- 自定义列：用户签名 -->
+      <!-- 自定义列：用户签名（默认不加载，点击查看再请求，节省流量） -->
       <template #signature="{ row }">
         <el-image
-          v-if="row.signaturePath"
+          v-if="row.signaturePath && loadedSignatureRows.includes(row.id)"
+          :ref="`signatureRef_${row.id}`"
           :src="baseApi + row.signaturePath"
           :preview-src-list="[baseApi + row.signaturePath]"
           style="width: 40px; height: 40px"
           fit="contain"
         />
+        <el-button
+          v-else-if="row.signaturePath"
+          size="mini"
+          type="text"
+          icon="el-icon-picture-outline"
+          @click="handleViewImage(row, 'signature')"
+          >查看</el-button
+        >
         <span v-else>-</span>
       </template>
 
@@ -165,6 +183,9 @@ export default {
       drawerTitle: "",
       drawerContent: "",
       currentRow: null,
+      // 图片懒加载控制：仅当用户点击「查看」后，才把对应行 id 放入下面的数组，触发 <el-image> 渲染加载。这样默认不发起任何图片请求，可以省流量。
+      loadedImageRows: [],
+      loadedSignatureRows: [],
       // 搜索字段配置
       searchFields: [
         { prop: "sn", label: "序列号", type: "input" },
@@ -278,6 +299,30 @@ export default {
       const item = this.phoneTypeList.find((t) => t.code === code);
       return item ? item.name : code;
     },
+    /** 点击「查看」按钮：标记当前行为已加载，然后自动触发 el-image 的预览大图
+     * @param {Object} row 当前行数据
+     * @param {'image' | 'signature'} type 图片类型
+     */
+    handleViewImage(row, type) {
+      const listKey =
+        type === "image" ? "loadedImageRows" : "loadedSignatureRows";
+      const refKey =
+        type === "image" ? `imageRef_${row.id}` : `signatureRef_${row.id}`;
+      // 已经渲染过则直接打开预览
+      const alreadyLoaded = this[listKey].includes(row.id);
+      if (!alreadyLoaded) {
+        this[listKey].push(row.id);
+      }
+      // 等下一个 tick 让 <el-image> 渲染出来后再调用其点击处理函数弹出大图预览
+      this.$nextTick(() => {
+        const imageRef = this.$refs[refKey];
+        // ref 在 v-for 中可能是数组
+        const target = Array.isArray(imageRef) ? imageRef[0] : imageRef;
+        if (target && typeof target.clickHandler === "function") {
+          target.clickHandler();
+        }
+      });
+    },
     /** 判断是否过期 */
     isExpired(coverage) {
       if (!coverage) return false;
@@ -307,36 +352,91 @@ export default {
       this.currentRow = row;
       // 将签名数据填充到协议HTML中对应的占位符位置
       let content = row.contractContent || "";
-      // 替换设备型号占位符（确保匹配表格末尾位置）
+      // 调试：打印原始协议HTML
+      console.log("[协议调试] 原始HTML：", content);
+      console.log("[协议调试] 行数据：", {
+        signatureModel: row.signatureModel,
+        signatureImei: row.signatureImei,
+        signaturePath: row.signaturePath,
+        signatureDate: row.signatureDate,
+      });
+
+      // 协议中关键词（设备型号/设备IME/签字确认/日期）后面可能存在以下几种形态：
+      // 1) <u>&nbsp;...&nbsp;</u> 占位下划线  →  需要替换为实际值
+      // 2) 紧跟空白/&nbsp;（无 <u> 占位） →  需要直接注入实际值
+      // 3) 已经填充了实际值                 →  保持不变（避免重复注入）
+      //
+      // 通用注入函数：
+      // - 在 keywordPattern（含冒号）匹配位置之后插入 valueHtml
+      // - 若紧跟着的是 <u>...</u> 占位（可被空白/&nbsp;/空 span 包裹），则一并替换掉该占位
+      // - 若紧跟着的是纯空白/&nbsp;（无实质内容直到下一个非空标签开始），也视为占位，覆盖掉
+      // - 若紧跟着已经是实际文本/图片（非空白），则不重复注入
+      const injectAfterKeyword = (html, keywordPattern, valueHtml) => {
+        if (!valueHtml) return html;
+        // 关键词后允许出现：</span>、空白、&nbsp;、<span ...>，然后是占位 <u>...</u> 或下一个有意义内容
+        // case A: 紧跟 <u>...</u> 占位 → 整体替换占位
+        const regexWithU = new RegExp(
+          `(${keywordPattern})((?:\\s|&nbsp;|</span>|<span[^>]*>)*)<u\\b[^>]*>[\\s\\S]*?</u>`,
+          "i"
+        );
+        if (regexWithU.test(html)) {
+          return html.replace(regexWithU, `$1$2${valueHtml}`);
+        }
+        // case B: 紧跟空白/&nbsp;且后续没有实际文本前先遇到下一个块 → 注入
+        // 检测冒号后到下一个非空白字符之间是否仅由 空白/&nbsp;/空标签 组成
+        const regexEmpty = new RegExp(
+          `(${keywordPattern})((?:\\s|&nbsp;)*)(?=<|$)`,
+          "i"
+        );
+        const match = html.match(regexEmpty);
+        if (match) {
+          // 进一步判断：冒号后第一个非空白字符是否是结束/换行类（说明位置为空，可注入）
+          // 简化处理：直接在冒号后注入
+          return html.replace(regexEmpty, `$1$2${valueHtml}`);
+        }
+        return html;
+      };
+
+      // 设备型号
       if (row.signatureModel) {
-        content = content.replace(
-          /(设备型号：(?:<\/[^>]+>)?)_*(?=<\/|$)/,
-          `$1<span style="text-decoration:underline;padding:0 4px;">${row.signatureModel}</span>`
+        content = injectAfterKeyword(
+          content,
+          "设备型号[：:]",
+          `<span style="text-decoration:underline;padding:0 4px;">${row.signatureModel}</span>`
         );
       }
-      // 替换设备IMEI占位符（确保匹配表格末尾位置）
+
+      // 设备IMEI（兼容 IME / IMEI）
       if (row.signatureImei) {
-        content = content.replace(
-          /(设备IMEI：(?:<\/[^>]+>)?)_*(?=<\/|$)/,
-          `$1<span style="text-decoration:underline;padding:0 4px;">${row.signatureImei}</span>`
+        content = injectAfterKeyword(
+          content,
+          "设备IME[I]?[：:]",
+          `<span style="text-decoration:underline;padding:0 4px;">${row.signatureImei}</span>`
         );
       }
-      // 替换签字确认占位符（插入签名图片，确保匹配表格末尾位置）
+
+      // 签字确认 → 插入签名图片
       if (row.signaturePath) {
-        content = content.replace(
-          /(签字确认：(?:<\/[^>]+>)?)_*(?=<\/|$)/,
-          `$1<img src="${
+        content = injectAfterKeyword(
+          content,
+          "签字确认[：:]",
+          `<img src="${
             this.baseApi + row.signaturePath
           }" style="max-width:200px;max-height:80px;vertical-align:middle;" />`
         );
       }
-      // 替换日期占位符（确保匹配表格末尾位置）
+
+      // 日期
       if (row.signatureDate) {
-        content = content.replace(
-          /(日(?:\s|&nbsp;)*期(?:\s|&nbsp;)*：(?:<\/[^>]+>)?)(?:\s|&nbsp;)*_*(?=<\/|$)/,
-          `$1<span style="text-decoration:underline;padding:0 4px;">${row.signatureDate}</span>`
+        content = injectAfterKeyword(
+          content,
+          "日(?:\\s|&nbsp;)*期(?:\\s|&nbsp;)*[：:]",
+          `<span style="text-decoration:underline;padding:0 4px;">${row.signatureDate}</span>`
         );
       }
+
+      // 调试：打印替换后的HTML
+      console.log("[协议调试] 替换后HTML：", content);
       this.drawerContent = content;
       this.drawerVisible = true;
       // 设置水印（以当前行的昵称为水印）
