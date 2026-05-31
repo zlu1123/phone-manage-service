@@ -39,27 +39,18 @@
         <span>{{ row.model || "-" }}</span>
       </template>
 
-      <!-- 自定义列：图片（默认不加载，点击查看再请求，节省流量） -->
+      <!-- 自定义列：图片（默认不加载，点击查看才请求，且仅请求 1 次） -->
       <template #imagePath="{ row }">
-        <el-image
-          v-if="row.imagePath && loadedImageRows.includes(row.id)"
-          :ref="`imageRef_${row.id}`"
-          :src="baseApi + row.imagePath"
-          :preview-src-list="[baseApi + row.imagePath]"
-          style="width: 40px; height: 40px"
-          fit="cover"
-        />
         <el-button
-          v-else-if="row.imagePath"
+          v-if="row.imagePath"
           size="mini"
           type="text"
           icon="el-icon-picture-outline"
-          @click="handleViewImage(row, 'image')"
+          @click="handleViewImage(row.imagePath)"
           >查看</el-button
         >
         <span v-else>-</span>
       </template>
-
       <!-- 自定义列：IMEI1 -->
       <template #imei1="{ row }">
         <span>{{ row.imei1 || "-" }}</span>
@@ -109,22 +100,14 @@
         <span v-else>-</span>
       </template>
 
-      <!-- 自定义列：用户签名（默认不加载，点击查看再请求，节省流量） -->
+      <!-- 自定义列：用户签名（默认不加载，点击查看才请求，且仅请求 1 次） -->
       <template #signature="{ row }">
-        <el-image
-          v-if="row.signaturePath && loadedSignatureRows.includes(row.id)"
-          :ref="`signatureRef_${row.id}`"
-          :src="baseApi + row.signaturePath"
-          :preview-src-list="[baseApi + row.signaturePath]"
-          style="width: 40px; height: 40px"
-          fit="contain"
-        />
         <el-button
-          v-else-if="row.signaturePath"
+          v-if="row.signaturePath"
           size="mini"
           type="text"
           icon="el-icon-picture-outline"
-          @click="handleViewImage(row, 'signature')"
+          @click="handleViewImage(row.signaturePath)"
           >查看</el-button
         >
         <span v-else>-</span>
@@ -135,6 +118,14 @@
         <span>{{ parseTime(row.createTime) }}</span>
       </template>
     </pro-table>
+
+    <!-- 全局图片预览器：使用 el-image-viewer，避免 <el-image> 缩略图 + 预览图双重加载 -->
+    <el-image-viewer
+      v-if="previewVisible"
+      :url-list="previewUrlList"
+      :on-close="handleClosePreview"
+      :z-index="3000"
+    />
 
     <!-- 协议内容预览抽屉 -->
     <el-drawer
@@ -163,9 +154,13 @@
 <script>
 import { queryOrderList, queryPhoneTypeList } from "@/api/order/list";
 import { exportExcel } from "@/utils/export";
+// element-ui 内部的全局图片预览器（和 <el-image> 点击后弹出的是同一个组件），
+// 直接使用可以避免 <el-image> 缩略图 + 预览图的重复请求
+import ElImageViewer from "element-ui/packages/image/src/image-viewer";
 
 export default {
   name: "Order",
+  components: { ElImageViewer },
   data() {
     return {
       // 图片资源前缀地址
@@ -183,9 +178,9 @@ export default {
       drawerTitle: "",
       drawerContent: "",
       currentRow: null,
-      // 图片懒加载控制：仅当用户点击「查看」后，才把对应行 id 放入下面的数组，触发 <el-image> 渲染加载。这样默认不发起任何图片请求，可以省流量。
-      loadedImageRows: [],
-      loadedSignatureRows: [],
+      // 图片预览器控制：默认不加载，点击查看后才渲染 el-image-viewer 并请求 1 次原图
+      previewVisible: false,
+      previewUrlList: [],
       // 搜索字段配置
       searchFields: [
         { prop: "sn", label: "序列号", type: "input" },
@@ -299,29 +294,18 @@ export default {
       const item = this.phoneTypeList.find((t) => t.code === code);
       return item ? item.name : code;
     },
-    /** 点击「查看」按钮：标记当前行为已加载，然后自动触发 el-image 的预览大图
-     * @param {Object} row 当前行数据
-     * @param {'image' | 'signature'} type 图片类型
+    /** 点击「查看」按钮：直接使用全局 el-image-viewer 预览图片，仅请求 1 次
+     * @param {string} relativePath 服务器返回的图片相对路径
      */
-    handleViewImage(row, type) {
-      const listKey =
-        type === "image" ? "loadedImageRows" : "loadedSignatureRows";
-      const refKey =
-        type === "image" ? `imageRef_${row.id}` : `signatureRef_${row.id}`;
-      // 已经渲染过则直接打开预览
-      const alreadyLoaded = this[listKey].includes(row.id);
-      if (!alreadyLoaded) {
-        this[listKey].push(row.id);
-      }
-      // 等下一个 tick 让 <el-image> 渲染出来后再调用其点击处理函数弹出大图预览
-      this.$nextTick(() => {
-        const imageRef = this.$refs[refKey];
-        // ref 在 v-for 中可能是数组
-        const target = Array.isArray(imageRef) ? imageRef[0] : imageRef;
-        if (target && typeof target.clickHandler === "function") {
-          target.clickHandler();
-        }
-      });
+    handleViewImage(relativePath) {
+      if (!relativePath) return;
+      this.previewUrlList = [this.baseApi + relativePath];
+      this.previewVisible = true;
+    },
+    /** 关闭预览器 */
+    handleClosePreview() {
+      this.previewVisible = false;
+      this.previewUrlList = [];
     },
     /** 判断是否过期 */
     isExpired(coverage) {
