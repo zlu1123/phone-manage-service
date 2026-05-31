@@ -72,24 +72,34 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
         long yesterdayOrders = getLongValue(result, "yesterdayOrders");
         long currentMonthOrders = getLongValue(result, "currentMonthOrders");
         long previousMonthOrders = getLongValue(result, "previousMonthOrders");
+        long signedOrders = getLongValue(result, "signedOrders");
+        long todaySignedOrders = getLongValue(result, "todaySignedOrders");
+        long yesterdaySignedOrders = getLongValue(result, "yesterdaySignedOrders");
 
-        Map<String, Object> statistics = new HashMap<>(16);
+        double signedRate = calculateRatio(signedOrders, totalOrders);
+        double signedGrowthRate = calculateGrowthRate(todaySignedOrders, yesterdaySignedOrders);
+
+        Map<String, Object> statistics = new HashMap<>(20);
         statistics.put("totalOrders", totalOrders);
         statistics.put("todayOrders", todayOrders);
         statistics.put("activatedDevices", activatedDevices);
         statistics.put("pendingOrders", pendingOrders);
+        statistics.put("signedOrders", signedOrders);
         statistics.put("totalOrdersGrowthRate", calculateGrowthRate(currentMonthOrders, previousMonthOrders));
         statistics.put("todayOrdersGrowthRate", calculateGrowthRate(todayOrders, yesterdayOrders));
         statistics.put("activationRate", calculateRatio(activatedDevices, totalOrders));
         statistics.put("pendingRate", calculateRatio(pendingOrders, totalOrders));
+        statistics.put("signedRate", signedRate);
         statistics.put("totalOrdersGrowthLabel", buildTrendLabel(calculateGrowthRate(currentMonthOrders, previousMonthOrders), "较上月"));
         statistics.put("todayOrdersGrowthLabel", buildTrendLabel(calculateGrowthRate(todayOrders, yesterdayOrders), "较昨日"));
         statistics.put("activationRateLabel", buildRateLabel(calculateRatio(activatedDevices, totalOrders), "激活率"));
         statistics.put("pendingRateLabel", buildRateLabel(calculateRatio(pendingOrders, totalOrders), "待处理占比"));
+        statistics.put("signedRateLabel", buildRateLabel(signedRate, "签约率"));
         statistics.put("totalOrdersTrend", calculateGrowthRate(currentMonthOrders, previousMonthOrders) >= 0 ? "up" : "down");
         statistics.put("todayOrdersTrend", calculateGrowthRate(todayOrders, yesterdayOrders) >= 0 ? "up" : "down");
         statistics.put("activationRateTrend", calculateRatio(activatedDevices, totalOrders) >= 0 ? "up" : "down");
         statistics.put("pendingRateTrend", calculateRatio(pendingOrders, totalOrders) <= 50 ? "down" : "up");
+        statistics.put("signedRateTrend", signedGrowthRate >= 0 ? "up" : "down");
         return statistics;
     }
 
@@ -115,25 +125,33 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
         long myYesterdayOrders = getLongValue(result, "myYesterdayOrders");
         long myRecentSevenDaysOrders = getLongValue(result, "myRecentSevenDaysOrders");
         long myPreviousSevenDaysOrders = getLongValue(result, "myPreviousSevenDaysOrders");
+        long mySignedOrders = getLongValue(result, "mySignedOrders");
+        long myTodaySignedOrders = getLongValue(result, "myTodaySignedOrders");
+        long myYesterdaySignedOrders = getLongValue(result, "myYesterdaySignedOrders");
 
         double myTotalOrdersGrowthRate = calculateGrowthRate(myRecentSevenDaysOrders, myPreviousSevenDaysOrders);
         double myTodayOrdersGrowthRate = calculateGrowthRate(myTodayOrders, myYesterdayOrders);
         double myActivationRate = calculateRatio(myActivatedDevices, myTotalOrders);
         double myPendingRate = calculateRatio(myPendingOrders, myTotalOrders);
+        double mySignedRate = calculateRatio(mySignedOrders, myTotalOrders);
+        double mySignedGrowthRate = calculateGrowthRate(myTodaySignedOrders, myYesterdaySignedOrders);
 
-        Map<String, Object> statistics = new HashMap<>(12);
+        Map<String, Object> statistics = new HashMap<>(16);
         statistics.put("myTotalOrders", myTotalOrders);
         statistics.put("myTodayOrders", myTodayOrders);
         statistics.put("myActivatedDevices", myActivatedDevices);
         statistics.put("myPendingOrders", myPendingOrders);
+        statistics.put("mySignedOrders", mySignedOrders);
         statistics.put("myTotalOrdersGrowthLabel", buildTrendLabel(myTotalOrdersGrowthRate, "近7天较前7天"));
         statistics.put("myTodayOrdersGrowthLabel", buildTrendLabel(myTodayOrdersGrowthRate, "较昨日"));
         statistics.put("myActivationRateLabel", buildRateLabel(myActivationRate, "激活率"));
         statistics.put("myPendingRateLabel", buildRateLabel(myPendingRate, "待处理占比"));
+        statistics.put("mySignedRateLabel", buildRateLabel(mySignedRate, "签约率"));
         statistics.put("myTotalOrdersTrend", myTotalOrdersGrowthRate >= 0 ? "up" : "down");
         statistics.put("myTodayOrdersTrend", myTodayOrdersGrowthRate >= 0 ? "up" : "down");
         statistics.put("myActivationRateTrend", myActivationRate >= 50 ? "up" : "down");
         statistics.put("myPendingRateTrend", myPendingRate <= 50 ? "down" : "up");
+        statistics.put("mySignedRateTrend", mySignedGrowthRate >= 0 ? "up" : "down");
         return statistics;
     }
 
@@ -155,6 +173,7 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
         List<String> dates = new ArrayList<>();
         List<Long> newOrders = new ArrayList<>();
         List<Long> completedOrders = new ArrayList<>();
+        List<Long> signedOrders = new ArrayList<>();
         List<Long> myOrders = new ArrayList<>();
 
         for (int i = 0; i < days; i++) {
@@ -164,16 +183,19 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
             Map<String, Object> row = rowMap.get(fullDate);
             long orderCount = getLongValue(row, "orderCount");
             long activatedCount = getLongValue(row, "activatedCount");
+            long signedCount = getLongValue(row, "signedCount");
             dates.add(displayDate);
             newOrders.add(orderCount);
             completedOrders.add(activatedCount);
+            signedOrders.add(signedCount);
             myOrders.add(orderCount);
         }
 
-        Map<String, Object> result = new HashMap<>(4);
+        Map<String, Object> result = new HashMap<>(8);
         result.put("dates", dates);
         result.put("newOrders", newOrders);
         result.put("completedOrders", completedOrders);
+        result.put("signedOrders", signedOrders);
         result.put("myOrders", myOrders);
         return result;
     }
@@ -201,6 +223,7 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
         List<String> months = new ArrayList<>();
         List<Long> orderCounts = new ArrayList<>();
         List<Long> activatedCounts = new ArrayList<>();
+        List<Long> signedCounts = new ArrayList<>();
 
         for (int i = 0; i < 6; i++) {
             YearMonth month = startMonth.plusMonths(i);
@@ -209,12 +232,14 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
             months.add(key);
             orderCounts.add(getLongValue(row, "orderCount"));
             activatedCounts.add(getLongValue(row, "activatedCount"));
+            signedCounts.add(getLongValue(row, "signedCount"));
         }
 
-        Map<String, Object> result = new HashMap<>(3);
+        Map<String, Object> result = new HashMap<>(4);
         result.put("months", months);
         result.put("orderCounts", orderCounts);
         result.put("activatedCounts", activatedCounts);
+        result.put("signedCounts", signedCounts);
         return result;
     }
 

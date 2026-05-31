@@ -130,6 +130,9 @@
             COALESCE(SUM(CASE WHEN DATE(COALESCE(NULLIF(sys_time, ''), DATE_FORMAT(create_time, '%Y-%m-%d'))) = STR_TO_DATE(#{currentDate}, '%Y-%m-%d') THEN 1 ELSE 0 END), 0) AS todayOrders,
             COALESCE(SUM(CASE WHEN activated = 1 THEN 1 ELSE 0 END), 0) AS activatedDevices,
             COALESCE(SUM(CASE WHEN activated = 0 OR activated IS NULL THEN 1 ELSE 0 END), 0) AS pendingOrders,
+            COALESCE(SUM(CASE WHEN signature_date IS NOT NULL AND signature_date != '' THEN 1 ELSE 0 END), 0) AS signedOrders,
+            COALESCE(SUM(CASE WHEN signature_date IS NOT NULL AND signature_date != '' AND DATE(COALESCE(NULLIF(sys_time, ''), DATE_FORMAT(create_time, '%Y-%m-%d'))) = STR_TO_DATE(#{currentDate}, '%Y-%m-%d') THEN 1 ELSE 0 END), 0) AS todaySignedOrders,
+            COALESCE(SUM(CASE WHEN signature_date IS NOT NULL AND signature_date != '' AND DATE(COALESCE(NULLIF(sys_time, ''), DATE_FORMAT(create_time, '%Y-%m-%d'))) = STR_TO_DATE(#{previousDate}, '%Y-%m-%d') THEN 1 ELSE 0 END), 0) AS yesterdaySignedOrders,
             COALESCE(SUM(CASE WHEN DATE(COALESCE(NULLIF(sys_time, ''), DATE_FORMAT(create_time, '%Y-%m-%d'))) = STR_TO_DATE(#{previousDate}, '%Y-%m-%d') THEN 1 ELSE 0 END), 0) AS yesterdayOrders,
             COALESCE(SUM(CASE WHEN DATE_FORMAT(COALESCE(NULLIF(sys_time, ''), DATE_FORMAT(create_time, '%Y-%m-%d')), '%Y-%m') = #{currentMonth} THEN 1 ELSE 0 END), 0) AS currentMonthOrders,
             COALESCE(SUM(CASE WHEN DATE_FORMAT(COALESCE(NULLIF(sys_time, ''), DATE_FORMAT(create_time, '%Y-%m-%d')), '%Y-%m') = #{previousMonth} THEN 1 ELSE 0 END), 0) AS previousMonthOrders
@@ -142,6 +145,9 @@
             COALESCE(SUM(CASE WHEN DATE(COALESCE(NULLIF(sys_time, ''), DATE_FORMAT(create_time, '%Y-%m-%d'))) = STR_TO_DATE(#{currentDate}, '%Y-%m-%d') THEN 1 ELSE 0 END), 0) AS myTodayOrders,
             COALESCE(SUM(CASE WHEN activated = 1 THEN 1 ELSE 0 END), 0) AS myActivatedDevices,
             COALESCE(SUM(CASE WHEN activated = 0 OR activated IS NULL THEN 1 ELSE 0 END), 0) AS myPendingOrders,
+            COALESCE(SUM(CASE WHEN signature_date IS NOT NULL AND signature_date != '' THEN 1 ELSE 0 END), 0) AS mySignedOrders,
+            COALESCE(SUM(CASE WHEN signature_date IS NOT NULL AND signature_date != '' AND DATE(COALESCE(NULLIF(sys_time, ''), DATE_FORMAT(create_time, '%Y-%m-%d'))) = STR_TO_DATE(#{currentDate}, '%Y-%m-%d') THEN 1 ELSE 0 END), 0) AS myTodaySignedOrders,
+            COALESCE(SUM(CASE WHEN signature_date IS NOT NULL AND signature_date != '' AND DATE(COALESCE(NULLIF(sys_time, ''), DATE_FORMAT(create_time, '%Y-%m-%d'))) = STR_TO_DATE(#{previousDate}, '%Y-%m-%d') THEN 1 ELSE 0 END), 0) AS myYesterdaySignedOrders,
             COALESCE(SUM(CASE WHEN DATE(COALESCE(NULLIF(sys_time, ''), DATE_FORMAT(create_time, '%Y-%m-%d'))) = STR_TO_DATE(#{previousDate}, '%Y-%m-%d') THEN 1 ELSE 0 END), 0) AS myYesterdayOrders,
             COALESCE(SUM(CASE WHEN DATE(COALESCE(NULLIF(sys_time, ''), DATE_FORMAT(create_time, '%Y-%m-%d'))) BETWEEN STR_TO_DATE(#{recentSevenDaysStart}, '%Y-%m-%d') AND STR_TO_DATE(#{currentDate}, '%Y-%m-%d') THEN 1 ELSE 0 END), 0) AS myRecentSevenDaysOrders,
             COALESCE(SUM(CASE WHEN DATE(COALESCE(NULLIF(sys_time, ''), DATE_FORMAT(create_time, '%Y-%m-%d'))) BETWEEN STR_TO_DATE(#{previousSevenDaysStart}, '%Y-%m-%d') AND STR_TO_DATE(#{previousSevenDaysEnd}, '%Y-%m-%d') THEN 1 ELSE 0 END), 0) AS myPreviousSevenDaysOrders
@@ -153,7 +159,8 @@
         SELECT
             DATE_FORMAT(COALESCE(NULLIF(sys_time, ''), DATE_FORMAT(create_time, '%Y-%m-%d')), '%Y-%m-%d') AS day,
             COUNT(*) AS orderCount,
-            SUM(CASE WHEN activated = 1 THEN 1 ELSE 0 END) AS activatedCount
+            SUM(CASE WHEN activated = 1 THEN 1 ELSE 0 END) AS activatedCount,
+            SUM(CASE WHEN signature_date IS NOT NULL AND signature_date != '' THEN 1 ELSE 0 END) AS signedCount
         FROM phone_active_info
         WHERE DATE(COALESCE(NULLIF(sys_time, ''), DATE_FORMAT(create_time, '%Y-%m-%d'))) &gt;= STR_TO_DATE(#{startDate}, '%Y-%m-%d')
           AND DATE(COALESCE(NULLIF(sys_time, ''), DATE_FORMAT(create_time, '%Y-%m-%d'))) &lt;= STR_TO_DATE(#{endDate}, '%Y-%m-%d')
@@ -168,7 +175,8 @@
         SELECT
             DATE_FORMAT(COALESCE(NULLIF(sys_time, ''), DATE_FORMAT(create_time, '%Y-%m-%d')), '%Y-%m') AS month,
             COUNT(*) AS orderCount,
-            SUM(CASE WHEN activated = 1 THEN 1 ELSE 0 END) AS activatedCount
+            SUM(CASE WHEN activated = 1 THEN 1 ELSE 0 END) AS activatedCount,
+            SUM(CASE WHEN signature_date IS NOT NULL AND signature_date != '' THEN 1 ELSE 0 END) AS signedCount
         FROM phone_active_info
         WHERE DATE_FORMAT(COALESCE(NULLIF(sys_time, ''), DATE_FORMAT(create_time, '%Y-%m-%d')), '%Y-%m') &gt;= #{startMonth}
           AND DATE_FORMAT(COALESCE(NULLIF(sys_time, ''), DATE_FORMAT(create_time, '%Y-%m-%d')), '%Y-%m') &lt;= #{endMonth}
