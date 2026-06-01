@@ -68,13 +68,20 @@
         </el-tag>
       </template>
 
-      <!-- 自定义列：是否过期 -->
+      <!-- 自定义列：激活日期（统一为 YYYY-MM-DD） -->
+      <template #activateDate="{ row }">
+        <span>{{ formatDate(row.activateDate) }}</span>
+      </template>
+
+      <!-- 自定义列：保修到期时间（统一为 YYYY-MM-DD） -->
+      <template #coverage="{ row }">
+        <span>{{ formatDate(row.coverage) }}</span>
+      </template>
+
+      <!-- 自定义列：质保状态（与小程序保持一致） -->
       <template #expired="{ row }">
-        <el-tag
-          :type="isExpired(row.coverage) ? 'danger' : 'success'"
-          size="small"
-        >
-          {{ isExpired(row.coverage) ? "已过期" : "未过期" }}
+        <el-tag :type="getWarrantyTagType(row)" size="small">
+          {{ getWarrantyInfo(row).status }}
         </el-tag>
       </template>
 
@@ -228,8 +235,18 @@ export default {
           slot: "activated",
           width: "90",
         },
-        { label: "激活日期", prop: "activateDate", width: "110" },
-        { label: "保修到期时间", prop: "coverage", width: "110" },
+        {
+          label: "激活日期",
+          prop: "activateDate",
+          slot: "activateDate",
+          width: "110",
+        },
+        {
+          label: "保修到期时间",
+          prop: "coverage",
+          slot: "coverage",
+          width: "110",
+        },
         { label: "是否过期", slot: "expired", width: "90" },
         { label: "查询时系统时间", prop: "sysTime", width: "110" },
         { label: "创建者", prop: "createBy", width: "100" },
@@ -307,12 +324,76 @@ export default {
       this.previewVisible = false;
       this.previewUrlList = [];
     },
-    /** 判断是否过期 */
-    isExpired(coverage) {
-      if (!coverage) return false;
-      const coverageDate = new Date(coverage);
-      const now = new Date();
-      return coverageDate < now;
+    /**
+     * 将任意日期入参统一格式化为 YYYY-MM-DD（本地时区）
+     * 兼容后端返回的多种形式：'2021-08-28' / '2023/12/31' / ISO 字符串 / 毫秒数等
+     */
+    formatDate(value) {
+      if (!value && value !== 0) return "-";
+      // 优先使用上下文可用的 parseTime（若公共工具提供）以保证跨项目一致性
+      let date;
+      if (typeof value === "number") {
+        date = new Date(value);
+      } else if (typeof value === "string") {
+        // 将 'YYYY/MM/DD' 转为 'YYYY-MM-DD'，避免 Safari 及不同浏览器的时区解析差异
+        const normalized = value.replace(/\//g, "-").trim();
+        date = new Date(normalized);
+        if (isNaN(date.getTime())) {
+          // 再试一次原始入参
+          date = new Date(value);
+        }
+      } else {
+        date = new Date(value);
+      }
+      if (!date || isNaN(date.getTime())) {
+        // 解析失败，原样返回，不破坏数据
+        return String(value);
+      }
+      const yyyy = date.getFullYear();
+      const mm = String(date.getMonth() + 1).padStart(2, "0");
+      const dd = String(date.getDate()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+    },
+    /**
+     * 计算质保状态（逻辑与小程序保持一致）
+     * 注意：每条数据的过保判断仅以该条记录返回的 sysTime 字段为准，
+     *      不使用本地时间或其他行的时间，避免被本地系统时间篑改影响。
+     * 返回 { status, expired }
+     *  - 未激活：activated 为 false → 已过期
+     *  - 已激活但无 coverage：仅显示“已激活”，不视为过期
+     *  - 已激活但缺失 sysTime：保守显示“已激活”，不视为过期
+     *  - 已激活且 coverage <= row.sysTime：已过保（过期）
+     *  - 已激活且 coverage >  row.sysTime：保修中（未过期）
+     */
+    getWarrantyInfo(row) {
+      if (!row || !row.activated) {
+        return { status: "未激活", expired: true };
+      }
+      const coverage = row.coverage;
+      if (!coverage) {
+        return { status: "已激活", expired: false };
+      }
+      // 必须使用本行返回的 sysTime，缺失则不判断过期，保守显示为“已激活”
+      if (!row.sysTime) {
+        return { status: "已激活", expired: false };
+      }
+      // 先将 '/' 统一为 '-'，避免不同浏览器解析为不同时区造成边界差异
+      const normalize = (v) =>
+        typeof v === "string" ? v.replace(/\//g, "-") : v;
+      const coverageTime = new Date(normalize(coverage)).getTime();
+      const sysTime = new Date(normalize(row.sysTime)).getTime();
+      if (isNaN(coverageTime) || isNaN(sysTime)) {
+        return { status: "已激活", expired: false };
+      }
+      const expired = coverageTime <= sysTime;
+      return { status: expired ? "已过保" : "保修中", expired };
+    },
+    /** 根据质保状态返回 el-tag 的 type */
+    getWarrantyTagType(row) {
+      const info = this.getWarrantyInfo(row);
+      if (info.expired) return "danger";
+      // “已激活”作为中性状态显示为 info；“保修中”显示为 success
+      return info.status === "保修中" ? "success" : "info";
     },
     /** 生成水印Canvas */
     generateWatermark(text) {
@@ -571,12 +652,19 @@ export default {
                 prop: "activated",
                 formatter: (row) => (row.activated ? "已激活" : "未激活"),
               },
-              { label: "激活日期", prop: "activateDate" },
-              { label: "保修到期时间", prop: "coverage" },
               {
-                label: "是否过期",
-                formatter: (row) =>
-                  this.isExpired(row.coverage) ? "已过期" : "未过期",
+                label: "激活日期",
+                prop: "activateDate",
+                formatter: (row) => this.formatDate(row.activateDate),
+              },
+              {
+                label: "保修到期时间",
+                prop: "coverage",
+                formatter: (row) => this.formatDate(row.coverage),
+              },
+              {
+                label: "质保状态",
+                formatter: (row) => this.getWarrantyInfo(row).status,
               },
               { label: "查询时系统时间", prop: "sysTime" },
               { label: "创建者", prop: "createBy" },
