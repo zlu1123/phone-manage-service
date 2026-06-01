@@ -43,6 +43,18 @@ public class DeviceInfoExtractorService {
     );
 
     /**
+     * IMEI关键字 + 数字段中间允许空格/横杠（OCR经常将"867109068843672"识别成"8671 09068843672"）
+     * 兼容格式：
+     * - "IMEI2:8671 09068822452"   荣耀/华为设备标识符页面（OCR将连续数字断开）
+     * - "IME11:8671 09068843672"  IMEI1 中的 "1" 被识别为字母 I，再加上索引数字1变成 IME11
+     * - "IMEI 1 8625-2707-1010-804" 数字段被横杠分隔
+     * 注：捕获组2为含空格的整段，使用前需 normalizeImei 清洗为纯数字
+     */
+    private static final Pattern IMEI_KEYWORD_SPACED = Pattern.compile(
+            "(?i)(?:[Il1]ME[Il1])(?:/MEID)?\\s*([12])?\\s*[:：]?\\s*((?:\\d[\\s\\-]?){14,18}\\d)"
+    );
+
+    /**
      * IMEI标签独占一行的情况（小米手机常见）
      * 行1: "IMEI1" 或 "IMEI 1" 或 "IMEI"
      * 行2: "862527071010804"
@@ -251,6 +263,19 @@ public class DeviceInfoExtractorService {
                 String indexStr = m.group(1); // "1" 或 "2" 或 null
                 String num = m.group(2);
                 num = normalizeImei(num);
+                if (num == null) continue;
+
+                int idx = parseImeiIndex(indexStr, line);
+                addImeiCandidate(num, idx, strongCandidates, weakCandidates);
+            }
+
+            // 策略1.5：关键字 + 数字段中间允许空格/横杠（OCR将15位数字断开成"8671 09068843672"）
+            // 必须在策略1之后执行，因为本正则更宽松，可能与策略1捕获重叠（重复的会被Luhn去重）
+            Matcher mSpaced = IMEI_KEYWORD_SPACED.matcher(line);
+            while (mSpaced.find()) {
+                String indexStr = mSpaced.group(1);
+                String numWithSpace = mSpaced.group(2);
+                String num = normalizeImei(numWithSpace);
                 if (num == null) continue;
 
                 int idx = parseImeiIndex(indexStr, line);

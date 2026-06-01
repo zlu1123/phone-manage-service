@@ -18,7 +18,14 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
 @Service
@@ -43,6 +50,35 @@ public class OCRService {
     @Value("${docker.command.timeout:30}")
     private int dockerTimeoutSeconds;
 
+    /**
+     * OCR 增强变体并行执行的线程池。
+     * 设计要点：
+     * 1) 使用守护线程，避免阻塞 JVM 退出。
+     * 2) 并发度由 {@link #ocrParallelism} 控制（默认 6，刚好覆盖 6 个增强变体）。
+     *    实际上限受宿主机 CPU 与 docker 守护进程能承载的并行子进程数限制，
+     *    可通过配置项 {@code ocr.parallelism} 调整。
+     */
+    private volatile ExecutorService ocrExecutor;
+
+    @Value("${ocr.parallelism:6}")
+    private int ocrParallelism;
+
+    private synchronized ExecutorService getOcrExecutor() {
+        if (ocrExecutor == null) {
+            int parallelism = Math.max(1, ocrParallelism);
+            final AtomicInteger counter = new AtomicInteger(0);
+            ocrExecutor = Executors.newFixedThreadPool(parallelism, new ThreadFactory() {
+                @Override
+                public Thread newThread(Runnable r) {
+                    Thread t = new Thread(r, "ocr-variant-" + counter.incrementAndGet());
+                    t.setDaemon(true);
+                    return t;
+                }
+            });
+        }
+        return ocrExecutor;
+    }
+
     public String recognize(MultipartFile file) throws IOException, InterruptedException {
         File savedFile = saveToSharedDir(file);
         String ocrText = execTesseract(savedFile);
@@ -53,31 +89,93 @@ public class OCRService {
     /**
      * 生成多个OCR候选结果：
      * 1. 原图直接识别
-     * 2. 原始结果信号不足时，补充规范化PNG识别
-     * 3. 原始结果信号不足时，补充上半屏裁切+放大+灰度增强识别
+     * 2. 原始结果信号不足时，并行执行多个增强变体（规范化PNG / 上半屏灰度 / 灰度对比度增强 / 旋转90/180/270）
+     *
+     * 性能优化：增强变体不再串行执行，改为线程池并行执行，整体耗时由
+     * "N × 单变体耗时" 缩短为约 "1 × 单变体耗时"（受 CPU/Docker 并发能力影响）。
      */
     public List<OcrResult> recognizeCandidates(MultipartFile file) throws IOException, InterruptedException {
         File savedFile = saveToSharedDir(file);
         List<File> tempFiles = new ArrayList<>();
         List<OcrResult> results = new ArrayList<>();
         try {
+            long originalStart = System.currentTimeMillis();
             String originalText = execTesseract(savedFile);
+            log.info("OCR变体[original]执行耗时: {} ms", System.currentTimeMillis() - originalStart);
             addOcrResult(results, "original", originalText);
 
             if (shouldTryEnhancedRecognition(originalText)) {
                 BufferedImage sourceImage = readImageQuietly(savedFile);
                 if (sourceImage != null) {
-                    File normalizedFile = createNormalizedVariant(sourceImage);
-                    tempFiles.add(normalizedFile);
-                    addOcrResult(results, "normalized_full", tryExecTesseract(normalizedFile, "normalized_full"));
+                    // ===== 1) 串行生成增强变体的图片文件（CPU 操作，耗时短） =====
+                    List<VariantTask> variantTasks = new ArrayList<>();
+                    try {
+                        File normalizedFile = createNormalizedVariant(sourceImage);
+                        tempFiles.add(normalizedFile);
+                        variantTasks.add(new VariantTask("normalized_full", normalizedFile));
 
-                    File upperGrayFile = createUpperGrayVariant(sourceImage);
-                    tempFiles.add(upperGrayFile);
-                    addOcrResult(results, "upper_gray", tryExecTesseract(upperGrayFile, "upper_gray"));
+                        File upperGrayFile = createUpperGrayVariant(sourceImage);
+                        tempFiles.add(upperGrayFile);
+                        variantTasks.add(new VariantTask("upper_gray", upperGrayFile));
 
-                    File upperGrayContrastFile = createUpperGrayContrastVariant(sourceImage);
-                    tempFiles.add(upperGrayContrastFile);
-                    addOcrResult(results, "upper_gray_contrast", tryExecTesseract(upperGrayContrastFile, "upper_gray_contrast"));
+                        File upperGrayContrastFile = createUpperGrayContrastVariant(sourceImage);
+                        tempFiles.add(upperGrayContrastFile);
+                        variantTasks.add(new VariantTask("upper_gray_contrast", upperGrayContrastFile));
+
+                        // 旋转变体：覆盖横屏/倒置拍摄场景（如手机横放拍摄设备标识符页面）
+                        // Tesseract 默认无法识别旋转90°/180°/270°的文字，需要预先正向化
+                        for (int degrees : new int[]{90, 180, 270}) {
+                            File rotatedFile = createRotatedVariant(sourceImage, degrees);
+                            tempFiles.add(rotatedFile);
+                            variantTasks.add(new VariantTask("rotated_" + degrees, rotatedFile));
+                        }
+                    } catch (IOException e) {
+                        log.warn("生成OCR增强变体图片失败，将仅使用已生成的部分变体", e);
+                    }
+
+                    // ===== 2) 并行调用 docker tesseract 识别每个增强变体 =====
+                    long enhancedStart = System.currentTimeMillis();
+                    ExecutorService executor = getOcrExecutor();
+                    List<Future<VariantOcrResult>> futures = new ArrayList<>(variantTasks.size());
+                    for (final VariantTask task : variantTasks) {
+                        futures.add(executor.submit(new Callable<VariantOcrResult>() {
+                            @Override
+                            public VariantOcrResult call() {
+                                long t0 = System.currentTimeMillis();
+                                String text = null;
+                                try {
+                                    text = execTesseract(task.imageFile);
+                                } catch (InterruptedException ie) {
+                                    Thread.currentThread().interrupt();
+                                    log.warn("增强OCR候选识别被中断，variant={}", task.variantName);
+                                } catch (Exception e) {
+                                    log.warn("增强OCR候选识别失败，variant={}", task.variantName, e);
+                                }
+                                long cost = System.currentTimeMillis() - t0;
+                                log.info("OCR变体[{}]执行耗时: {} ms", task.variantName, cost);
+                                return new VariantOcrResult(task.variantName, text);
+                            }
+                        }));
+                    }
+
+                    // ===== 3) 按变体顺序回收结果（保留原有顺序，方便后续 controller 评分时的稳定性） =====
+                    for (Future<VariantOcrResult> future : futures) {
+                        try {
+                            VariantOcrResult variantResult = future.get();
+                            addOcrResult(results, variantResult.variantName, variantResult.text);
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                            // 中断时取消剩余任务后退出
+                            for (Future<VariantOcrResult> f : futures) {
+                                f.cancel(true);
+                            }
+                            throw ie;
+                        } catch (ExecutionException ee) {
+                            log.warn("获取增强OCR变体结果失败", ee.getCause());
+                        }
+                    }
+                    log.info("OCR增强变体并行执行总耗时: {} ms（变体数={}）",
+                            System.currentTimeMillis() - enhancedStart, variantTasks.size());
                 } else {
                     log.warn("图片增强识别已跳过，无法读取图片文件: {}", savedFile.getName());
                 }
@@ -92,6 +190,32 @@ public class OCRService {
             for (File tempFile : tempFiles) {
                 deleteQuietly(tempFile);
             }
+        }
+    }
+
+    /**
+     * 描述一个待执行的 OCR 增强变体任务（变体名 + 已生成的图片文件）。
+     */
+    private static class VariantTask {
+        final String variantName;
+        final File imageFile;
+
+        VariantTask(String variantName, File imageFile) {
+            this.variantName = variantName;
+            this.imageFile = imageFile;
+        }
+    }
+
+    /**
+     * 一个变体的 OCR 执行结果（文本可能为 null，表示该变体识别失败）。
+     */
+    private static class VariantOcrResult {
+        final String variantName;
+        final String text;
+
+        VariantOcrResult(String variantName, String text) {
+            this.variantName = variantName;
+            this.text = text;
         }
     }
 
@@ -142,11 +266,16 @@ public class OCRService {
 
         boolean lowConfidence = !hasLongMixedToken && (usefulLines <= 3 || signalLines == 0);
         boolean suspiciousAboutPage = hasAboutPageSignal && hasModelLine && hasSnLine && hasSuspiciousChars;
-        if (lowConfidence || suspiciousAboutPage) {
-            log.info("OCR触发增强识别: usefulLines={}, signalLines={}, hasLongMixedToken={}, hasAboutPageSignal={}, hasModelLine={}, hasSnLine={}, hasSuspiciousChars={}",
-                    usefulLines, signalLines, hasLongMixedToken, hasAboutPageSignal, hasModelLine, hasSnLine, hasSuspiciousChars);
+        // 没有任何设备信号关键字（"序列号"/"IMEI"/"型号"等）时，无论是否识别出"长字母数字混合串"，
+        // 都强制触发增强识别。原因：旋转拍摄/倒置拍摄时 OCR 会产出大量乱码长串（如 SV278890601299Z3Y），
+        // 这些乱码本身长度合法但语义错误，必须通过旋转变体重试才能拿到正确文本。
+        boolean noDeviceSignal = signalLines == 0;
+        boolean shouldEnhance = lowConfidence || suspiciousAboutPage || noDeviceSignal;
+        if (shouldEnhance) {
+            log.info("OCR触发增强识别: usefulLines={}, signalLines={}, hasLongMixedToken={}, hasAboutPageSignal={}, hasModelLine={}, hasSnLine={}, hasSuspiciousChars={}, noDeviceSignal={}",
+                    usefulLines, signalLines, hasLongMixedToken, hasAboutPageSignal, hasModelLine, hasSnLine, hasSuspiciousChars, noDeviceSignal);
         }
-        return lowConfidence || suspiciousAboutPage;
+        return shouldEnhance;
     }
 
     private boolean isNoiseLine(String line) {
@@ -192,18 +321,6 @@ public class OCRService {
         }
     }
 
-    private String tryExecTesseract(File imageFile, String variantName) throws InterruptedException {
-        try {
-            return execTesseract(imageFile);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw e;
-        } catch (Exception e) {
-            log.warn("增强OCR候选识别失败，variant={}", variantName, e);
-            return null;
-        }
-    }
-
     private File createNormalizedVariant(BufferedImage sourceImage) throws IOException {
         return writeTempPng(toRgbImage(sourceImage), "normalized");
     }
@@ -233,6 +350,51 @@ public class OCRService {
         BufferedImage gray = toGrayImage(scaled);
         BufferedImage contrast = adjustContrast(gray, 1.6f, 8f);
         return writeTempPng(contrast, "upper-gray-contrast");
+    }
+
+    /**
+     * 创建旋转变体：将原图按指定角度顺时针旋转后输出 PNG。
+     * 用于覆盖手机横放/倒置拍摄场景（Tesseract 对旋转文字识别能力有限）。
+     *
+     * @param sourceImage 原始图像
+     * @param degrees     旋转角度，支持 90 / 180 / 270
+     */
+    private File createRotatedVariant(BufferedImage sourceImage, int degrees) throws IOException {
+        BufferedImage rgbImage = toRgbImage(sourceImage);
+        BufferedImage rotated = rotateImage(rgbImage, degrees);
+        return writeTempPng(rotated, "rotated-" + degrees);
+    }
+
+    /**
+     * 顺时针旋转图像。仅支持 90/180/270 度，其他角度按 0 处理（直接返回原图）。
+     */
+    private BufferedImage rotateImage(BufferedImage sourceImage, int degrees) {
+        int normalized = ((degrees % 360) + 360) % 360;
+        if (normalized == 0) {
+            return sourceImage;
+        }
+        int srcWidth = sourceImage.getWidth();
+        int srcHeight = sourceImage.getHeight();
+        int dstWidth = (normalized == 180) ? srcWidth : srcHeight;
+        int dstHeight = (normalized == 180) ? srcHeight : srcWidth;
+
+        BufferedImage rotated = new BufferedImage(dstWidth, dstHeight, BufferedImage.TYPE_INT_RGB);
+        Graphics2D graphics = rotated.createGraphics();
+        graphics.setColor(Color.WHITE);
+        graphics.fillRect(0, 0, dstWidth, dstHeight);
+        graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+        graphics.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        AffineTransform transform = new AffineTransform();
+        // 先平移到目标画布中心，再旋转，再平移回去（保证旋转后图像完整落在画布内）
+        transform.translate(dstWidth / 2.0, dstHeight / 2.0);
+        transform.rotate(Math.toRadians(normalized));
+        transform.translate(-srcWidth / 2.0, -srcHeight / 2.0);
+
+        graphics.drawImage(sourceImage, transform, null);
+        graphics.dispose();
+        return rotated;
     }
 
     private File writeTempPng(BufferedImage image, String suffix) throws IOException {
