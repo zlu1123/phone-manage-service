@@ -171,6 +171,10 @@ public class DeviceInfoExtractorService {
         if (ocrText == null || ocrText.isEmpty()) {
             return new DeviceInfo("", "", "");
         }
+        // 荣耀已从华为接口拆分，但 OCR 提取规则与华为一致（SN/IMEI 格式相同），统一按 huawei 处理
+        if ("honor".equalsIgnoreCase(brandType)) {
+            brandType = "huawei";
+        }
         log.info("原始OCR文本:\n{}", ocrText);
 
         // 1. 文本预处理：清洗OCR噪声行

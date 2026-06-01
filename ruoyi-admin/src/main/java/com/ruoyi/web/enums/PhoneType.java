@@ -9,7 +9,8 @@ import java.util.stream.Collectors;
 public enum PhoneType {
     APPLE("1", "苹果", "apple_warranty"),
     XIAOMI("2", "小米/红米", "xiaomi"),
-    HUAWEI("3", "华为/荣耀", "huawei");
+    HUAWEI("3", "华为", "huawei"),
+    HONOR("4", "荣耀", "honor");
 
     private final String code;
     private final String name;

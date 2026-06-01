@@ -51,10 +51,14 @@ public class PhoneInfoConverterContext {
         registerObjectConverter(PhoneType.APPLE.getCode(),map -> objectMapper.convertValue(map, ApplePhoneObject.class));
         registerObjectConverter(PhoneType.XIAOMI.getCode(), map -> objectMapper.convertValue(map, XiaoMiPhoneObject.class));
         registerObjectConverter(PhoneType.HUAWEI.getCode(), map -> objectMapper.convertValue(map, HuaWeiPhoneObject.class));
+        // 荣耀已从华为接口拆分，但返回结构与华为一致，复用 HuaWeiPhoneObject 解析
+        registerObjectConverter(PhoneType.HONOR.getCode(), map -> objectMapper.convertValue(map, HuaWeiPhoneObject.class));
 
         registerStrategy(PhoneType.APPLE.getCode(), new ApplePhoneConverter());
         registerStrategy(PhoneType.XIAOMI.getCode(), new XiaoMiPhoneConverter());
         registerStrategy(PhoneType.HUAWEI.getCode(), new HuaWeiPhoneConverter());
+        // 荣耀复用华为字段映射
+        registerStrategy(PhoneType.HONOR.getCode(), new HuaWeiPhoneConverter());
         // 可以继续添加更多类型...
     }
 }
