@@ -89,20 +89,6 @@ export const constantRoutes = [
     ]
   },
   {
-    path: '/order',
-    component: Layout,
-    hidden: true,
-    redirect: 'noredirect',
-    children: [
-      {
-        path: 'list',
-        component: () => import('@/views/order/list/index'),
-        name: 'OrderList',
-        meta: { title: '订单列表', icon: 'list' }
-      }
-    ]
-  },
-  {
     path: '/info',
     component: Layout,
     hidden: true,
