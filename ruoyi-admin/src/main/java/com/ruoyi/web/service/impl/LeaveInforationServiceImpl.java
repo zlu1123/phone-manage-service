@@ -135,7 +135,7 @@ public class LeaveInforationServiceImpl implements LeaveInformationService {
      * @param LeaveInformation 查询条件
      * @return 留资信息列表
      */
-    public List<LeaveInformation> queryLeaveInformationsByCondition(LeaveInformation leaveInformation) {
+    public List<LeaveInformation> queryLeaveInformationByCondition(LeaveInformation leaveInformation) {
         return leaveInformationMapper.selectByCondition(leaveInformation);
     }
 

@@ -14,7 +14,7 @@ public interface LeaveInformationService {
 
     LeaveInformation queryLeaveInformationById(LeaveInformation leaveInformation);
 
-    List<LeaveInformation> queryLeaveInformationsByCondition(LeaveInformation leaveInformation);
+    List<LeaveInformation> queryLeaveInformationByCondition(LeaveInformation leaveInformation);
 
     List<LeaveInformation> queryInfoByNameOrNum(String text);
 }

@@ -2,7 +2,6 @@ package com.ruoyi.web.controller.system;
 
 import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.R;
-import com.ruoyi.framework.config.ServerConfig;
 import com.ruoyi.web.domain.LeaveInformation;
 import com.ruoyi.web.model.LeaveInformationDto;
 import com.ruoyi.web.service.LeaveInformationService;
@@ -26,9 +25,6 @@ public class LeaveInformationController extends BaseController {
     @Autowired
     private LeaveInformationService leaveInformationService;
 
-    @Autowired
-    private ServerConfig serverConfig;
-
     /**
      * @param LeaveInformation 查询条件
      * @return 订单分页列表
@@ -37,7 +33,7 @@ public class LeaveInformationController extends BaseController {
     @GetMapping("/getList")
     public R getContract(LeaveInformation leaveInformation) {
         startPage();
-        List<LeaveInformation> list = leaveInformationService.queryLeaveInformationsByCondition(leaveInformation);
+        List<LeaveInformation> list = leaveInformationService.queryLeaveInformationByCondition(leaveInformation);
         return R.ok(getDataTable(list));
     }
 

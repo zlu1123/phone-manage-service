@@ -12,11 +12,13 @@ import com.ruoyi.framework.config.ServerConfig;
 import com.ruoyi.system.domain.SysConfig;
 import com.ruoyi.system.service.ISysConfigService;
 import com.ruoyi.web.core.config.PhoneInfoConverterContext;
+import com.ruoyi.web.domain.CompensationOrder;
 import com.ruoyi.web.domain.Contract;
 import com.ruoyi.web.domain.LeaveInformation;
 import com.ruoyi.web.domain.PhoneActiveInfo;
 import com.ruoyi.web.enums.PhoneType;
-import com.ruoyi.web.model.ContractDto;
+import com.ruoyi.web.model.CompensationOrderDto;
+import com.ruoyi.web.model.CompensationOrderReturnDto;
 import com.ruoyi.web.model.LeaveInformationDto;
 import com.ruoyi.web.model.PhoneInfoDto;
 import com.ruoyi.web.service.*;
@@ -412,10 +414,75 @@ public class WechatApiController extends BaseController {
      */
     @ApiOperation("查询留资信息列表")
     @GetMapping("/getLeaveInformationList")
-    public TableDataInfo getContract(@RequestParam(value = "context") String context) {
+    public TableDataInfo getLeaveInformationList(@RequestParam(value = "context") String context) {
         startPage();
         List<LeaveInformation> list = leaveInformationService.queryInfoByNameOrNum(context);
         return getDataTable(list);
     }
 
+
+    @Autowired
+    private CompensationOrderService compensationOrderService;
+
+    /**
+     * 新增赔付订单
+     *
+     * @param compensationOrderDto 赔付订单信息
+     * @return 操作结果
+     */
+    @PostMapping("/insertCompensationOrder")
+    public R insert(@RequestBody @Validated CompensationOrderDto compensationOrderDto) {
+        try {
+            CompensationOrder compensationOrder = new CompensationOrder();
+            BeanUtils.copyProperties(compensationOrderDto, compensationOrder);
+            compensationOrder.setStatus(0);
+            compensationOrder.setCreateBy(getUsername());
+            compensationOrder.setUpdateBy(getUsername());
+            Long id = compensationOrderService.insert(compensationOrder);
+            if (id > 0) {
+                return R.ok(id);
+            } else {
+                return R.fail();
+            }
+        } catch (Exception e) {
+            return R.fail(e.getMessage());
+        }
+    }
+
+    /**
+     * @param compensationOrderDto 查询条件
+     * @return 订单分页列表
+     */
+    @ApiOperation("查询赔付订单信息")
+    @GetMapping("/getCompensationOrderList")
+    public TableDataInfo getCompensationOrderList(CompensationOrderDto compensationOrderDto) {
+        startPage();
+        List<CompensationOrderReturnDto> list = compensationOrderService.queryCompensationOrderByCondition(compensationOrderDto);
+        return getDataTable(list);
+    }
+
+    /**
+     * 更新赔付订单
+     *
+     * @param compensationOrder 赔付订单（必须包含ID）
+     * @return 操作结果
+     */
+    @PostMapping("/updateCompensationOrder")
+    public R updateCompensationOrder(@RequestBody @Validated CompensationOrder compensationOrder) {
+        try {
+            // 校验ID
+            if (compensationOrder.getId() == null) {
+                return R.fail("赔付订单ID不能为空");
+            }
+            compensationOrder.setUpdateBy(getUsername());
+            int rows = compensationOrderService.update(compensationOrder);
+            if (rows > 0) {
+                return R.ok();
+            } else {
+                return R.fail();
+            }
+        } catch (Exception e) {
+            return R.fail(e.getMessage());
+        }
+    }
 }

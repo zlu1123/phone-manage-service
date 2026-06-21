@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.ruoyi.web.mapper.CompensationOrderMapper">
+
+    <!-- 结果映射 -->
+    <resultMap id="BaseResultMap" type="com.ruoyi.web.domain.CompensationOrder">
+        <id column="id" property="id" jdbcType="INTEGER"/>
+        <result column="order_id" property="orderId" jdbcType="INTEGER"/>
+        <result column="info_id" property="infoId" jdbcType="INTEGER"/>
+        <result column="amount" property="amount" jdbcType="DOUBLE"/>
+        <result column="status" property="status" jdbcType="INTEGER"/>
+        <result column="rejection_reason" property="rejectionReason" jdbcType="VARCHAR"/>
+        <result column="remark" property="remark" jdbcType="VARCHAR"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+        <result column="create_by" property="createBy" jdbcType="VARCHAR"/>
+        <result column="update_time" property="updateTime" jdbcType="TIMESTAMP"/>
+        <result column="update_by" property="updateBy" jdbcType="VARCHAR"/>
+    </resultMap>
+
+    <!-- 结果映射 -->
+    <resultMap id="BaseResultDtoMap" type="com.ruoyi.web.model.CompensationOrderReturnDto">
+        <id column="id" property="id" jdbcType="INTEGER"/>
+        <result column="order_id" property="orderId" jdbcType="INTEGER"/>
+        <result column="info_id" property="infoId" jdbcType="INTEGER"/>
+
+        <result column="name" property="name" jdbcType="VARCHAR"/>
+        <result column="phone_num" property="remark" jdbcType="VARCHAR"/>
+        <result column="signature_imei" property="signatureImei" jdbcType="VARCHAR"/>
+
+        <result column="amount" property="amount" jdbcType="DOUBLE"/>
+        <result column="status" property="status" jdbcType="INTEGER"/>
+        <result column="rejection_reason" property="rejectionReason" jdbcType="VARCHAR"/>
+        <result column="remark" property="remark" jdbcType="VARCHAR"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+        <result column="create_by" property="createBy" jdbcType="VARCHAR"/>
+        <result column="update_time" property="updateTime" jdbcType="TIMESTAMP"/>
+        <result column="update_by" property="updateBy" jdbcType="VARCHAR"/>
+    </resultMap>
+
+    <!-- 基础字段列表 -->
+    <sql id="Base_Column_List">
+        id, order_id, info_id, amount, status, rejection_reason, remark, create_time, create_by, update_time, update_by
+    </sql>
+
+    <!-- 根据ID查询信息 -->
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM compensation_order
+        WHERE id = #{id}
+    </select>
+
+    <!-- 条件查询赔付订单列表 -->
+    <select id="selectByCondition" resultMap="BaseResultDtoMap">
+        SELECT co.*, li.name, li.phone_num, pai.signature_imei
+        FROM compensation_order co
+            left join phone_active_info pai on co.order_id = pai.id
+            left join leave_information li on co.info_id = li.id
+        <where>
+            <if test="name != null and name != ''">
+                AND li.name LIKE CONCAT('%', #{name}, '%')
+            </if>
+            <if test="phoneNum != null and phoneNum != ''">
+                AND li.phone_num LIKE CONCAT('%', #{phoneNum}, '%')
+            </if>
+            <if test="signatureImei != null and signatureImei != ''">
+                AND pai.signature_imei = #{signatureImei}
+            </if>
+            <if test="createBy != null and createBy != ''">
+                AND co.create_by LIKE CONCAT('%', #{createBy}, '%')
+            </if>
+        </where>
+        ORDER BY update_time DESC
+    </select>
+
+    <!-- 新增赔付订单 -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO compensation_order (
+            order_id, info_id, amount, status, rejection_reason, remark, create_by, update_time, update_by
+        ) VALUES (
+                     #{orderId}, #{infoId}, #{amount}, #{status}, #{rejectionReason}, #{remark}, #{createBy}, #{updateTime}, #{updateBy}
+                 )
+    </insert>
+
+    <!-- 选择性新增赔付订单 -->
+    <insert id="insertSelective" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO compensation_order
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="orderId != null">order_id,</if>
+            <if test="infoId != null">info_id,</if>
+
+            <if test="amount != null">amount,</if>
+            <if test="status != null">status,</if>
+            <if test="rejectionReason != null and rejectionReason != ''">rejection_reason,</if>
+            <if test="remark != null and remark != ''">remark,</if>
+
+            <if test="createTime != null">create_time,</if>
+            <if test="createBy != null and createBy != ''">create_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="updateBy != null and updateBy != ''">update_by,</if>
+        </trim>
+        <trim prefix="VALUES (" suffix=")" suffixOverrides=",">
+            <if test="orderId != null">#{orderId},</if>
+            <if test="infoId != null">#{infoId},</if>
+
+            <if test="amount != null">#{amount},</if>
+            <if test="status != null">#{status},</if>
+            <if test="rejectionReason != null and rejectionReason != ''">#{rejectionReason},</if>
+            <if test="remark != null and remark != ''">#{remark},</if>
+
+            <if test="createTime != null">#{createTime},</if>
+            <if test="createBy != null and createBy != ''">#{createBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="updateBy != null and updateBy != ''">#{updateBy},</if>
+        </trim>
+    </insert>
+
+    <!-- 选择性更新赔付订单 -->
+    <update id="updateSelective">
+        UPDATE compensation_order
+        <set>
+            <if test="amount != null">amount = #{amount},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="rejectionReason != null and rejectionReason != ''">rejection_reason = #{rejectionReason},</if>
+            <if test="remark != null and remark != ''">remark = #{remark},</if>
+
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <!-- 根据ID删除赔付订单 -->
+    <delete id="deleteById">
+        DELETE FROM compensation_order WHERE id = #{id}
+    </delete>
+
+</mapper>
