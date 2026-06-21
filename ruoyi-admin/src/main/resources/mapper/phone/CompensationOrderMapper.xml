@@ -26,7 +26,7 @@
         <result column="info_id" property="infoId" jdbcType="INTEGER"/>
 
         <result column="name" property="name" jdbcType="VARCHAR"/>
-        <result column="phone_num" property="remark" jdbcType="VARCHAR"/>
+        <result column="phone_num" property="phoneNum" jdbcType="VARCHAR"/>
         <result column="signature_imei" property="signatureImei" jdbcType="VARCHAR"/>
 
         <result column="amount" property="amount" jdbcType="DOUBLE"/>
