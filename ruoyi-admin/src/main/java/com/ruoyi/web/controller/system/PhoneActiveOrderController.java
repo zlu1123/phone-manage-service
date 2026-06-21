@@ -1,9 +1,7 @@
 package com.ruoyi.web.controller.system;
 
-import com.ruoyi.common.constant.Constants;
 import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.R;
-import com.ruoyi.system.service.ISysConfigService;
 import com.ruoyi.web.domain.PhoneActiveInfo;
 import com.ruoyi.web.service.IPhoneActiveInfoService;
 import io.swagger.annotations.Api;
@@ -17,7 +15,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.List;
 
 import static com.ruoyi.common.utils.PageUtils.startPage;
@@ -34,9 +31,6 @@ public class PhoneActiveOrderController extends BaseController {
 
     @Autowired
     private IPhoneActiveInfoService phoneActiveInfoService;
-
-    @Autowired
-    private ISysConfigService configService;
 
     /**
      * @param phoneActiveInfo 查询条件
@@ -105,16 +99,9 @@ public class PhoneActiveOrderController extends BaseController {
     }
 
     private String resolveCurrentDate() {
-        String systemDate = configService.selectConfigByKey(Constants.SYSTEM_TIME_CACHE_KEY);
-        if (systemDate == null || systemDate.trim().isEmpty()) {
-            return LocalDate.now().format(DATE_FORMATTER);
-        }
-        try {
-            return LocalDate.parse(systemDate.trim(), DATE_FORMATTER).format(DATE_FORMATTER);
-        } catch (DateTimeParseException e) {
-            log.warn("系统时间配置格式非法，改用服务器当前日期，systemDate={}", systemDate, e);
-            return LocalDate.now().format(DATE_FORMATTER);
-        }
+        // 仪表盘首页始终使用服务器真实日期，不受 sys.time 业务配置影响
+        // sys.time 配置仅用于手机设备系统时间的同步，不应影响后台管理界面的数据查询
+        return LocalDate.now().format(DATE_FORMATTER);
     }
 
     /**
