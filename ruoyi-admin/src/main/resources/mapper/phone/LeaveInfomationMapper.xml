@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.ruoyi.web.mapper.LeaveInformationMapper">
+
+    <!-- 结果映射 -->
+    <resultMap id="BaseResultMap" type="com.ruoyi.web.domain.LeaveInformation">
+        <id column="id" property="id" jdbcType="INTEGER"/>
+        <result column="name" property="name" jdbcType="VARCHAR"/>
+        <result column="phone_num" property="phoneNum" jdbcType="VARCHAR"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+        <result column="create_by" property="createBy" jdbcType="VARCHAR"/>
+        <result column="update_time" property="updateTime" jdbcType="TIMESTAMP"/>
+        <result column="update_by" property="updateBy" jdbcType="VARCHAR"/>
+    </resultMap>
+
+    <!-- 基础字段列表 -->
+    <sql id="Base_Column_List">
+        id, name, phone_num, create_time, create_by, update_time, update_by
+    </sql>
+
+    <!-- 根据ID查询信息 -->
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM leave_information
+        WHERE id = #{id}
+    </select>
+
+    <!-- 查询所有留资信息列表 -->
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM leave_information
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 分页查询留资信息列表 -->
+    <select id="selectByPage" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM leave_information
+        ORDER BY create_time DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <!-- 条件查询留资信息列表 -->
+    <select id="selectByCondition" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM leave_information
+        <where>
+            <if test="name != null and name != ''">
+                AND name LIKE CONCAT('%', #{name}, '%')
+            </if>
+            <if test="phoneNum != null and phoneNum != ''">
+                AND phone_num LIKE CONCAT('%', #{phoneNum}, '%')
+            </if>
+            <if test="createBy != null and createBy != ''">
+                AND create_by LIKE CONCAT('%', #{createBy}, '%')
+            </if>
+        </where>
+        ORDER BY update_time DESC
+    </select>
+
+    <!-- 条件查询留资信息列表 -->
+    <select id="selectByNameOrNum" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM leave_information
+        <where>
+            <if test="context != null and context != ''">
+                AND (name LIKE CONCAT('%', #{context}, '%') or phone_num LIKE CONCAT('%', #{context}, '%') )
+            </if>
+        </where>
+        ORDER BY update_time DESC
+    </select>
+
+    <!-- 新增留资信息 -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO leave_information (
+            name, version, phone_num, create_time, create_by, update_time, update_by
+        ) VALUES (
+                     #{name}, #{phoneNum}, #{createTime}, #{createBy}, #{updateTime}, #{updateBy}
+                 )
+    </insert>
+
+    <!-- 选择性新增留资信息 -->
+    <insert id="insertSelective" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO leave_information
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="name != null and name != ''">name,</if>
+            <if test="phoneNum != null and phoneNum != ''">phone_num,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="createBy != null and createBy != ''">create_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="updateBy != null and updateBy != ''">update_by,</if>
+        </trim>
+        <trim prefix="VALUES (" suffix=")" suffixOverrides=",">
+            <if test="name != null and name != ''">#{name},</if>
+            <if test="phoneNum != null and phoneNum != ''">#{phoneNum},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="createBy != null and createBy != ''">#{createBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="updateBy != null and updateBy != ''">#{updateBy},</if>
+        </trim>
+    </insert>
+
+    <!-- 根据ID更新留资信息 -->
+    <update id="updateById">
+        UPDATE leave_information
+        SET name = #{name},
+            phone_num = #{phoneNum},
+            update_time = #{updateTime},
+            update_by = #{updateBy}
+        WHERE id = #{id}
+    </update>
+
+    <!-- 选择性更新留资信息 -->
+    <update id="updateSelective">
+        UPDATE leave_information
+        <set>
+            <if test="name != null and name != ''">name = #{name},</if>
+            <if test="phoneNum != null and phoneNum != ''">phone_num = #{phoneNum},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <!-- 根据ID删除留资信息 -->
+    <delete id="deleteById">
+        DELETE FROM leave_information WHERE id = #{id}
+    </delete>
+
+    <!-- 统计留资信息总数 -->
+    <select id="countTotal" resultType="int">
+        SELECT COUNT(*) FROM leave_information
+    </select>
+
+    <!-- 检查留资信息电话号码是否存在 -->
+    <select id="checkPhoneNumExists" resultType="int">
+        SELECT COUNT(*) FROM leave_information WHERE phone_num = #{phoneNum}
+    </select>
+
+</mapper>

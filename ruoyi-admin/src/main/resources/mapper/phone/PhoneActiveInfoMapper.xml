@@ -29,6 +29,7 @@
         <result column="nick_name" property="nickName"/>
         <result column="update_time" property="updateTime"/>
         <result column="update_by" property="updateBy"/>
+        <result column="phone_num" property="phoneNum"/>
     </resultMap>
 
     <sql id="Base_Column_List">
@@ -53,11 +54,11 @@
         INSERT INTO phone_active_info (
             sn, phone_type, imei1, imei2, model, activated, activate_date, coverage, image_path, active_info, sys_time,
              contract_id, contract_path, signature_path, contract_content, signature_model, signature_imei, signature_date,
-            create_time, create_by, nick_name, update_time, update_by
+            create_time, create_by, nick_name, update_time, update_by, info_id
         ) VALUES (
                      #{sn}, #{phoneType}, #{imei1}, #{imei2}, #{model}, #{activated}, #{activateDate}, #{coverage}, #{imagePath}, #{activeInfo}, #{sysTime},
                      #{contractId}, #{contractPath}, #{signaturePath}, #{contractContent}, #{signatureModel}, #{signatureImei}, #{signatureDate},
-                     #{createTime}, #{createBy}, #{nickName}, #{updateTime}, #{updateBy}
+                     #{createTime}, #{createBy}, #{nickName}, #{updateTime}, #{updateBy}, #{infoId}
                  )
     </insert>
 
@@ -82,6 +83,7 @@
             <if test="signatureModel != null">signature_model = #{signatureModel},</if>
             <if test="signatureImei != null">signature_imei = #{signatureImei},</if>
             <if test="signatureDate != null">signature_date = #{signatureDate},</if>
+            <if test="infoId != null">info_id = #{infoId},</if>
 
             <if test="sysTime != null">sys_time = #{sysTime},</if>
             update_time = now(),
@@ -95,18 +97,18 @@
     </delete>
 
     <select id="selectByExample" resultMap="BaseResultMap" parameterType="com.ruoyi.web.domain.PhoneActiveInfo">
-        SELECT <include refid="Base_Column_List_Q"/>
-        FROM phone_active_info
+        SELECT pai.*, li.name, li.phone_num
+        FROM phone_active_info pai left join leave_information li on pai.info_id = li.id
         <where>
-            <if test="id != null"> AND id = #{id}</if>
-            <if test="sn != null and sn != ''"> AND sn = #{sn}</if>
-            <if test="phoneType != null and phoneType != ''"> AND phone_type = #{phoneType}</if>
-            <if test="imei1 != null and imei1 != ''"> AND imei1 = #{imei1}</if>
-            <if test="imei2 != null and imei2 != ''"> AND imei2 = #{imei2}</if>
-            <if test="model != null and model != ''"> AND model = #{model}</if>
-            <if test="activated != null"> AND activated = #{activated}</if>
-            <if test="sysTime != null and sysTime != ''"> AND sys_time = #{sysTime}</if>
-            <if test="contractId != null"> AND contract_id = #{contractId}</if>
+            <if test="id != null"> AND pai.id = #{id}</if>
+            <if test="sn != null and sn != ''"> AND pai.sn = #{sn}</if>
+            <if test="phoneType != null and phoneType != ''"> AND pai.phone_type = #{phoneType}</if>
+            <if test="imei1 != null and imei1 != ''"> AND pai.imei1 = #{imei1}</if>
+            <if test="imei2 != null and imei2 != ''"> AND pai.imei2 = #{imei2}</if>
+            <if test="model != null and model != ''"> AND pai.model = #{model}</if>
+            <if test="activated != null"> AND pai.activated = #{activated}</if>
+            <if test="sysTime != null and sysTime != ''"> AND pai.sys_time = #{sysTime}</if>
+            <if test="contractId != null"> AND pai.contract_id = #{contractId}</if>
             <!-- create_time 范围查询 -->
 <!--            <if test="beginCreateTime != null and beginCreateTime != ''">-->
 <!--                AND create_time >= #{beginCreateTime}-->
@@ -114,14 +116,16 @@
 <!--            <if test="endCreateTime != null and endCreateTime != ''">-->
 <!--                AND create_time &lt;= #{endCreateTime}-->
 <!--            </if>-->
-            <if test="createBy != null and createBy != ''"> AND create_by = #{createBy}</if>
-            <if test="nickName != null and nickName != ''"> AND nick_name like CONCAT('%', #{nickName}, '%')</if>
+            <if test="createBy != null and createBy != ''"> AND pai.create_by = #{createBy}</if>
+            <if test="nickName != null and nickName != ''"> AND pai.nick_name like CONCAT('%', #{nickName}, '%')</if>
 
-            <if test="signatureModel != null and signatureModel != ''"> AND signature_model like CONCAT('%', #{signatureModel}, '%')</if>
-            <if test="signatureImei != null and signatureImei != ''"> AND signature_imei like CONCAT('%', #{signatureImei}, '%')</if>
-            <if test="signatureDate != null and signatureDate != ''"> AND signature_date = #{signatureDate}</if>
+            <if test="signatureModel != null and signatureModel != ''"> AND pai.signature_model like CONCAT('%', #{signatureModel}, '%')</if>
+            <if test="signatureImei != null and signatureImei != ''"> AND pai.signature_imei like CONCAT('%', #{signatureImei}, '%')</if>
+            <if test="signatureDate != null and signatureDate != ''"> AND pai.signature_date = #{signatureDate}</if>
+            <if test="name != null and name != ''"> AND li.name LIKE CONCAT('%', #{name}, '%')</if>
+            <if test="phoneNum != null and phoneNum != ''"> AND li.phone_num LIKE CONCAT('%', #{phoneNum}, '%')</if>
         </where>
-        order by create_time desc
+        order by pai.create_time desc
     </select>
 
     <select id="selectDashboardStatistics" resultType="java.util.HashMap">

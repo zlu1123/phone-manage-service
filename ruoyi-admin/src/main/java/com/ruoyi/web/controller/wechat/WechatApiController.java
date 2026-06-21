@@ -5,6 +5,7 @@ import com.ruoyi.common.constant.CacheConstants;
 import com.ruoyi.common.constant.Constants;
 import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.R;
+import com.ruoyi.common.core.page.TableDataInfo;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.common.utils.file.FileUploadUtils;
 import com.ruoyi.framework.config.ServerConfig;
@@ -12,14 +13,13 @@ import com.ruoyi.system.domain.SysConfig;
 import com.ruoyi.system.service.ISysConfigService;
 import com.ruoyi.web.core.config.PhoneInfoConverterContext;
 import com.ruoyi.web.domain.Contract;
+import com.ruoyi.web.domain.LeaveInformation;
 import com.ruoyi.web.domain.PhoneActiveInfo;
 import com.ruoyi.web.enums.PhoneType;
 import com.ruoyi.web.model.ContractDto;
+import com.ruoyi.web.model.LeaveInformationDto;
 import com.ruoyi.web.model.PhoneInfoDto;
-import com.ruoyi.web.service.ContractService;
-import com.ruoyi.web.service.IPhoneActiveInfoService;
-import com.ruoyi.web.service.MapToObjectConverter;
-import com.ruoyi.web.service.PhoneInfoConverter;
+import com.ruoyi.web.service.*;
 import com.ruoyi.web.service.impl.ExternalApiService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -27,6 +27,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -74,6 +75,7 @@ public class WechatApiController extends BaseController {
     @PostMapping("/queryActiveInfo")
     public R queryActiveInfo(@RequestParam("typeCode") String typeCode,
                              @RequestParam("code") String code,
+                             @RequestParam("infoId") Long infoId,
                              @RequestParam(value = "imei", required = false) String imei,
                              @RequestParam(value = "imei2", required = false) String imei2,
                              @RequestParam(value = "imagePath", required = false) String imagePath,
@@ -119,7 +121,7 @@ public class WechatApiController extends BaseController {
             phoneInfoDto.setSysTime((String) redisTemplate.opsForValue().get(CacheConstants.SYS_CONFIG_KEY + Constants.SYSTEM_TIME_CACHE_KEY));
             phoneInfoDto.setImagePath(normalizeImagePath(resolvedImagePath));
             phoneInfoDto.setImageUrl(buildImageUrl(phoneInfoDto.getImagePath()));
-            Long id = saveActiveInfo(phoneInfoDto, apiResult.getRawJson(), typeCode, phoneInfoDto.getImagePath());
+            Long id = saveActiveInfo(phoneInfoDto, apiResult.getRawJson(), typeCode, phoneInfoDto.getImagePath(), infoId);
             phoneInfoDto.setId(id);
         } catch (Exception e) {
             log.error("保存数据失败", e);
@@ -234,7 +236,7 @@ public class WechatApiController extends BaseController {
         }
     }
 
-    private Long saveActiveInfo(PhoneInfoDto dto, String rawJson, String typeCode, String imagePath) {
+    private Long saveActiveInfo(PhoneInfoDto dto, String rawJson, String typeCode, String imagePath, Long infoId) {
         log.info("开始保存信息，{}", dto);
         PhoneActiveInfo info = new PhoneActiveInfo();
         info.setSn(dto.getSn());
@@ -248,6 +250,7 @@ public class WechatApiController extends BaseController {
         info.setActiveInfo(rawJson); // 原始完整 JSON
         info.setSysTime(dto.getSysTime());
         info.setImagePath(imagePath);
+        info.setInfoId(infoId);
         // 设置创建人/更新人
         info.setCreateBy(getUsername());
         info.setUpdateBy(getUsername());
@@ -351,6 +354,7 @@ public class WechatApiController extends BaseController {
 
     @Autowired
     private ISysConfigService configService;
+
     @ApiOperation("查询订单列表-个人")
     @GetMapping("/test")
     public R test(){
@@ -373,4 +377,45 @@ public class WechatApiController extends BaseController {
         System.out.println("定时任务--------系统时间更新完成");
         return R.ok();
     }
+
+
+    @Autowired
+    private LeaveInformationService leaveInformationService;
+
+    /**
+     * 新增留资信息
+     *
+     * @param leaveInformationDto 留资信息信息
+     * @return 操作结果
+     */
+    @PostMapping("/insertLeaveInformation")
+    public R insert(@RequestBody @Validated LeaveInformationDto leaveInformationDto) {
+        try {
+            LeaveInformation leaveInformation = new LeaveInformation();
+            BeanUtils.copyProperties(leaveInformationDto, leaveInformation);
+            leaveInformation.setCreateBy(getUsername());
+            leaveInformation.setUpdateBy(getUsername());
+            Long id = leaveInformationService.insert(leaveInformation);
+            if (id > 0) {
+                return R.ok(id);
+            } else {
+                return R.fail();
+            }
+        } catch (Exception e) {
+            return R.fail(e.getMessage());
+        }
+    }
+
+    /**
+     * @param context 手机号或姓名
+     * @return 订单分页列表
+     */
+    @ApiOperation("查询留资信息列表")
+    @GetMapping("/getLeaveInformationList")
+    public TableDataInfo getContract(@RequestParam(value = "context") String context) {
+        startPage();
+        List<LeaveInformation> list = leaveInformationService.queryInfoByNameOrNum(context);
+        return getDataTable(list);
+    }
+
 }

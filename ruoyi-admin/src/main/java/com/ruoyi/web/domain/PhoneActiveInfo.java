@@ -27,5 +27,9 @@ public class PhoneActiveInfo extends BaseEntity {
     private String signatureModel; //协议签订设备型号
     private String signatureImei; //协议签订设备IMEI
     private String signatureDate; //协议签订日期
+    private Long infoId; //留资人id
+
+    private String name; // 留资人姓名 ----扩展，不是数据字段，只做关联返回
+    private String phoneNum; // 留资人电话 ----扩展，不是数据字段，只做关联返回
 
 }
