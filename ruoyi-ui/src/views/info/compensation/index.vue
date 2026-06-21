@@ -29,7 +29,13 @@
 
       <!-- 赔付金额列 -->
       <template #amount="{ row }">
-        <span>{{ row.amount != null ? "¥" + row.amount : "-" }}</span>
+        <span>{{
+          Number(row.status) === 2
+            ? "-"
+            : row.amount != null
+            ? "¥" + row.amount
+            : "-"
+        }}</span>
       </template>
 
       <!-- 创建时间列 -->
@@ -40,6 +46,7 @@
       <!-- 操作列 -->
       <template #action="{ row }">
         <el-button
+          v-if="Number(row.status) === 0"
           size="mini"
           type="text"
           icon="el-icon-edit"
@@ -115,16 +122,6 @@
         label-width="100px"
         size="small"
       >
-        <el-form-item label="赔付金额" prop="amount">
-          <el-input-number
-            v-model="reviewForm.amount"
-            :precision="2"
-            :min="0"
-            :max="999999.99"
-            placeholder="请输入赔付金额"
-            style="width: 100%"
-          />
-        </el-form-item>
         <el-form-item label="审核状态" prop="status">
           <el-select
             v-model="reviewForm.status"
@@ -134,6 +131,20 @@
             <el-option label="审核通过" :value="1" />
             <el-option label="审核不通过" :value="2" />
           </el-select>
+        </el-form-item>
+        <el-form-item
+          v-if="reviewForm.status === 1"
+          label="赔付金额"
+          prop="amount"
+        >
+          <el-input-number
+            v-model="reviewForm.amount"
+            :precision="2"
+            :min="0"
+            :max="999999.99"
+            placeholder="请输入赔付金额"
+            style="width: 100%"
+          />
         </el-form-item>
         <el-form-item
           v-if="reviewForm.status === 2"
@@ -203,14 +214,35 @@ export default {
       reviewDialogVisible: false,
       reviewForm: {},
       reviewRules: {
-        amount: [
-          { required: true, message: "请输入赔付金额", trigger: "blur" },
-        ],
         status: [
           { required: true, message: "请选择审核状态", trigger: "change" },
         ],
+        amount: [
+          {
+            validator: (rule, value, callback) => {
+              if (
+                this.reviewForm.status === 1 &&
+                (value == null || value === "")
+              ) {
+                callback(new Error("请输入赔付金额"));
+              } else {
+                callback();
+              }
+            },
+            trigger: "blur",
+          },
+        ],
         rejectionReason: [
-          { required: true, message: "请输入拒绝原因", trigger: "blur" },
+          {
+            validator: (rule, value, callback) => {
+              if (this.reviewForm.status === 2 && !value) {
+                callback(new Error("请输入拒绝原因"));
+              } else {
+                callback();
+              }
+            },
+            trigger: "blur",
+          },
         ],
       },
       // 提交按钮loading
