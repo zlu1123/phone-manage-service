@@ -64,8 +64,8 @@ public class CompensationOrderServiceImpl implements CompensationOrderService {
         }
 
         // 查询原赔付订单信息
-        CompensationOrder oldLeaveInformation = compensationOrderMapper.selectById(compensationOrder.getId());
-        if (oldLeaveInformation == null) {
+        CompensationOrder oldCompensationOrder = compensationOrderMapper.selectById(compensationOrder.getId());
+        if (oldCompensationOrder == null) {
             throw new RuntimeException("赔付订单不存在，ID：" + compensationOrder.getId());
         }
 
@@ -93,9 +93,9 @@ public class CompensationOrderServiceImpl implements CompensationOrderService {
         }
 
         // 查询赔付订单是否存在
-        CompensationOrder leaveInformation1 = compensationOrderMapper.selectById(compensationOrder.getId());
-        if (leaveInformation1 == null) {
-            throw new RuntimeException("袖子信息不存在，ID：" + compensationOrder.getId());
+        CompensationOrder existingOrder = compensationOrderMapper.selectById(compensationOrder.getId());
+        if (existingOrder == null) {
+            throw new RuntimeException("赔付订单不存在，ID：" + compensationOrder.getId());
         }
 
         // 执行删除操作

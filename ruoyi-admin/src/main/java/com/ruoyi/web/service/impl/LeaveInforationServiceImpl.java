@@ -104,7 +104,7 @@ public class LeaveInforationServiceImpl implements LeaveInformationService {
         // 查询留资是否存在
         LeaveInformation leaveInformation1 = leaveInformationMapper.selectById(leaveInformation.getId());
         if (leaveInformation1 == null) {
-            throw new RuntimeException("袖子信息不存在，ID：" + leaveInformation.getId());
+            throw new RuntimeException("留资信息不存在，ID：" + leaveInformation.getId());
         }
 
         // 执行删除操作

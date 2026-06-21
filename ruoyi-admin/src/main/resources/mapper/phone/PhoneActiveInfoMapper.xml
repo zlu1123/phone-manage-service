@@ -36,13 +36,13 @@
     <sql id="Base_Column_List">
         id, sn, phone_type, imei1, imei2, model, activated, activate_date, coverage, image_path, active_info, sys_time,
           contract_id, contract_path, signature_path, contract_content, signature_model, signature_imei, signature_date,
-        create_time, create_by, nick_name, update_time, update_by
+        create_time, create_by, nick_name, update_time, update_by, info_id
     </sql>
 
     <sql id="Base_Column_List_Q">
         id, sn, phone_type, imei1, imei2, model, activated, activate_date, coverage, image_path, sys_time,
           contract_id, contract_path, signature_path, contract_content, signature_model, signature_imei, signature_date,
-        create_time, create_by, nick_name, update_time, update_by
+        create_time, create_by, nick_name, update_time, update_by, info_id
     </sql>
 
     <select id="selectBySn" resultMap="BaseResultMap">
@@ -86,9 +86,8 @@
             <if test="signatureDate != null">signature_date = #{signatureDate},</if>
             <if test="infoId != null">info_id = #{infoId},</if>
 
-            <if test="sysTime != null">sys_time = #{sysTime},</if>
-            update_time = now(),
-            <if test="updateBy != null">update_by = #{updateBy},</if>
+            update_time = now()
+            <if test="updateBy != null">, update_by = #{updateBy}</if>
         </set>
         WHERE id = #{id}
     </update>

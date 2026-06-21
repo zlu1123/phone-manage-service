@@ -75,7 +75,7 @@
     <!-- 新增留资信息 -->
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO leave_information (
-            name, version, phone_num, create_time, create_by, update_time, update_by
+            name, phone_num, create_time, create_by, update_time, update_by
         ) VALUES (
                      #{name}, #{phoneNum}, #{createTime}, #{createBy}, #{updateTime}, #{updateBy}
                  )
