@@ -51,6 +51,14 @@
         WHERE id = #{id}
     </select>
 
+    <!-- 根据订单ID和状态查询赔付订单 -->
+    <select id="selectByOrderIdAndStatus" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM compensation_order
+        WHERE order_id = #{orderId}
+        AND status = #{status}
+    </select>
+
     <!-- 条件查询赔付订单列表 -->
     <select id="selectByCondition" resultMap="BaseResultDtoMap">
         SELECT co.*, li.name, li.phone_num, pai.signature_imei

@@ -30,6 +30,11 @@ public class CompensationOrderServiceImpl implements CompensationOrderService {
     @Transactional(rollbackFor = Exception.class)
     public Long insert(CompensationOrder compensationOrder) {
 
+        // 校验同一订单是否已有待审核的赔付记录
+        if (compensationOrder.getOrderId() != null) {
+            checkPendingCompensationExists(compensationOrder.getOrderId());
+        }
+
         // 设置创建时间和更新时间
         Date now = new Date();
         compensationOrder.setCreateTime(now);
@@ -105,6 +110,20 @@ public class CompensationOrderServiceImpl implements CompensationOrderService {
      */
     public List<CompensationOrderReturnDto> queryCompensationOrderByCondition(CompensationOrderDto compensationOrderDto) {
         return compensationOrderMapper.selectByCondition(compensationOrderDto);
+    }
+
+    /**
+     * 校验指定订单是否有待审核的赔付记录
+     *
+     * @param orderId 订单ID
+     * @throws RuntimeException 如果存在待审核的赔付订单
+     */
+    @Override
+    public void checkPendingCompensationExists(Long orderId) {
+        CompensationOrder pendingOrder = compensationOrderMapper.selectByOrderIdAndStatus(orderId, 0);
+        if (pendingOrder != null) {
+            throw new RuntimeException("该订单已存在待审核的赔付记录，不可重复发起赔付");
+        }
     }
 
 }

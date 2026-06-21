@@ -24,6 +24,15 @@ public interface CompensationOrderMapper {
     CompensationOrder selectById(@Param("id") Long id);
 
     /**
+     * 根据订单ID查询指定状态的赔付订单
+     *
+     * @param orderId 订单ID
+     * @param status 赔付状态
+     * @return 赔付订单
+     */
+    CompensationOrder selectByOrderIdAndStatus(@Param("orderId") Long orderId, @Param("status") Integer status);
+
+    /**
      * 条件查询赔付订单列表
      *
      * @param compensationOrderDto 查询条件
