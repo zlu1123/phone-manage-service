@@ -65,7 +65,7 @@
                 AND li.phone_num LIKE CONCAT('%', #{phoneNum}, '%')
             </if>
             <if test="signatureImei != null and signatureImei != ''">
-                AND pai.signature_imei = #{signatureImei}
+                AND pai.signature_imei LIKE CONCAT('%', #{signatureImei}, '%')
             </if>
             <if test="createBy != null and createBy != ''">
                 AND co.create_by LIKE CONCAT('%', #{createBy}, '%')
