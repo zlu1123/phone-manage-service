@@ -111,7 +111,7 @@ export const constantRoutes = [
         path: 'compensation',
         component: () => import('@/views/info/compensation/index'),
         name: 'CompensationOrder',
-        meta: { title: '待赔付列表' }
+        meta: { title: '赔付列表' }
       }
     ]
   }
