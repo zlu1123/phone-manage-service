@@ -64,6 +64,9 @@
             <if test="phoneNum != null and phoneNum != ''">
                 AND li.phone_num LIKE CONCAT('%', #{phoneNum}, '%')
             </if>
+            <if test="status != null">
+                AND co.status = #{status}
+            </if>
             <if test="signatureImei != null and signatureImei != ''">
                 AND pai.signature_imei LIKE CONCAT('%', #{signatureImei}, '%')
             </if>

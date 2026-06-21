@@ -30,6 +30,7 @@
         <result column="update_time" property="updateTime"/>
         <result column="update_by" property="updateBy"/>
         <result column="phone_num" property="phoneNum"/>
+        <result column="info_id" property="infoId"/>
     </resultMap>
 
     <sql id="Base_Column_List">
