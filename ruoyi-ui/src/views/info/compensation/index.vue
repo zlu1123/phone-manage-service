@@ -150,6 +150,7 @@
           v-if="reviewForm.status === 2"
           label="拒绝原因"
           prop="rejectionReason"
+          :required="reviewForm.status === 2"
         >
           <el-input
             v-model="reviewForm.rejectionReason"
