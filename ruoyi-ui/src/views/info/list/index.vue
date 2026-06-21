@@ -199,6 +199,8 @@ export default {
         },
         { prop: "createBy", label: "创建者", type: "input" },
         { prop: "nickName", label: "昵称", type: "input" },
+        { prop: "name", label: "留资人姓名", type: "input" },
+        { prop: "phoneNum", label: "留资人电话", type: "input" },
         {
           prop: "activated",
           label: "激活状态",
@@ -251,6 +253,8 @@ export default {
         { label: "查询时系统时间", prop: "sysTime", width: "110" },
         { label: "创建者", prop: "createBy", width: "100" },
         { label: "昵称", prop: "nickName", width: "100" },
+        { label: "留资人姓名", prop: "name", width: "100" },
+        { label: "留资人电话", prop: "phoneNum", width: "120" },
         {
           label: "用户协议",
           prop: "contractPath",
@@ -669,6 +673,8 @@ export default {
               { label: "查询时系统时间", prop: "sysTime" },
               { label: "创建者", prop: "createBy" },
               { label: "昵称", prop: "nickName" },
+              { label: "留资人姓名", prop: "name" },
+              { label: "留资人电话", prop: "phoneNum" },
               {
                 label: "用户协议",
                 prop: "contractPath",

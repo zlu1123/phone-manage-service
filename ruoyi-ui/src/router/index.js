@@ -101,6 +101,33 @@ export const constantRoutes = [
         meta: { title: '订单列表', icon: 'list' }
       }
     ]
+  },
+  {
+    path: '/info',
+    component: Layout,
+    hidden: true,
+    redirect: 'noRedirect',
+    meta: { title: '信息管理', icon: 'table' },
+    children: [
+      {
+        path: 'list',
+        component: () => import('@/views/info/list/index'),
+        name: 'InfoOrderList',
+        meta: { title: '订单列表' }
+      },
+      {
+        path: 'user',
+        component: () => import('@/views/info/user/index'),
+        name: 'InfoLeaveInfoUser',
+        meta: { title: '用户列表' }
+      },
+      {
+        path: 'compensation',
+        component: () => import('@/views/info/compensation/index'),
+        name: 'CompensationOrder',
+        meta: { title: '待赔付列表' }
+      }
+    ]
   }
 ]
 
