@@ -277,7 +277,7 @@ export default {
           minWidth: "120",
           showOverflowTooltip: true,
         },
-        { label: "创建人", prop: "createBy", width: "100" },
+        { label: "创建人", prop: "createByName", width: "100" },
         {
           label: "创建时间",
           prop: "createTime",
