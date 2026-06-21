@@ -76,6 +76,11 @@ public class CompensationOrderReturnDto {
     private String createBy;
 
     /**
+     * 创建人名称/昵称
+     */
+    private String createByName;
+
+    /**
      * 更新时间
      */
     private Date updateTime;

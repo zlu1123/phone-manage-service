@@ -35,6 +35,7 @@
         <result column="remark" property="remark" jdbcType="VARCHAR"/>
         <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
         <result column="create_by" property="createBy" jdbcType="VARCHAR"/>
+        <result column="create_by_name" property="createByName" jdbcType="VARCHAR"/>
         <result column="update_time" property="updateTime" jdbcType="TIMESTAMP"/>
         <result column="update_by" property="updateBy" jdbcType="VARCHAR"/>
     </resultMap>
@@ -61,10 +62,11 @@
 
     <!-- 条件查询赔付订单列表 -->
     <select id="selectByCondition" resultMap="BaseResultDtoMap">
-        SELECT co.*, li.name, li.phone_num, pai.signature_imei
+        SELECT co.*, li.name, li.phone_num, pai.signature_imei, su.nick_name as create_by_name
         FROM compensation_order co
             left join phone_active_info pai on co.order_id = pai.id
             left join leave_information li on co.info_id = li.id
+            left join sys_user su on co.create_by = su.user_name
         <where>
             <if test="name != null and name != ''">
                 AND li.name LIKE CONCAT('%', #{name}, '%')
@@ -82,7 +84,7 @@
                 AND co.create_by LIKE CONCAT('%', #{createBy}, '%')
             </if>
         </where>
-        ORDER BY update_time DESC
+        ORDER BY co.update_time DESC
     </select>
 
     <!-- 新增赔付订单 -->
