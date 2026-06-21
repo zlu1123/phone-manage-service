@@ -32,4 +32,6 @@ public class PhoneActiveInfo extends BaseEntity {
     private String name; // 留资人姓名 ----扩展，不是数据字段，只做关联返回
     private String phoneNum; // 留资人电话 ----扩展，不是数据字段，只做关联返回
 
+    private Integer isSignature; // 是否已签约 ----扩展，不是数据字段，只做关联返回
+
 }

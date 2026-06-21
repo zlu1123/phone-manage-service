@@ -124,6 +124,7 @@
             <if test="signatureDate != null and signatureDate != ''"> AND pai.signature_date = #{signatureDate}</if>
             <if test="name != null and name != ''"> AND li.name LIKE CONCAT('%', #{name}, '%')</if>
             <if test="phoneNum != null and phoneNum != ''"> AND li.phone_num LIKE CONCAT('%', #{phoneNum}, '%')</if>
+            <if test="isSignature != null and isSignature == 1"> AND pai.signature_imei is not null</if>
         </where>
         order by pai.create_time desc
     </select>

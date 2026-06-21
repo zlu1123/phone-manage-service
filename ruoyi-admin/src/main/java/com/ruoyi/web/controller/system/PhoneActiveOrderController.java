@@ -116,4 +116,17 @@ public class PhoneActiveOrderController extends BaseController {
             return LocalDate.now().format(DATE_FORMATTER);
         }
     }
+
+    /**
+     * @param phoneActiveInfo 查询条件
+     * @return 订单分页列表
+     */
+    @ApiOperation("查询已签约订单列表")
+    @GetMapping("/querySignContractOrderList")
+    public R querySignContractOrderList(PhoneActiveInfo phoneActiveInfo) {
+        startPage();
+        phoneActiveInfo.setIsSignature(1);
+        List<PhoneActiveInfo> list = phoneActiveInfoService.queryActiveList(phoneActiveInfo);
+        return R.ok(getDataTable(list));
+    }
 }
