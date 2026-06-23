@@ -54,6 +54,14 @@
           >审核</el-button
         >
         <el-button
+          v-if="Number(row.status) === 1 && Number(row.amount) === 0"
+          size="mini"
+          type="text"
+          icon="el-icon-edit"
+          @click="handleEditAmount(row)"
+          >修改金额</el-button
+        >
+        <el-button
           size="mini"
           type="text"
           icon="el-icon-delete"
@@ -181,6 +189,47 @@
         >
       </div>
     </el-dialog>
+
+    <!-- 修改金额对话框 -->
+    <el-dialog
+      title="修改赔付金额"
+      :visible.sync="editAmountDialogVisible"
+      width="450px"
+      append-to-body
+      :close-on-click-modal="false"
+    >
+      <el-form
+        ref="editAmountForm"
+        :model="editAmountForm"
+        :rules="editAmountRules"
+        label-width="100px"
+        size="small"
+        @submit.native.prevent
+      >
+        <el-form-item label="赔付金额" prop="amount">
+          <el-input-number
+            v-model="editAmountForm.amount"
+            :precision="2"
+            :min="0.01"
+            :max="999999.99"
+            placeholder="请输入赔付金额"
+            style="width: 100%"
+          />
+        </el-form-item>
+      </el-form>
+      <div slot="footer" class="dialog-footer">
+        <el-button size="small" @click="editAmountDialogVisible = false"
+          >取 消</el-button
+        >
+        <el-button
+          type="primary"
+          size="small"
+          :loading="submitLoading"
+          @click="handleEditAmountSubmit"
+          >确 定</el-button
+        >
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -218,21 +267,6 @@ export default {
         status: [
           { required: true, message: "请选择审核状态", trigger: "change" },
         ],
-        amount: [
-          {
-            validator: (rule, value, callback) => {
-              if (
-                this.reviewForm.status === 1 &&
-                (value == null || value === "")
-              ) {
-                callback(new Error("请输入赔付金额"));
-              } else {
-                callback();
-              }
-            },
-            trigger: "blur",
-          },
-        ],
         rejectionReason: [
           {
             validator: (rule, value, callback) => {
@@ -248,6 +282,14 @@ export default {
       },
       // 提交按钮loading
       submitLoading: false,
+      // 修改金额对话框
+      editAmountDialogVisible: false,
+      editAmountForm: {},
+      editAmountRules: {
+        amount: [
+          { required: true, message: "请输入赔付金额", trigger: "blur" },
+        ],
+      },
       // 搜索字段配置
       searchFields: [
         { prop: "name", label: "留资人姓名", type: "input" },
@@ -374,6 +416,35 @@ export default {
           .then(() => {
             this.$message.success("审核提交成功");
             this.reviewDialogVisible = false;
+            this.$refs.proTable.refresh();
+          })
+          .finally(() => {
+            this.submitLoading = false;
+          });
+      });
+    },
+    /** 修改金额按钮 */
+    handleEditAmount(row) {
+      this.editAmountForm = {
+        id: row.id,
+        amount: undefined,
+      };
+      this.editAmountDialogVisible = true;
+      this.$nextTick(() => {
+        if (this.$refs.editAmountForm) {
+          this.$refs.editAmountForm.clearValidate();
+        }
+      });
+    },
+    /** 提交修改金额 */
+    handleEditAmountSubmit() {
+      this.$refs.editAmountForm.validate((valid) => {
+        if (!valid) return;
+        this.submitLoading = true;
+        updateCompensation(this.editAmountForm)
+          .then(() => {
+            this.$message.success("金额修改成功");
+            this.editAmountDialogVisible = false;
             this.$refs.proTable.refresh();
           })
           .finally(() => {

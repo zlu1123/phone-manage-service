@@ -31,18 +31,19 @@
         <result column="update_by" property="updateBy"/>
         <result column="phone_num" property="phoneNum"/>
         <result column="info_id" property="infoId"/>
+        <result column="skip_api_call" property="skipApiCall"/>
     </resultMap>
 
     <sql id="Base_Column_List">
         id, sn, phone_type, imei1, imei2, model, activated, activate_date, coverage, image_path, active_info, sys_time,
           contract_id, contract_path, signature_path, contract_content, signature_model, signature_imei, signature_date,
-        create_time, create_by, nick_name, update_time, update_by, info_id
+        create_time, create_by, nick_name, update_time, update_by, info_id, skip_api_call
     </sql>
 
     <sql id="Base_Column_List_Q">
         id, sn, phone_type, imei1, imei2, model, activated, activate_date, coverage, image_path, sys_time,
           contract_id, contract_path, signature_path, contract_content, signature_model, signature_imei, signature_date,
-        create_time, create_by, nick_name, update_time, update_by, info_id
+        create_time, create_by, nick_name, update_time, update_by, info_id, skip_api_call
     </sql>
 
     <select id="selectBySn" resultMap="BaseResultMap">
@@ -55,11 +56,11 @@
         INSERT INTO phone_active_info (
             sn, phone_type, imei1, imei2, model, activated, activate_date, coverage, image_path, active_info, sys_time,
              contract_id, contract_path, signature_path, contract_content, signature_model, signature_imei, signature_date,
-            create_time, create_by, nick_name, update_time, update_by, info_id
+            create_time, create_by, nick_name, update_time, update_by, info_id, skip_api_call
         ) VALUES (
                      #{sn}, #{phoneType}, #{imei1}, #{imei2}, #{model}, #{activated}, #{activateDate}, #{coverage}, #{imagePath}, #{activeInfo}, #{sysTime},
                      #{contractId}, #{contractPath}, #{signaturePath}, #{contractContent}, #{signatureModel}, #{signatureImei}, #{signatureDate},
-                     #{createTime}, #{createBy}, #{nickName}, #{updateTime}, #{updateBy}, #{infoId}
+                     #{createTime}, #{createBy}, #{nickName}, #{updateTime}, #{updateBy}, #{infoId}, #{skipApiCall}
                  )
     </insert>
 
@@ -85,6 +86,7 @@
             <if test="signatureImei != null">signature_imei = #{signatureImei},</if>
             <if test="signatureDate != null">signature_date = #{signatureDate},</if>
             <if test="infoId != null">info_id = #{infoId},</if>
+            <if test="skipApiCall != null">skip_api_call = #{skipApiCall},</if>
 
             update_time = now()
             <if test="updateBy != null">, update_by = #{updateBy}</if>
@@ -118,6 +120,7 @@
 <!--            </if>-->
             <if test="createBy != null and createBy != ''"> AND pai.create_by = #{createBy}</if>
             <if test="nickName != null and nickName != ''"> AND pai.nick_name like CONCAT('%', #{nickName}, '%')</if>
+            <if test="skipApiCall != null"> AND pai.skip_api_call = #{skipApiCall}</if>
 
             <if test="signatureModel != null and signatureModel != ''"> AND pai.signature_model like CONCAT('%', #{signatureModel}, '%')</if>
             <if test="signatureImei != null and signatureImei != ''"> AND pai.signature_imei like CONCAT('%', #{signatureImei}, '%')</if>

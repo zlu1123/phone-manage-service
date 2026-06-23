@@ -34,4 +34,6 @@ public class PhoneActiveInfo extends BaseEntity {
 
     private Integer isSignature; // 是否已签约 ----扩展，不是数据字段，只做关联返回
 
+    private Integer skipApiCall; // 是否跳过06 API查询：0-正常查询 1-无旧手机跳过
+
 }

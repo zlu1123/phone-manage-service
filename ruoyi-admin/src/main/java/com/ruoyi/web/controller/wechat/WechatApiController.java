@@ -83,7 +83,14 @@ public class WechatApiController extends BaseController {
                              @RequestParam(value = "imagePath", required = false) String imagePath,
                              @RequestParam(value = "imageUrl", required = false) String imageUrl,
                              @RequestParam(value = "img", required = false) MultipartFile img,
-                             @RequestParam(value = "file", required = false) MultipartFile file) {
+                             @RequestParam(value = "file", required = false) MultipartFile file,
+                             @RequestParam(value = "skipApiCall", required = false, defaultValue = "false") Boolean skipApiCall) {
+        // 跳过06 API调用（无旧手机场景：新增用户 / 旧手机损坏丢失等）
+        if (Boolean.TRUE.equals(skipApiCall)) {
+            log.info("skipApiCall=true，跳过06 API查询，直接进入下一步。typeCode={}, code={}, imei={}, imei2={}", typeCode, code, imei, imei2);
+            return handleSkipApiCall(typeCode, code, imei, imei2, imagePath, imageUrl, img, file, infoId);
+        }
+
         String type = PhoneType.getValueByCode(typeCode);
         if (type == null) {
             return R.fail("查询失败，无效的手机类型！");
@@ -127,6 +134,56 @@ public class WechatApiController extends BaseController {
             phoneInfoDto.setId(id);
         } catch (Exception e) {
             log.error("保存数据失败", e);
+            return R.fail("保存数据失败：" + e.getMessage());
+        }
+        return R.ok(phoneInfoDto);
+    }
+
+    /**
+     * 跳过06 API查询，直接构造返回信息（无旧手机场景）
+     * 用于以下场景：
+     * - 新增用户（无旧手机）
+     * - 旧手机损坏/丢失（后续由前端根据旧手机使用时长判断跳转签协议或亚丁）
+     */
+    private R handleSkipApiCall(String typeCode, String code, String imei, String imei2,
+                                 String imagePath, String imageUrl, MultipartFile img,
+                                 MultipartFile file, Long infoId) {
+        String resolvedImagePath;
+        try {
+            resolvedImagePath = resolveImagePath(imagePath, imageUrl, img, file);
+        } catch (Exception e) {
+            log.error("处理上传图片失败", e);
+            return R.fail("图片处理失败：" + e.getMessage());
+        }
+
+        // 构造 PhoneInfoDto，直接使用前端传入的信息，无需调用06 API
+        PhoneInfoDto phoneInfoDto = new PhoneInfoDto();
+        String trimmedCode = code == null ? "" : code.trim();
+        String trimmedImei = imei == null ? "" : imei.trim();
+        String trimmedImei2 = imei2 == null ? "" : imei2.trim();
+
+        // 识别 code 是 SN 还是 IMEI：如果 code 是纯数字且长度>=15，则可能是 IMEI
+        if (!trimmedCode.isEmpty() && trimmedCode.matches("\\d{15,17}")) {
+            phoneInfoDto.setImei1(trimmedCode);
+            if (!trimmedImei.isEmpty()) {
+                phoneInfoDto.setImei2(trimmedImei);
+            }
+        } else {
+            phoneInfoDto.setSn(trimmedCode);
+            phoneInfoDto.setImei1(trimmedImei);
+            phoneInfoDto.setImei2(trimmedImei2);
+        }
+
+        // 无旧手机场景，不设置 model/activated 等06 API返回的字段
+        phoneInfoDto.setSysTime((String) redisTemplate.opsForValue().get(CacheConstants.SYS_CONFIG_KEY + Constants.SYSTEM_TIME_CACHE_KEY));
+        phoneInfoDto.setImagePath(normalizeImagePath(resolvedImagePath));
+        phoneInfoDto.setImageUrl(buildImageUrl(phoneInfoDto.getImagePath()));
+
+        try {
+            Long id = saveActiveInfo(phoneInfoDto, null, typeCode, phoneInfoDto.getImagePath(), infoId, 1);
+            phoneInfoDto.setId(id);
+        } catch (Exception e) {
+            log.error("保存数据失败（skipApiCall）", e);
             return R.fail("保存数据失败：" + e.getMessage());
         }
         return R.ok(phoneInfoDto);
@@ -239,7 +296,11 @@ public class WechatApiController extends BaseController {
     }
 
     private Long saveActiveInfo(PhoneInfoDto dto, String rawJson, String typeCode, String imagePath, Long infoId) {
-        log.info("开始保存信息，{}", dto);
+        return saveActiveInfo(dto, rawJson, typeCode, imagePath, infoId, 0);
+    }
+
+    private Long saveActiveInfo(PhoneInfoDto dto, String rawJson, String typeCode, String imagePath, Long infoId, Integer skipApiCall) {
+        log.info("开始保存信息，skipApiCall={}, {}", skipApiCall, dto);
         PhoneActiveInfo info = new PhoneActiveInfo();
         info.setSn(dto.getSn());
         info.setPhoneType(typeCode);
@@ -253,6 +314,7 @@ public class WechatApiController extends BaseController {
         info.setSysTime(dto.getSysTime());
         info.setImagePath(imagePath);
         info.setInfoId(infoId);
+        info.setSkipApiCall(skipApiCall);
         // 设置创建人/更新人
         info.setCreateBy(getUsername());
         info.setUpdateBy(getUsername());

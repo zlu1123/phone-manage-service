@@ -29,6 +29,12 @@
         </el-col>
       </template>
 
+      <!-- 自定义列：订单类型 -->
+      <template #skipApiCall="{ row }">
+        <el-tag v-if="row.skipApiCall === 1" type="warning" size="small">新手机登记</el-tag>
+        <el-tag v-else type="info" size="small">旧手机识别</el-tag>
+      </template>
+
       <!-- 自定义列：手机品牌 -->
       <template #phoneType="{ row }">
         <span>{{ getPhoneTypeName(row.phoneType) }}</span>
@@ -210,10 +216,26 @@ export default {
             { label: "未激活", value: false },
           ],
         },
+        {
+          prop: "skipApiCall",
+          label: "订单类型",
+          type: "select",
+          options: [
+            { label: "全部", value: "" },
+            { label: "新手机登记", value: 1 },
+            { label: "旧手机识别", value: 0 },
+          ],
+        },
       ],
       // 表格列配置
       columns: [
         { label: "ID", prop: "id", width: "50" },
+        {
+          label: "订单类型",
+          prop: "skipApiCall",
+          slot: "skipApiCall",
+          width: "90",
+        },
         {
           label: "手机品牌",
           prop: "phoneType",
@@ -641,6 +663,11 @@ export default {
             queryParams,
             columns: [
               { label: "ID", prop: "id", width: 6 },
+              {
+                label: "订单类型",
+                formatter: (row) => (row.skipApiCall === 1 ? "新手机登记" : "旧手机识别"),
+                width: 10,
+              },
               {
                 label: "手机品牌",
                 prop: "phoneType",
