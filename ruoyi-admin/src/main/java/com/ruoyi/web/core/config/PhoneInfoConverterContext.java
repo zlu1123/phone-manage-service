@@ -7,8 +7,14 @@ import com.ruoyi.web.model.HuaWeiPhoneObject;
 import com.ruoyi.web.model.XiaoMiPhoneObject;
 import com.ruoyi.web.service.MapToObjectConverter;
 import com.ruoyi.web.service.PhoneInfoConverter;
+import com.ruoyi.web.model.OppoPhoneObject;
+import com.ruoyi.web.model.SamsungPhoneObject;
+import com.ruoyi.web.model.VivoPhoneObject;
 import com.ruoyi.web.service.impl.ApplePhoneConverter;
 import com.ruoyi.web.service.impl.HuaWeiPhoneConverter;
+import com.ruoyi.web.service.impl.OppoPhoneConverter;
+import com.ruoyi.web.service.impl.SamsungPhoneConverter;
+import com.ruoyi.web.service.impl.VivoPhoneConverter;
 import com.ruoyi.web.service.impl.XiaoMiPhoneConverter;
 import org.springframework.stereotype.Component;
 
@@ -54,11 +60,17 @@ public class PhoneInfoConverterContext {
         // 荣耀已从华为接口拆分，但返回结构与华为一致，复用 HuaWeiPhoneObject 解析
         registerObjectConverter(PhoneType.HONOR.getCode(), map -> objectMapper.convertValue(map, HuaWeiPhoneObject.class));
 
+        registerObjectConverter(PhoneType.OPPO.getCode(), map -> objectMapper.convertValue(map, OppoPhoneObject.class));
+        registerObjectConverter(PhoneType.VIVO.getCode(), map -> objectMapper.convertValue(map, VivoPhoneObject.class));
+        registerObjectConverter(PhoneType.SAMSUNG.getCode(), map -> objectMapper.convertValue(map, SamsungPhoneObject.class));
+
         registerStrategy(PhoneType.APPLE.getCode(), new ApplePhoneConverter());
         registerStrategy(PhoneType.XIAOMI.getCode(), new XiaoMiPhoneConverter());
         registerStrategy(PhoneType.HUAWEI.getCode(), new HuaWeiPhoneConverter());
         // 荣耀复用华为字段映射
         registerStrategy(PhoneType.HONOR.getCode(), new HuaWeiPhoneConverter());
-        // 可以继续添加更多类型...
+        registerStrategy(PhoneType.OPPO.getCode(), new OppoPhoneConverter());
+        registerStrategy(PhoneType.VIVO.getCode(), new VivoPhoneConverter());
+        registerStrategy(PhoneType.SAMSUNG.getCode(), new SamsungPhoneConverter());
     }
 }

@@ -12,7 +12,7 @@ import java.util.stream.Collectors;
 /**
  * 设备信息提取服务
  * 从OCR识别文本中提取手机的IMEI和SN码
- * 支持品牌：苹果、华为/荣耀、小米/红米
+ * 支持品牌：苹果、华为/荣耀、小米/红米、OPPO/真我/一加、VIVO/iQOO、三星
  *
  * 全链路识别策略：
  * 1. OCR文本预处理（噪声过滤、字符修正）
@@ -186,6 +186,14 @@ public class DeviceInfoExtractorService {
         // 荣耀已从华为接口拆分，但 OCR 提取规则与华为一致（SN/IMEI 格式相同），统一按 huawei 处理
         if ("honor".equalsIgnoreCase(brandType)) {
             brandType = "huawei";
+        }
+        // OPPO/真我/一加、VIVO/iQOO OCR 规则复用小米模式（Android 厂商 SN/IMEI 格式相似）
+        if ("oppo".equalsIgnoreCase(brandType) || "vivo".equalsIgnoreCase(brandType)) {
+            brandType = "xiaomi";
+        }
+        // 三星 SN 格式与国际品牌相似，复用通用模式（default 分支会走 SN_GENERIC）
+        if ("samsung".equalsIgnoreCase(brandType)) {
+            brandType = "samsung";
         }
         log.info("原始OCR文本:\n{}", ocrText);
 
@@ -848,6 +856,8 @@ public class DeviceInfoExtractorService {
                 return 14; // 华为SN通常16~20位
             case "xiaomi":
                 return 12; // 小米SN通常12~20位
+            case "samsung":
+                return 10; // 三星SN通常10~15位
             default:
                 return 10;
         }
@@ -1129,6 +1139,11 @@ public class DeviceInfoExtractorService {
                 // 小米/红米SN：通常12~22位，全大写字母数字
                 // 例如：0HFKJD8F2L1M（12位）
                 return Pattern.compile("[A-Z0-9]{10,22}");
+
+            case "samsung":
+                // 三星SN：通常10~15位字母数字混合
+                // 例如：R5CW81GZKAM（11位）
+                return Pattern.compile("[A-Z0-9]{8,16}");
 
             default:
                 return SN_GENERIC;

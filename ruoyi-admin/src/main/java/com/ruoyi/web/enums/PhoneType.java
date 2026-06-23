@@ -10,7 +10,10 @@ public enum PhoneType {
     APPLE("1", "苹果", "apple_warranty"),
     XIAOMI("2", "小米/红米", "xiaomi"),
     HUAWEI("3", "华为", "huawei"),
-    HONOR("4", "荣耀", "honor");
+    HONOR("4", "荣耀", "honor"),
+    OPPO("5", "OPPO/真我/一加", "oppo"),
+    VIVO("6", "VIVO/iQOO", "vivo"),
+    SAMSUNG("7", "三星", "samsung");
 
     private final String code;
     private final String name;
