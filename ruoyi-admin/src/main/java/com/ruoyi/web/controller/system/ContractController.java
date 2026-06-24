@@ -36,6 +36,24 @@ public class ContractController extends BaseController {
     private ServerConfig serverConfig;
 
     /**
+     * 根据ID获取协议内容（供前端点击查看协议时按需加载）
+     *
+     * @param id 协议ID
+     * @return 协议内容
+     */
+    @ApiOperation("根据ID获取协议内容")
+    @GetMapping("/getById")
+    public R getById(@RequestParam("id") Integer id) {
+        Contract contract = new Contract();
+        contract.setId(id);
+        Contract result = contractService.queryContractById(contract);
+        if (result == null) {
+            return R.fail("协议不存在");
+        }
+        return R.ok(result);
+    }
+
+    /**
      * @param ContractDto 查询条件
      * @return 订单分页列表
      */

@@ -36,4 +36,7 @@ public class PhoneActiveInfo extends BaseEntity {
 
     private Integer skipApiCall; // 是否跳过06 API查询：0-正常查询 1-无旧手机跳过
 
+    private Integer oldPhoneStatus; // 旧手机状态：0-无旧手机, 1-损坏/丢失
+    private Integer oldPhoneUsageMonths; // 旧手机使用月数
+
 }

@@ -6,15 +6,12 @@
       :search-fields="searchFields"
       :columns="columns"
       :extra-params="extraParams"
+      row-key="id"
     >
       <!-- 工具栏：导出按钮 -->
       <template #toolbar>
         <el-col :span="1.5">
-          <el-tooltip
-            content="导出时会按照当前筛选条件导出数据"
-            placement="top"
-            :open-delay="500"
-          >
+          <el-tooltip content="导出时会按照当前筛选条件导出数据" placement="top" :open-delay="500">
             <el-button
               type="warning"
               plain
@@ -31,99 +28,116 @@
 
       <!-- 自定义列：订单类型 -->
       <template #skipApiCall="{ row }">
-        <el-tag v-if="row.skipApiCall === 1" type="warning" size="small">新手机登记</el-tag>
-        <el-tag v-else type="info" size="small">旧手机识别</el-tag>
-      </template>
-
-      <!-- 自定义列：手机品牌 -->
-      <template #phoneType="{ row }">
-        <span>{{ getPhoneTypeName(row.phoneType) }}</span>
-      </template>
-
-      <!-- 自定义列：手机型号 -->
-      <template #model="{ row }">
-        <span>{{ row.model || "-" }}</span>
-      </template>
-
-      <!-- 自定义列：图片（默认不加载，点击查看才请求，且仅请求 1 次） -->
-      <template #imagePath="{ row }">
-        <el-button
-          v-if="row.imagePath"
-          size="mini"
-          type="text"
-          icon="el-icon-picture-outline"
-          @click="handleViewImage(row.imagePath)"
-          >查看</el-button
+        <el-tag v-if="row.skipApiCall === 1 &amp;&amp; row.oldPhoneStatus === 0" type="danger" size="small"
+          >无旧手机新手机签约</el-tag
         >
+        <el-tag v-else-if="row.skipApiCall === 1 &amp;&amp; row.oldPhoneStatus === 1" type="danger" size="small"
+          >旧手机丢失/遗失新签约</el-tag
+        >
+        <el-tag v-else-if="row.oldPhoneStatus === 1" type="warning" size="small">旧手机丢失/遗失去亚丁</el-tag>
+        <el-tag v-else type="success" size="small">旧手机识别</el-tag>
+      </template>
+
+      <!-- 自定义列：渠道 -->
+      <template #channel="{ row }">
+        <el-tag :type="row.skipApiCall === 1 ? '' : 'warning'" size="small">
+          {{ row.skipApiCall === 1 ? '自有' : '亚丁' }}
+        </el-tag>
+      </template>
+
+      <!-- 自定义列：旧手机使用月数 -->
+      <template #oldPhoneUsageMonths="{ row }">
+        <span v-if="row.oldPhoneUsageMonths === 0">小于24个月</span>
+        <span v-else-if="row.oldPhoneUsageMonths === 24">大于24个月</span>
+        <span v-else-if="row.oldPhoneUsageMonths">> {{ row.oldPhoneUsageMonths }}</span>
         <span v-else>-</span>
       </template>
-      <!-- 自定义列：IMEI1 -->
-      <template #imei1="{ row }">
-        <span>{{ row.imei1 || "-" }}</span>
+
+      <!-- 展开行：旧手机详情 + 签约信息 -->
+      <template #expand="{ row }">
+        <div class="expand-content">
+          <div class="expand-section">
+            <h4 class="expand-title">旧手机详情</h4>
+            <el-descriptions :column="3" size="small" border>
+              <el-descriptions-item label="手机品牌">{{ getPhoneTypeName(row.phoneType) }}</el-descriptions-item>
+              <el-descriptions-item label="手机型号">{{ row.model || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="序列号">{{ row.sn || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="IMEI2">{{ row.imei2 || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="图片">
+                <el-button
+                  v-if="row.imagePath"
+                  size="mini"
+                  type="text"
+                  icon="el-icon-picture-outline"
+                  @click="handleViewImage(row.imagePath)"
+                  >查看</el-button
+                >
+                <span v-else>-</span>
+              </el-descriptions-item>
+              <el-descriptions-item label="激活日期">{{ formatDate(row.activateDate) }}</el-descriptions-item>
+              <el-descriptions-item label="保修到期">{{ formatDate(row.coverage) }}</el-descriptions-item>
+              <el-descriptions-item label="系统时间">{{ row.sysTime || '-' }}</el-descriptions-item>
+            </el-descriptions>
+          </div>
+          <div class="expand-section">
+            <h4 class="expand-title">签约信息</h4>
+            <el-descriptions :column="3" size="small" border>
+              <el-descriptions-item label="昵称">{{ row.nickName || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="签名型号">{{ row.signatureModel || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="签名IMEI">{{ row.signatureImei || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="签名日期">{{ row.signatureDate || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="用户协议">
+                <el-button
+                  v-if="row.contractId || row.contractContent"
+                  size="mini"
+                  type="text"
+                  icon="el-icon-view"
+                  @click="handleViewContract(row)"
+                  >查看</el-button
+                >
+                <el-link
+                  v-else-if="row.contractPath"
+                  type="primary"
+                  :href="baseApi + row.contractPath"
+                  target="_blank"
+                  :underline="false"
+                  >查看</el-link
+                >
+                <span v-else>-</span>
+              </el-descriptions-item>
+              <el-descriptions-item label="用户签名">
+                <el-button
+                  v-if="row.signaturePath"
+                  size="mini"
+                  type="text"
+                  icon="el-icon-picture-outline"
+                  @click="handleViewImage(row.signaturePath)"
+                  >查看</el-button
+                >
+                <span v-else>-</span>
+              </el-descriptions-item>
+            </el-descriptions>
+          </div>
+        </div>
       </template>
 
-      <!-- 自定义列：IMEI2 -->
-      <template #imei2="{ row }">
-        <span>{{ row.imei2 || "-" }}</span>
+      <!-- 自定义列：IMEI1 -->
+      <template #imei1="{ row }">
+        <span>{{ row.imei1 || '-' }}</span>
       </template>
 
       <!-- 自定义列：激活状态 -->
       <template #activated="{ row }">
         <el-tag :type="row.activated ? 'success' : 'info'" size="small">
-          {{ row.activated ? "已激活" : "未激活" }}
+          {{ row.activated ? '已激活' : '--' }}
         </el-tag>
       </template>
 
-      <!-- 自定义列：激活日期（统一为 YYYY-MM-DD） -->
-      <template #activateDate="{ row }">
-        <span>{{ formatDate(row.activateDate) }}</span>
-      </template>
-
-      <!-- 自定义列：保修到期时间（统一为 YYYY-MM-DD） -->
-      <template #coverage="{ row }">
-        <span>{{ formatDate(row.coverage) }}</span>
-      </template>
-
-      <!-- 自定义列：质保状态（与小程序保持一致） -->
+      <!-- 自定义列：质保状态 -->
       <template #expired="{ row }">
         <el-tag :type="getWarrantyTagType(row)" size="small">
           {{ getWarrantyInfo(row).status }}
         </el-tag>
-      </template>
-
-      <!-- 自定义列：用户协议 -->
-      <template #contract="{ row }">
-        <el-button
-          v-if="row.contractContent"
-          size="mini"
-          type="text"
-          icon="el-icon-view"
-          @click="handleViewContract(row)"
-          >查看协议</el-button
-        >
-        <el-link
-          v-else-if="row.contractPath"
-          type="primary"
-          :href="baseApi + row.contractPath"
-          target="_blank"
-          :underline="false"
-        >
-          查看协议
-        </el-link>
-        <span v-else>-</span>
-      </template>
-
-      <!-- 自定义列：用户签名（默认不加载，点击查看才请求，且仅请求 1 次） -->
-      <template #signature="{ row }">
-        <el-button
-          v-if="row.signaturePath"
-          size="mini"
-          type="text"
-          icon="el-icon-picture-outline"
-          @click="handleViewImage(row.signaturePath)"
-          >查看</el-button
-        >
-        <span v-else>-</span>
       </template>
 
       <!-- 自定义列：创建时间 -->
@@ -133,29 +147,12 @@
     </pro-table>
 
     <!-- 全局图片预览器：使用 el-image-viewer，避免 <el-image> 缩略图 + 预览图双重加载 -->
-    <el-image-viewer
-      v-if="previewVisible"
-      :url-list="previewUrlList"
-      :on-close="handleClosePreview"
-      :z-index="3000"
-    />
+    <el-image-viewer v-if="previewVisible" :url-list="previewUrlList" :on-close="handleClosePreview" :z-index="3000" />
 
     <!-- 协议内容预览抽屉 -->
-    <el-drawer
-      :title="drawerTitle"
-      :visible.sync="drawerVisible"
-      direction="rtl"
-      size="50%"
-      append-to-body
-    >
+    <el-drawer :title="drawerTitle" :visible.sync="drawerVisible" direction="rtl" size="50%" append-to-body>
       <div class="drawer-toolbar">
-        <el-button
-          type="primary"
-          size="small"
-          icon="el-icon-printer"
-          @click="handlePrint"
-          >打印协议</el-button
-        >
+        <el-button type="primary" size="small" icon="el-icon-printer" @click="handlePrint">打印协议</el-button>
       </div>
       <div id="printArea" ref="printArea" class="contract-content-wrapper">
         <div v-html="drawerContent"></div>
@@ -165,14 +162,14 @@
 </template>
 
 <script>
-import { queryOrderList, queryPhoneTypeList } from "@/api/order/list";
-import { exportExcel } from "@/utils/export";
+import { queryOrderList, queryPhoneTypeList, getContractById } from '@/api/order/list';
+import { exportExcel } from '@/utils/export';
 // element-ui 内部的全局图片预览器（和 <el-image> 点击后弹出的是同一个组件），
 // 直接使用可以避免 <el-image> 缩略图 + 预览图的重复请求
-import ElImageViewer from "element-ui/packages/image/src/image-viewer";
+import ElImageViewer from 'element-ui/packages/image/src/image-viewer';
 
 export default {
-  name: "Order",
+  name: 'Order',
   components: { ElImageViewer },
   data() {
     return {
@@ -188,117 +185,84 @@ export default {
       extraParams: {},
       // 抽屉相关
       drawerVisible: false,
-      drawerTitle: "",
-      drawerContent: "",
+      drawerTitle: '',
+      drawerContent: '',
       currentRow: null,
       // 图片预览器控制：默认不加载，点击查看后才渲染 el-image-viewer 并请求 1 次原图
       previewVisible: false,
       previewUrlList: [],
       // 搜索字段配置
       searchFields: [
-        { prop: "sn", label: "序列号", type: "input" },
+        { prop: 'sn', label: '序列号', type: 'input' },
         {
-          prop: "phoneType",
-          label: "手机品牌",
-          type: "select",
+          prop: 'phoneType',
+          label: '旧手机品牌',
+          type: 'select',
           options: [], // 动态加载
         },
-        { prop: "createBy", label: "创建者", type: "input" },
-        { prop: "nickName", label: "昵称", type: "input" },
-        { prop: "name", label: "留资人姓名", type: "input" },
-        { prop: "phoneNum", label: "留资人电话", type: "input" },
+        { prop: 'createBy', label: '创建者', type: 'input' },
+        { prop: 'nickName', label: '昵称', type: 'input' },
+        { prop: 'name', label: '留资人姓名', type: 'input' },
+        { prop: 'phoneNum', label: '留资人电话', type: 'input' },
         {
-          prop: "activated",
-          label: "激活状态",
-          type: "select",
+          prop: 'activated',
+          label: '激活状态',
+          type: 'select',
           options: [
-            { label: "已激活", value: true },
-            { label: "未激活", value: false },
+            { label: '已激活', value: true },
+            { label: '未激活', value: false },
           ],
         },
         {
-          prop: "skipApiCall",
-          label: "订单类型",
-          type: "select",
+          prop: 'oldPhoneStatus',
+          label: '订单类型',
+          type: 'select',
           options: [
-            { label: "全部", value: "" },
-            { label: "新手机登记", value: 1 },
-            { label: "旧手机识别", value: 0 },
+            { label: '全部', value: '' },
+            { label: '有旧手机（正常）', value: 2 },
+            { label: '有旧手机但已损坏/遗失', value: 1 },
+            { label: '无旧手机', value: 0 },
           ],
         },
       ],
       // 表格列配置
       columns: [
-        { label: "ID", prop: "id", width: "50" },
+        { label: '', type: 'expand', slot: 'expand', width: '50', attrs: { type: 'expand' } },
+        { label: 'ID', prop: 'id', width: '50' },
         {
-          label: "订单类型",
-          prop: "skipApiCall",
-          slot: "skipApiCall",
-          width: "90",
+          label: '订单类型',
+          prop: 'skipApiCall',
+          slot: 'skipApiCall',
+          width: '150',
         },
         {
-          label: "手机品牌",
-          prop: "phoneType",
-          slot: "phoneType",
-          minWidth: "80",
-        },
-        { label: "手机型号", prop: "model", slot: "model", minWidth: "80" },
-        {
-          label: "图片",
-          prop: "imagePath",
-          slot: "imagePath",
-          width: "80",
-          showOverflowTooltip: false,
-        },
-        { label: "序列号", prop: "sn", minWidth: "110" },
-        { label: "IMEI1", prop: "imei1", slot: "imei1", minWidth: "110" },
-        { label: "IMEI2", prop: "imei2", slot: "imei2", minWidth: "110" },
-        {
-          label: "激活状态",
-          prop: "activated",
-          slot: "activated",
-          width: "90",
+          label: '渠道',
+          prop: 'channel',
+          slot: 'channel',
+          width: '70',
         },
         {
-          label: "激活日期",
-          prop: "activateDate",
-          slot: "activateDate",
-          width: "110",
+          label: '旧手机使用月数',
+          prop: 'oldPhoneUsageMonths',
+          slot: 'oldPhoneUsageMonths',
+          width: '130',
         },
+        { label: '旧手机IMEI1', prop: 'imei1', slot: 'imei1', minWidth: '110' },
+        { label: '留资人姓名', prop: 'name', width: '100' },
+        { label: '留资人电话', prop: 'phoneNum', width: '120' },
+        { label: '创建者', prop: 'createBy', width: '100' },
         {
-          label: "保修到期时间",
-          prop: "coverage",
-          slot: "coverage",
-          width: "110",
+          label: '激活状态',
+          prop: 'activated',
+          slot: 'activated',
+          width: '90',
         },
-        { label: "是否过期", slot: "expired", width: "90" },
-        { label: "查询时系统时间", prop: "sysTime", width: "110" },
-        { label: "创建者", prop: "createBy", width: "100" },
-        { label: "昵称", prop: "nickName", width: "100" },
-        { label: "留资人姓名", prop: "name", width: "100" },
-        { label: "留资人电话", prop: "phoneNum", width: "120" },
+        { label: '质保状态', slot: 'expired', width: '90' },
         {
-          label: "用户协议",
-          prop: "contractPath",
-          slot: "contract",
-          width: "100",
-          showOverflowTooltip: false,
-        },
-        {
-          label: "用户签名",
-          prop: "signaturePath",
-          slot: "signature",
-          width: "90",
-          showOverflowTooltip: false,
-        },
-        { label: "签名型号", prop: "signatureModel", width: "120" },
-        { label: "签名IMEI", prop: "signatureImei", width: "140" },
-        { label: "签名日期", prop: "signatureDate", width: "110" },
-        {
-          label: "创建时间",
-          prop: "createTime",
-          slot: "createTime",
-          width: "180",
+          label: '创建时间',
+          prop: 'createTime',
+          slot: 'createTime',
+          width: '180',
         },
       ],
     };
@@ -317,9 +281,7 @@ export default {
         .then((response) => {
           this.phoneTypeList = response.data || [];
           // 动态更新搜索字段的 options
-          const phoneTypeField = this.searchFields.find(
-            (f) => f.prop === "phoneType"
-          );
+          const phoneTypeField = this.searchFields.find((f) => f.prop === 'phoneType');
           if (phoneTypeField) {
             phoneTypeField.options = this.phoneTypeList.map((item) => ({
               label: item.name,
@@ -328,12 +290,12 @@ export default {
           }
         })
         .catch((err) => {
-          console.error("获取手机品牌列表失败：", err);
+          console.error('获取手机品牌列表失败：', err);
         });
     },
     /** 根据品牌code获取品牌名称 */
     getPhoneTypeName(code) {
-      if (!code) return "-";
+      if (!code) return '-';
       const item = this.phoneTypeList.find((t) => t.code === code);
       return item ? item.name : code;
     },
@@ -355,14 +317,14 @@ export default {
      * 兼容后端返回的多种形式：'2021-08-28' / '2023/12/31' / ISO 字符串 / 毫秒数等
      */
     formatDate(value) {
-      if (!value && value !== 0) return "-";
+      if (!value && value !== 0) return '-';
       // 优先使用上下文可用的 parseTime（若公共工具提供）以保证跨项目一致性
       let date;
-      if (typeof value === "number") {
+      if (typeof value === 'number') {
         date = new Date(value);
-      } else if (typeof value === "string") {
+      } else if (typeof value === 'string') {
         // 将 'YYYY/MM/DD' 转为 'YYYY-MM-DD'，避免 Safari 及不同浏览器的时区解析差异
-        const normalized = value.replace(/\//g, "-").trim();
+        const normalized = value.replace(/\//g, '-').trim();
         date = new Date(normalized);
         if (isNaN(date.getTime())) {
           // 再试一次原始入参
@@ -376,8 +338,8 @@ export default {
         return String(value);
       }
       const yyyy = date.getFullYear();
-      const mm = String(date.getMonth() + 1).padStart(2, "0");
-      const dd = String(date.getDate()).padStart(2, "0");
+      const mm = String(date.getMonth() + 1).padStart(2, '0');
+      const dd = String(date.getDate()).padStart(2, '0');
       return `${yyyy}-${mm}-${dd}`;
     },
     /**
@@ -393,59 +355,93 @@ export default {
      */
     getWarrantyInfo(row) {
       if (!row || !row.activated) {
-        return { status: "未激活", expired: true };
+        return { status: '未激活', expired: true };
       }
       const coverage = row.coverage;
       if (!coverage) {
-        return { status: "已激活", expired: false };
+        return { status: '已激活', expired: false };
       }
       // 必须使用本行返回的 sysTime，缺失则不判断过期，保守显示为“已激活”
       if (!row.sysTime) {
-        return { status: "已激活", expired: false };
+        return { status: '已激活', expired: false };
       }
       // 先将 '/' 统一为 '-'，避免不同浏览器解析为不同时区造成边界差异
-      const normalize = (v) =>
-        typeof v === "string" ? v.replace(/\//g, "-") : v;
+      const normalize = (v) => (typeof v === 'string' ? v.replace(/\//g, '-') : v);
       const coverageTime = new Date(normalize(coverage)).getTime();
       const sysTime = new Date(normalize(row.sysTime)).getTime();
       if (isNaN(coverageTime) || isNaN(sysTime)) {
-        return { status: "已激活", expired: false };
+        return { status: '已激活', expired: false };
       }
       const expired = coverageTime <= sysTime;
-      return { status: expired ? "已过保" : "保修中", expired };
+      return { status: expired ? '已过保' : '保修中', expired };
     },
     /** 根据质保状态返回 el-tag 的 type */
     getWarrantyTagType(row) {
       const info = this.getWarrantyInfo(row);
-      if (info.expired) return "danger";
+      if (info.expired) return 'danger';
       // “已激活”作为中性状态显示为 info；“保修中”显示为 success
-      return info.status === "保修中" ? "success" : "info";
+      return info.status === '保修中' ? 'success' : 'info';
     },
     /** 生成水印Canvas */
     generateWatermark(text) {
-      const canvas = document.createElement("canvas");
+      const canvas = document.createElement('canvas');
       canvas.width = 200;
       canvas.height = 200;
-      const ctx = canvas.getContext("2d");
+      const ctx = canvas.getContext('2d');
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.font = "16px Microsoft YaHei";
-      ctx.fillStyle = "rgba(180, 180, 180, 0.3)";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
+      ctx.font = '16px Microsoft YaHei';
+      ctx.fillStyle = 'rgba(180, 180, 180, 0.3)';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
       ctx.translate(100, 100);
       ctx.rotate((-30 * Math.PI) / 180);
       ctx.fillText(text, 0, 0);
       return canvas.toDataURL();
     },
-    /** 查看协议内容（抽屉展示） */
+    /** 查看协议内容（抽屉展示）—— 按需异步加载合同内容 */
     handleViewContract(row) {
-      this.drawerTitle = "用户协议内容";
+      this.drawerTitle = '用户协议内容';
       this.currentRow = row;
+
+      // 如果列表数据已不再携带 contractContent，则通过接口按需加载
+      if (row.contractId) {
+        getContractById(row.contractId).then((res) => {
+          const contract = res.data;
+          if (!contract || !contract.content) {
+            this.$message.warning('协议内容不存在');
+            return;
+          }
+          this.renderContractContent(contract.content);
+          this.drawerVisible = true;
+        }).catch(() => {
+          this.$message.error('获取协议内容失败，请稍后重试');
+        });
+        return;
+      }
+
+      // 兜底：旧数据可能仍有 contractContent（兼容）
+      if (row.contractContent) {
+        this.renderContractContent(row.contractContent);
+        this.drawerVisible = true;
+        return;
+      }
+
+      // 只有合同文件路径，无富文本内容
+      if (row.contractPath) {
+        window.open(this.baseApi + row.contractPath, '_blank');
+        return;
+      }
+
+      this.$message.warning('暂无协议内容');
+    },
+    /** 渲染协议内容（将签名数据注入协议HTML） */
+    renderContractContent(content) {
+      const row = this.currentRow;
+
       // 将签名数据填充到协议HTML中对应的占位符位置
-      let content = row.contractContent || "";
       // 调试：打印原始协议HTML
-      console.log("[协议调试] 原始HTML：", content);
-      console.log("[协议调试] 行数据：", {
+      console.log('[协议调试] 原始HTML：', content);
+      console.log('[协议调试] 行数据：', {
         signatureModel: row.signatureModel,
         signatureImei: row.signatureImei,
         signaturePath: row.signaturePath,
@@ -468,17 +464,14 @@ export default {
         // case A: 紧跟 <u>...</u> 占位 → 整体替换占位
         const regexWithU = new RegExp(
           `(${keywordPattern})((?:\\s|&nbsp;|</span>|<span[^>]*>)*)<u\\b[^>]*>[\\s\\S]*?</u>`,
-          "i"
+          'i'
         );
         if (regexWithU.test(html)) {
           return html.replace(regexWithU, `$1$2${valueHtml}`);
         }
         // case B: 紧跟空白/&nbsp;且后续没有实际文本前先遇到下一个块 → 注入
         // 检测冒号后到下一个非空白字符之间是否仅由 空白/&nbsp;/空标签 组成
-        const regexEmpty = new RegExp(
-          `(${keywordPattern})((?:\\s|&nbsp;)*)(?=<|$)`,
-          "i"
-        );
+        const regexEmpty = new RegExp(`(${keywordPattern})((?:\\s|&nbsp;)*)(?=<|$)`, 'i');
         const match = html.match(regexEmpty);
         if (match) {
           // 进一步判断：冒号后第一个非空白字符是否是结束/换行类（说明位置为空，可注入）
@@ -492,7 +485,7 @@ export default {
       if (row.signatureModel) {
         content = injectAfterKeyword(
           content,
-          "设备型号[：:]",
+          '设备型号[：:]',
           `<span style="text-decoration:underline;padding:0 4px;">${row.signatureModel}</span>`
         );
       }
@@ -501,7 +494,7 @@ export default {
       if (row.signatureImei) {
         content = injectAfterKeyword(
           content,
-          "设备IME[I]?[：:]",
+          '设备IME[I]?[：:]',
           `<span style="text-decoration:underline;padding:0 4px;">${row.signatureImei}</span>`
         );
       }
@@ -510,7 +503,7 @@ export default {
       if (row.signaturePath) {
         content = injectAfterKeyword(
           content,
-          "签字确认[：:]",
+          '签字确认[：:]',
           `<img src="${
             this.baseApi + row.signaturePath
           }" style="max-width:200px;max-height:80px;vertical-align:middle;" />`
@@ -521,18 +514,17 @@ export default {
       if (row.signatureDate) {
         content = injectAfterKeyword(
           content,
-          "日(?:\\s|&nbsp;)*期(?:\\s|&nbsp;)*[：:]",
+          '日(?:\\s|&nbsp;)*期(?:\\s|&nbsp;)*[：:]',
           `<span style="text-decoration:underline;padding:0 4px;">${row.signatureDate}</span>`
         );
       }
 
       // 调试：打印替换后的HTML
-      console.log("[协议调试] 替换后HTML：", content);
+      console.log('[协议调试] 替换后HTML：', content);
       this.drawerContent = content;
-      this.drawerVisible = true;
       // 设置水印（以当前行的昵称为水印）
       this.$nextTick(() => {
-        const watermarkText = row.nickName || row.createBy || "用户";
+        const watermarkText = row.nickName || row.createBy || '用户';
         const watermarkUrl = this.generateWatermark(watermarkText);
         if (this.$refs.printArea) {
           this.$refs.printArea.style.backgroundImage = `url(${watermarkUrl})`;
@@ -542,17 +534,14 @@ export default {
     /** 打印协议 */
     handlePrint() {
       // 获取协议正文内容
-      const contentDiv = this.$refs.printArea.querySelector("div");
-      const printContent = contentDiv
-        ? contentDiv.innerHTML
-        : this.$refs.printArea.innerHTML;
+      const contentDiv = this.$refs.printArea.querySelector('div');
+      const printContent = contentDiv ? contentDiv.innerHTML : this.$refs.printArea.innerHTML;
       // 打印时以当前登录用户昵称作为水印
-      const currentUserName =
-        this.$store.getters.nickName || this.$store.getters.name || "用户";
+      const currentUserName = this.$store.getters.nickName || this.$store.getters.name || '用户';
       const watermarkUrl = this.generateWatermark(currentUserName);
-      const printWindow = window.open("", "_blank");
+      const printWindow = window.open('', '_blank');
       if (!printWindow) {
-        this.$message.warning("请允许弹出窗口后重试");
+        this.$message.warning('请允许弹出窗口后重试');
         return;
       }
       const htmlContent = `
@@ -649,10 +638,10 @@ export default {
     },
     /** 导出按钮操作 */
     handleExport() {
-      this.$confirm("是否确认导出订单数据？", "提示", {
-        confirmButtonText: "确定",
-        cancelButtonText: "取消",
-        type: "warning",
+      this.$confirm('是否确认导出订单数据？', '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
       })
         .then(() => {
           this.exportLoading = true;
@@ -662,78 +651,97 @@ export default {
             fetchApi: queryOrderList,
             queryParams,
             columns: [
-              { label: "ID", prop: "id", width: 6 },
+              { label: 'ID', prop: 'id', width: 6 },
               {
-                label: "订单类型",
-                formatter: (row) => (row.skipApiCall === 1 ? "新手机登记" : "旧手机识别"),
+                label: '订单类型',
+                formatter: (row) => {
+                  if (row.skipApiCall === 1 && row.oldPhoneStatus === 0) return '无旧手机新手机签约';
+                  if (row.skipApiCall === 1 && row.oldPhoneStatus === 1) return '旧手机丢失/遗失新签约';
+                  if (row.oldPhoneStatus === 1) return '旧手机丢失/遗失去亚丁';
+                  return '旧手机识别';
+                },
                 width: 10,
               },
               {
-                label: "手机品牌",
-                prop: "phoneType",
+                label: '渠道',
+                formatter: (row) => (row.skipApiCall === 1 ? '自有' : '亚丁'),
+                width: 8,
+              },
+              {
+                label: '旧手机使用月数',
+                prop: 'oldPhoneUsageMonths',
+                width: 12,
+                formatter: (row) => {
+                  if (row.oldPhoneUsageMonths === 0) return '小于24个月';
+                  if (row.oldPhoneUsageMonths === 24) return '大于24个月';
+                  if (row.oldPhoneUsageMonths) return '> ' + row.oldPhoneUsageMonths;
+                  return '-';
+                },
+              },
+              {
+                label: '旧手机品牌',
+                prop: 'phoneType',
                 formatter: (row) => this.getPhoneTypeName(row.phoneType),
                 width: 12,
               },
-              { label: "手机型号", prop: "model" },
-              { label: "序列号", prop: "sn", width: 18 },
-              { label: "IMEI1", prop: "imei1", width: 18 },
-              { label: "IMEI2", prop: "imei2", width: 18 },
+              { label: '旧手机型号', prop: 'model' },
+              { label: '旧手机序列号', prop: 'sn', width: 18 },
+              { label: '旧手机IMEI1', prop: 'imei1', width: 18 },
+              { label: '旧手机IMEI2', prop: 'imei2', width: 18 },
               {
-                label: "激活状态",
-                prop: "activated",
-                formatter: (row) => (row.activated ? "已激活" : "未激活"),
+                label: '旧手机激活状态',
+                prop: 'activated',
+                formatter: (row) => (row.activated ? '已激活' : '--'),
               },
               {
-                label: "激活日期",
-                prop: "activateDate",
+                label: '旧手机激活日期',
+                prop: 'activateDate',
                 formatter: (row) => this.formatDate(row.activateDate),
               },
               {
-                label: "保修到期时间",
-                prop: "coverage",
+                label: '旧手机保修到期时间',
+                prop: 'coverage',
                 formatter: (row) => this.formatDate(row.coverage),
               },
               {
-                label: "质保状态",
+                label: '质保状态',
                 formatter: (row) => this.getWarrantyInfo(row).status,
               },
-              { label: "查询时系统时间", prop: "sysTime" },
-              { label: "创建者", prop: "createBy" },
-              { label: "昵称", prop: "nickName" },
-              { label: "留资人姓名", prop: "name" },
-              { label: "留资人电话", prop: "phoneNum" },
+              { label: '查询时系统时间', prop: 'sysTime' },
+              { label: '创建者', prop: 'createBy' },
+              { label: '昵称', prop: 'nickName' },
+              { label: '留资人姓名', prop: 'name' },
+              { label: '留资人电话', prop: 'phoneNum' },
               {
-                label: "用户协议",
-                prop: "contractPath",
-                formatter: (row) =>
-                  row.contractPath ? this.baseApi + row.contractPath : "-",
+                label: '用户协议',
+                prop: 'contractPath',
+                formatter: (row) => (row.contractPath ? this.baseApi + row.contractPath : '-'),
                 width: 40,
               },
               {
-                label: "用户签名",
-                prop: "signaturePath",
-                formatter: (row) =>
-                  row.signaturePath ? this.baseApi + row.signaturePath : "-",
+                label: '用户签名',
+                prop: 'signaturePath',
+                formatter: (row) => (row.signaturePath ? this.baseApi + row.signaturePath : '-'),
                 width: 40,
               },
-              { label: "签名型号", prop: "signatureModel" },
-              { label: "签名IMEI", prop: "signatureImei", width: 18 },
-              { label: "签名日期", prop: "signatureDate" },
-              { label: "创建时间", prop: "createTime", width: 20 },
+              { label: '签名型号', prop: 'signatureModel' },
+              { label: '签名IMEI', prop: 'signatureImei', width: 18 },
+              { label: '签名日期', prop: 'signatureDate' },
+              { label: '创建时间', prop: 'createTime', width: 20 },
             ],
-            fileName: "订单数据",
-            sheetName: "订单数据",
+            fileName: '订单数据',
+            sheetName: '订单数据',
           })
             .then((count) => {
               this.$message.success(`导出成功，共 ${count} 条数据`);
               this.exportLoading = false;
             })
             .catch((err) => {
-              if (err.message === "EMPTY_DATA") {
-                this.$message.warning("没有可导出的数据");
+              if (err.message === 'EMPTY_DATA') {
+                this.$message.warning('没有可导出的数据');
               } else {
-                console.error("导出订单数据失败：", err);
-                this.$message.error("导出失败，请稍后重试");
+                console.error('导出订单数据失败：', err);
+                this.$message.error('导出失败，请稍后重试');
               }
               this.exportLoading = false;
             });
@@ -749,6 +757,28 @@ export default {
   padding: 0 20px 10px;
   border-bottom: 1px solid #ebeef5;
 }
+
+/* 展开行内容 */
+.expand-content {
+  padding: 12px 20px;
+  background: #fafafa;
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.expand-section {
+  flex: 1;
+  min-width: 360px;
+}
+.expand-title {
+  margin: 0 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #e8e8e8;
+  font-size: 14px;
+  color: #303133;
+  font-weight: 600;
+}
+
 .contract-content-wrapper {
   padding: 20px;
   line-height: 1.8;
@@ -782,5 +812,7 @@ export default {
 .contract-content-wrapper /deep/ table th {
   background-color: #f5f5f5;
   font-weight: bold;
+}
+</style>
 }
 </style>

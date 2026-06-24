@@ -16,3 +16,12 @@ export function queryPhoneTypeList() {
     method: 'get'
   })
 }
+
+// 根据协议ID获取协议内容（按需加载富文本）
+export function getContractById(id) {
+  return request({
+    url: '/system/contract/getById',
+    method: 'get',
+    params: { id }
+  })
+}

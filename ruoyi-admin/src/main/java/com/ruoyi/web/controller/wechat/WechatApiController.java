@@ -75,8 +75,8 @@ public class WechatApiController extends BaseController {
      */
     @ApiOperation("查询激活信息")
     @PostMapping("/queryActiveInfo")
-    public R queryActiveInfo(@RequestParam("typeCode") String typeCode,
-                             @RequestParam("code") String code,
+    public R queryActiveInfo(@RequestParam(value = "typeCode", required = false) String typeCode,
+                             @RequestParam(value = "code", required = false) String code,
                              @RequestParam("infoId") Long infoId,
                              @RequestParam(value = "imei", required = false) String imei,
                              @RequestParam(value = "imei2", required = false) String imei2,
@@ -84,11 +84,14 @@ public class WechatApiController extends BaseController {
                              @RequestParam(value = "imageUrl", required = false) String imageUrl,
                              @RequestParam(value = "img", required = false) MultipartFile img,
                              @RequestParam(value = "file", required = false) MultipartFile file,
-                             @RequestParam(value = "skipApiCall", required = false, defaultValue = "false") Boolean skipApiCall) {
+                             @RequestParam(value = "skipApiCall", required = false, defaultValue = "false") Boolean skipApiCall,
+                             @RequestParam(value = "oldPhoneStatus", required = false) Integer oldPhoneStatus,
+                             @RequestParam(value = "oldPhoneUsageMonths", required = false) Integer oldPhoneUsageMonths) {
         // 跳过06 API调用（无旧手机场景：新增用户 / 旧手机损坏丢失等）
         if (Boolean.TRUE.equals(skipApiCall)) {
-            log.info("skipApiCall=true，跳过06 API查询，直接进入下一步。typeCode={}, code={}, imei={}, imei2={}", typeCode, code, imei, imei2);
-            return handleSkipApiCall(typeCode, code, imei, imei2, imagePath, imageUrl, img, file, infoId);
+            log.info("skipApiCall=true，跳过06 API查询，直接进入下一步。typeCode={}, code={}, imei={}, imei2={}, oldPhoneStatus={}, oldPhoneUsageMonths={}",
+                    typeCode, code, imei, imei2, oldPhoneStatus, oldPhoneUsageMonths);
+            return handleSkipApiCall(typeCode, code, imei, imei2, imagePath, imageUrl, img, file, infoId, oldPhoneStatus, oldPhoneUsageMonths);
         }
 
         String type = PhoneType.getValueByCode(typeCode);
@@ -147,7 +150,8 @@ public class WechatApiController extends BaseController {
      */
     private R handleSkipApiCall(String typeCode, String code, String imei, String imei2,
                                  String imagePath, String imageUrl, MultipartFile img,
-                                 MultipartFile file, Long infoId) {
+                                 MultipartFile file, Long infoId,
+                                 Integer oldPhoneStatus, Integer oldPhoneUsageMonths) {
         String resolvedImagePath;
         try {
             resolvedImagePath = resolveImagePath(imagePath, imageUrl, img, file);
@@ -173,6 +177,10 @@ public class WechatApiController extends BaseController {
             phoneInfoDto.setImei1(trimmedImei);
             phoneInfoDto.setImei2(trimmedImei2);
         }
+
+        // 设置旧手机状态和使用月数（损坏/丢失场景）
+        phoneInfoDto.setOldPhoneStatus(oldPhoneStatus);
+        phoneInfoDto.setOldPhoneUsageMonths(oldPhoneUsageMonths);
 
         // 无旧手机场景，不设置 model/activated 等06 API返回的字段
         phoneInfoDto.setSysTime((String) redisTemplate.opsForValue().get(CacheConstants.SYS_CONFIG_KEY + Constants.SYSTEM_TIME_CACHE_KEY));
@@ -315,6 +323,8 @@ public class WechatApiController extends BaseController {
         info.setImagePath(imagePath);
         info.setInfoId(infoId);
         info.setSkipApiCall(skipApiCall);
+        info.setOldPhoneStatus(dto.getOldPhoneStatus());
+        info.setOldPhoneUsageMonths(dto.getOldPhoneUsageMonths());
         // 设置创建人/更新人
         info.setCreateBy(getUsername());
         info.setUpdateBy(getUsername());

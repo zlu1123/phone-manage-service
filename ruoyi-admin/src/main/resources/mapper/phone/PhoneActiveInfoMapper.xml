@@ -32,18 +32,20 @@
         <result column="phone_num" property="phoneNum"/>
         <result column="info_id" property="infoId"/>
         <result column="skip_api_call" property="skipApiCall"/>
+        <result column="old_phone_status" property="oldPhoneStatus"/>
+        <result column="old_phone_usage_months" property="oldPhoneUsageMonths"/>
     </resultMap>
 
     <sql id="Base_Column_List">
         id, sn, phone_type, imei1, imei2, model, activated, activate_date, coverage, image_path, active_info, sys_time,
           contract_id, contract_path, signature_path, contract_content, signature_model, signature_imei, signature_date,
-        create_time, create_by, nick_name, update_time, update_by, info_id, skip_api_call
+        create_time, create_by, nick_name, update_time, update_by, info_id, skip_api_call, old_phone_status, old_phone_usage_months
     </sql>
 
     <sql id="Base_Column_List_Q">
         id, sn, phone_type, imei1, imei2, model, activated, activate_date, coverage, image_path, sys_time,
-          contract_id, contract_path, signature_path, contract_content, signature_model, signature_imei, signature_date,
-        create_time, create_by, nick_name, update_time, update_by, info_id, skip_api_call
+          contract_id, contract_path, signature_path, signature_model, signature_imei, signature_date,
+        create_time, create_by, nick_name, update_time, update_by, info_id, skip_api_call, old_phone_status, old_phone_usage_months
     </sql>
 
     <select id="selectBySn" resultMap="BaseResultMap">
@@ -56,11 +58,11 @@
         INSERT INTO phone_active_info (
             sn, phone_type, imei1, imei2, model, activated, activate_date, coverage, image_path, active_info, sys_time,
              contract_id, contract_path, signature_path, contract_content, signature_model, signature_imei, signature_date,
-            create_time, create_by, nick_name, update_time, update_by, info_id, skip_api_call
+            create_time, create_by, nick_name, update_time, update_by, info_id, skip_api_call, old_phone_status, old_phone_usage_months
         ) VALUES (
                      #{sn}, #{phoneType}, #{imei1}, #{imei2}, #{model}, #{activated}, #{activateDate}, #{coverage}, #{imagePath}, #{activeInfo}, #{sysTime},
                      #{contractId}, #{contractPath}, #{signaturePath}, #{contractContent}, #{signatureModel}, #{signatureImei}, #{signatureDate},
-                     #{createTime}, #{createBy}, #{nickName}, #{updateTime}, #{updateBy}, #{infoId}, #{skipApiCall}
+                     #{createTime}, #{createBy}, #{nickName}, #{updateTime}, #{updateBy}, #{infoId}, #{skipApiCall}, #{oldPhoneStatus}, #{oldPhoneUsageMonths}
                  )
     </insert>
 
@@ -87,6 +89,8 @@
             <if test="signatureDate != null">signature_date = #{signatureDate},</if>
             <if test="infoId != null">info_id = #{infoId},</if>
             <if test="skipApiCall != null">skip_api_call = #{skipApiCall},</if>
+            <if test="oldPhoneStatus != null">old_phone_status = #{oldPhoneStatus},</if>
+            <if test="oldPhoneUsageMonths != null">old_phone_usage_months = #{oldPhoneUsageMonths},</if>
 
             update_time = now()
             <if test="updateBy != null">, update_by = #{updateBy}</if>
@@ -99,7 +103,11 @@
     </delete>
 
     <select id="selectByExample" resultMap="BaseResultMap" parameterType="com.ruoyi.web.domain.PhoneActiveInfo">
-        SELECT pai.*, li.name, li.phone_num
+        SELECT 
+            pai.id, pai.sn, pai.phone_type, pai.imei1, pai.imei2, pai.model, pai.activated, pai.activate_date, pai.coverage, pai.image_path, pai.sys_time,
+            pai.contract_id, pai.contract_path, pai.signature_path, pai.signature_model, pai.signature_imei, pai.signature_date,
+            pai.create_time, pai.create_by, pai.nick_name, pai.update_time, pai.update_by, pai.info_id, pai.skip_api_call, pai.old_phone_status, pai.old_phone_usage_months,
+            li.name, li.phone_num
         FROM phone_active_info pai left join leave_information li on pai.info_id = li.id
         <where>
             <if test="id != null"> AND pai.id = #{id}</if>
@@ -121,6 +129,7 @@
             <if test="createBy != null and createBy != ''"> AND pai.create_by = #{createBy}</if>
             <if test="nickName != null and nickName != ''"> AND pai.nick_name like CONCAT('%', #{nickName}, '%')</if>
             <if test="skipApiCall != null"> AND pai.skip_api_call = #{skipApiCall}</if>
+            <if test="oldPhoneStatus != null"> AND pai.old_phone_status = #{oldPhoneStatus}</if>
 
             <if test="signatureModel != null and signatureModel != ''"> AND pai.signature_model like CONCAT('%', #{signatureModel}, '%')</if>
             <if test="signatureImei != null and signatureImei != ''"> AND pai.signature_imei like CONCAT('%', #{signatureImei}, '%')</if>

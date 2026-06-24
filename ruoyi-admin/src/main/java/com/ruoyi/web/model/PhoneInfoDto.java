@@ -37,4 +37,10 @@ public class PhoneInfoDto {
     private Long contractId;
     @ApiModelProperty("协议文件相对路径")
     private String contractPath;
+
+    @ApiModelProperty("旧手机状态：0-无旧手机, 1-损坏/丢失")
+    private Integer oldPhoneStatus;
+
+    @ApiModelProperty("旧手机使用月数（损坏/丢失场景）")
+    private Integer oldPhoneUsageMonths;
 }
