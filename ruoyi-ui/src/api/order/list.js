@@ -17,10 +17,10 @@ export function queryPhoneTypeList() {
   })
 }
 
-// 根据协议ID获取协议内容（按需加载富文本）
-export function getContractById(id) {
+// 根据订单ID获取签约时的协议内容（历史快照，不受协议模板表变更影响）
+export function getOrderContractContent(id) {
   return request({
-    url: '/system/contract/getById',
+    url: '/system/order/getContractContent',
     method: 'get',
     params: { id }
   })

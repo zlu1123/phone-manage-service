@@ -8,7 +8,7 @@
       :extra-params="extraParams"
       row-key="id"
     >
-      <!-- 工具栏：导出按钮 -->
+      <!-- 工具栏：导出/导入按钮 -->
       <template #toolbar>
         <el-col :span="1.5">
           <el-tooltip content="导出时会按照当前筛选条件导出数据" placement="top" :open-delay="500">
@@ -23,6 +23,17 @@
               >导出</el-button
             >
           </el-tooltip>
+        </el-col>
+        <el-col :span="1.5">
+          <el-button
+            type="primary"
+            plain
+            icon="el-icon-upload2"
+            size="mini"
+            @click="handleImport"
+            v-hasRole="['admin']"
+            >导入</el-button
+          >
         </el-col>
       </template>
 
@@ -45,13 +56,7 @@
         </el-tag>
       </template>
 
-      <!-- 自定义列：旧手机使用月数 -->
-      <template #oldPhoneUsageMonths="{ row }">
-        <span v-if="row.oldPhoneUsageMonths === 0">小于24个月</span>
-        <span v-else-if="row.oldPhoneUsageMonths === 24">大于24个月</span>
-        <span v-else-if="row.oldPhoneUsageMonths">> {{ row.oldPhoneUsageMonths }}</span>
-        <span v-else>-</span>
-      </template>
+      <!-- 自定义列：IMEI1 -->
 
       <!-- 展开行：旧手机详情 + 签约信息 -->
       <template #expand="{ row }">
@@ -62,7 +67,14 @@
               <el-descriptions-item label="手机品牌">{{ getPhoneTypeName(row.phoneType) }}</el-descriptions-item>
               <el-descriptions-item label="手机型号">{{ row.model || '-' }}</el-descriptions-item>
               <el-descriptions-item label="序列号">{{ row.sn || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="IMEI1">{{ row.imei1 || '-' }}</el-descriptions-item>
               <el-descriptions-item label="IMEI2">{{ row.imei2 || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="旧手机使用月数">
+                <span v-if="row.oldPhoneUsageMonths === 0">小于24个月</span>
+                <span v-else-if="row.oldPhoneUsageMonths === 24">大于24个月</span>
+                <span v-else-if="row.oldPhoneUsageMonths">> {{ row.oldPhoneUsageMonths }}</span>
+                <span v-else>-</span>
+              </el-descriptions-item>
               <el-descriptions-item label="图片">
                 <el-button
                   v-if="row.imagePath"
@@ -121,11 +133,6 @@
         </div>
       </template>
 
-      <!-- 自定义列：IMEI1 -->
-      <template #imei1="{ row }">
-        <span>{{ row.imei1 || '-' }}</span>
-      </template>
-
       <!-- 自定义列：激活状态 -->
       <template #activated="{ row }">
         <el-tag :type="row.activated ? 'success' : 'info'" size="small">
@@ -158,12 +165,47 @@
         <div v-html="drawerContent"></div>
       </div>
     </el-drawer>
+
+    <!-- 订单导入对话框 -->
+    <el-dialog :title="upload.title" :visible.sync="upload.open" width="400px" append-to-body>
+      <el-upload
+        ref="upload"
+        :limit="1"
+        accept=".xlsx, .xls"
+        :headers="upload.headers"
+        :action="upload.url + '?updateSupport=' + upload.updateSupport"
+        :disabled="upload.isUploading"
+        :on-progress="handleFileUploadProgress"
+        :on-success="handleFileSuccess"
+        :auto-upload="false"
+        drag
+      >
+        <i class="el-icon-upload"></i>
+        <div class="el-upload__text">将文件拖到此处，或<em>点击上传</em></div>
+        <div class="el-upload__tip text-center" slot="tip">
+          <div class="el-upload__tip" slot="tip">
+            <el-checkbox v-model="upload.updateSupport" />是否更新已存在的订单数据
+          </div>
+          <span>仅允许导入xls、xlsx格式文件。</span>
+          <br />
+          <span style="color: #e6a23c">必填列：旧手机序列号、创建时间（模板中已红色加粗标注）</span>
+          <br />
+          <el-link type="primary" :underline="false" style="font-size: 12px; vertical-align: baseline" @click="importTemplate">下载模板</el-link>
+        </div>
+      </el-upload>
+      <div slot="footer" class="dialog-footer">
+        <el-button type="primary" @click="submitFileForm">确 定</el-button>
+        <el-button @click="upload.open = false">取 消</el-button>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script>
-import { queryOrderList, queryPhoneTypeList, getContractById } from '@/api/order/list';
+import { queryOrderList, queryPhoneTypeList, getOrderContractContent } from '@/api/order/list';
 import { exportExcel } from '@/utils/export';
+import { getToken } from '@/utils/auth';
+import * as XLSX from 'xlsx';
 // element-ui 内部的全局图片预览器（和 <el-image> 点击后弹出的是同一个组件），
 // 直接使用可以避免 <el-image> 缩略图 + 预览图的重复请求
 import ElImageViewer from 'element-ui/packages/image/src/image-viewer';
@@ -177,6 +219,15 @@ export default {
       baseApi: process.env.VUE_APP_BASE_API,
       // 导出loading
       exportLoading: false,
+      // 导入参数
+      upload: {
+        open: false,
+        title: '',
+        isUploading: false,
+        updateSupport: false,
+        headers: { Authorization: 'Bearer ' + getToken() },
+        url: process.env.VUE_APP_BASE_API + '/system/order/importData',
+      },
       // 手机品牌列表
       phoneTypeList: [],
       // 列表请求接口
@@ -227,7 +278,7 @@ export default {
       ],
       // 表格列配置
       columns: [
-        { label: '', type: 'expand', slot: 'expand', width: '50', attrs: { type: 'expand' } },
+        { label: '', slot: 'expand', width: '50' },
         { label: 'ID', prop: 'id', width: '50' },
         {
           label: '订单类型',
@@ -239,25 +290,18 @@ export default {
           label: '渠道',
           prop: 'channel',
           slot: 'channel',
-          width: '70',
+          width: '80',
         },
-        {
-          label: '旧手机使用月数',
-          prop: 'oldPhoneUsageMonths',
-          slot: 'oldPhoneUsageMonths',
-          width: '130',
-        },
-        { label: '旧手机IMEI1', prop: 'imei1', slot: 'imei1', minWidth: '110' },
         { label: '留资人姓名', prop: 'name', width: '100' },
-        { label: '留资人电话', prop: 'phoneNum', width: '120' },
-        { label: '创建者', prop: 'createBy', width: '100' },
+        { label: '留资人电话', prop: 'phoneNum' },
+        { label: '创建者', prop: 'createBy' },
         {
-          label: '激活状态',
+          label: '鸭宝激活状态',
           prop: 'activated',
           slot: 'activated',
-          width: '90',
+          width: '120',
         },
-        { label: '质保状态', slot: 'expired', width: '90' },
+        { label: '质保状态', slot: 'expired'},
         {
           label: '创建时间',
           prop: 'createTime',
@@ -271,6 +315,11 @@ export default {
     // 从路由参数中读取 sn（快速查询跳转时携带）
     if (this.$route.query.sn) {
       this.extraParams = { sn: this.$route.query.sn };
+    }
+    // 给质保状态列表头注入 render-header（含问号提示）
+    const expiredCol = this.columns.find((c) => c.slot === 'expired');
+    if (expiredCol) {
+      expiredCol.renderHeader = this.renderWarrantyHeader;
     }
     this.getPhoneTypeList();
   },
@@ -382,6 +431,34 @@ export default {
       // “已激活”作为中性状态显示为 info；“保修中”显示为 success
       return info.status === '保修中' ? 'success' : 'info';
     },
+    /** 自定义表头渲染：质保状态 + 问号提示 */
+    renderWarrantyHeader(h, { column }) {
+      return h('span', { style: { display: 'inline-flex', alignItems: 'center' } }, [
+        h('span', column.label),
+        h('el-tooltip', {
+          props: { placement: 'top', effect: 'dark' },
+        }, [
+          h('div', {
+            slot: 'content',
+            style: { maxWidth: '280px', lineHeight: '1.8' },
+          }, [
+            h('div', '质保状态根据查询时的系统时间判定：'),
+            h('div', '· 未激活 → 显示「未激活」'),
+            h('div', '· 已激活但无保修到期时间 → 「已激活」'),
+            h('div', '\u2003（视为未过期）'),
+            h('div', '· 保修到期时间 ≤ 查询系统时间 → 「已过保」'),
+            h('div', '· 保修到期时间 > 查询系统时间 → 「保修中」'),
+          ]),
+          h('svg', {
+            attrs: { viewBox: '0 0 1024 1024', width: '14', height: '14' },
+            style: { marginLeft: '4px', cursor: 'pointer', verticalAlign: 'middle' },
+          }, [
+            h('path', { attrs: { d: 'M512 64C264.6 64 64 264.6 64 512s200.6 448 448 448 448-200.6 448-448S759.4 64 512 64z m0 820c-205.4 0-372-166.6-372-372s166.6-372 372-372 372 166.6 372 372-166.6 372-372 372z', fill: '#909399' } }),
+            h('path', { attrs: { d: 'M464 688a48 48 0 1 0 96 0 48 48 0 1 0-96 0z m24-112h48c4.4 0 8-3.6 8-8v-16c0-61.8 35.2-115.4 85.8-141.6 19.6-10 31.8-29.8 31.8-51.8 0-34.2-27.8-62-62-62h-0.6c-32 0.2-58.6 25-61.4 56.6-0.8 9.2-8.4 16.4-17.6 16.4h-48c-10.6 0-19-9.2-17.6-19.8C421 297.6 461.2 256 512.2 256h0.6c51 0.2 92.8 40.6 95.2 91.4 2.6 55.6-33 103.2-85.2 126.2-19.4 8.6-32.8 28.2-32.8 50.4v16c0 4.4-3.6 8-8 8z', fill: '#fff' } }),
+          ]),
+        ]),
+      ]);
+    },
     /** 生成水印Canvas */
     generateWatermark(text) {
       const canvas = document.createElement('canvas');
@@ -405,13 +482,13 @@ export default {
 
       // 如果列表数据已不再携带 contractContent，则通过接口按需加载
       if (row.contractId) {
-        getContractById(row.contractId).then((res) => {
-          const contract = res.data;
-          if (!contract || !contract.content) {
+        getOrderContractContent(row.id).then((res) => {
+          const content = res.data;
+          if (!content) {
             this.$message.warning('协议内容不存在');
             return;
           }
-          this.renderContractContent(contract.content);
+          this.renderContractContent(content);
           this.drawerVisible = true;
         }).catch(() => {
           this.$message.error('获取协议内容失败，请稍后重试');
@@ -748,6 +825,100 @@ export default {
         })
         .catch(() => {});
     },
+    /** 导入按钮操作 */
+    handleImport() {
+      this.upload.title = '订单导入';
+      this.upload.open = true;
+    },
+    /** 下载导入模板 */
+    importTemplate() {
+      this.download('system/order/importTemplate', {}, `order_template_${new Date().getTime()}.xlsx`);
+    },
+    /** 文件上传中处理 */
+    handleFileUploadProgress() {
+      this.upload.isUploading = true;
+    },
+    /** 文件上传成功处理 */
+    handleFileSuccess(response) {
+      this.upload.open = false;
+      this.upload.isUploading = false;
+      this.$refs.upload.clearFiles();
+      const msg = typeof response === 'string' ? response : (response.data || response.msg || '');
+      this.$alert(
+        "<div style='overflow: auto;overflow-x: hidden;max-height: 70vh;padding: 10px 20px 0;'>" + msg + '</div>',
+        '导入结果',
+        { dangerouslyUseHTMLString: true }
+      );
+      // 刷新列表（重置到第一页）
+      this.$refs.proTable.queryParams.pageNum = 1;
+      this.$refs.proTable.refresh();
+    },
+    /** 提交上传文件 —— 前端校验必填列 */
+    submitFileForm() {
+      const file = this.$refs.upload.uploadFiles;
+      if (
+        !file ||
+        file.length === 0 ||
+        (!file[0].name.toLowerCase().endsWith('.xls') && !file[0].name.toLowerCase().endsWith('.xlsx'))
+      ) {
+        this.$modal.msgError('请选择后缀为"xls"或"xlsx"的文件。');
+        return;
+      }
+      // 前端读取Excel校验必填列
+      const raw = file[0].raw;
+      if (!raw) {
+        this.$modal.msgError('文件读取失败，请重新选择文件');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheet = workbook.Sheets[workbook.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+          if (!rows || rows.length < 2) {
+            this.$modal.msgError('Excel 文件中没有数据行，请填写至少一行数据');
+            return;
+          }
+          // 表头行（匹配带不带（必填）后缀的列名）
+          const headerRow = rows[0];
+          const columnMap = {};
+          headerRow.forEach((h, idx) => {
+            const clean = String(h || '').replace(/[（(]必填[）)]/g, '').trim();
+            if (clean) columnMap[clean] = idx;
+          });
+          // 必填列定义（与后端 @Excel(required=true) 保持一致）
+          const requiredColumns = ['旧手机序列号', '创建时间'];
+          const missingCols = requiredColumns.filter((col) => !(col in columnMap));
+          if (missingCols.length > 0) {
+            this.$modal.msgError('Excel 缺必填列：' + missingCols.join('、') + '，请使用最新模板');
+            return;
+          }
+          // 逐行校验必填字段
+          for (let r = 1; r < rows.length; r++) {
+            const row = rows[r];
+            if (!row || row.every((cell) => cell === undefined || String(cell).trim() === '')) {
+              continue; // 跳过完全空行
+            }
+            for (const col of requiredColumns) {
+              const idx = columnMap[col];
+              const val = row[idx];
+              if (val === undefined || val === null || String(val).trim() === '') {
+                this.$modal.msgError(`第 ${r + 1} 行「${col}」不能为空，请修正后重新上传`);
+                return;
+              }
+            }
+          }
+          // 校验通过，执行上传
+          this.$refs.upload.submit();
+        } catch (err) {
+          console.error('Excel 解析失败：', err);
+          this.$modal.msgError('Excel 文件解析失败，请检查文件格式');
+        }
+      };
+      reader.readAsArrayBuffer(raw);
+    },
   },
 };
 </script>
@@ -814,5 +985,7 @@ export default {
   font-weight: bold;
 }
 </style>
+  background-color: #f5f5f5;
+  font-weight: bold;
 }
 </style>

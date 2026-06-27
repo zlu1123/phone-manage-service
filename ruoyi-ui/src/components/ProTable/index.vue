@@ -10,12 +10,7 @@
       v-show="showSearch"
       :label-width="searchLabelWidth"
     >
-      <el-form-item
-        v-for="field in searchFields"
-        :key="field.prop"
-        :label="field.label"
-        :prop="field.prop"
-      >
+      <el-form-item v-for="field in searchFields" :key="field.prop" :label="field.label" :prop="field.prop">
         <!-- 输入框 -->
         <el-input
           v-if="field.type === 'input' || !field.type"
@@ -33,12 +28,7 @@
           clearable
           :style="{ width: field.width || '200px' }"
         >
-          <el-option
-            v-for="option in field.options"
-            :key="option.value"
-            :label="option.label"
-            :value="option.value"
-          />
+          <el-option v-for="option in field.options" :key="option.value" :label="option.label" :value="option.value" />
         </el-select>
         <!-- 日期选择 -->
         <el-date-picker
@@ -63,23 +53,11 @@
           :style="{ width: field.width || '340px' }"
         />
         <!-- 自定义搜索项插槽 -->
-        <slot
-          v-else-if="field.type === 'slot'"
-          :name="`search-${field.prop}`"
-          :queryParams="queryParams"
-        />
+        <slot v-else-if="field.type === 'slot'" :name="`search-${field.prop}`" :queryParams="queryParams" />
       </el-form-item>
       <el-form-item>
-        <el-button
-          type="primary"
-          icon="el-icon-search"
-          size="mini"
-          @click="handleQuery"
-          >搜索</el-button
-        >
-        <el-button icon="el-icon-refresh" size="mini" @click="handleResetQuery"
-          >重置</el-button
-        >
+        <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
+        <el-button icon="el-icon-refresh" size="mini" @click="handleResetQuery">重置</el-button>
       </el-form-item>
     </el-form>
 
@@ -87,23 +65,27 @@
     <el-row :gutter="10" class="mb8">
       <!-- 工具栏左侧插槽：放置操作按钮 -->
       <slot name="toolbar" :queryParams="queryParams" :loading="loading" />
-      <right-toolbar
-        :showSearch.sync="showSearch"
-        @queryTable="fetchData"
-      ></right-toolbar>
+      <right-toolbar :showSearch.sync="showSearch" @queryTable="fetchData"></right-toolbar>
     </el-row>
 
     <!-- 表格 -->
-    <el-table
-      v-loading="loading"
-      :data="tableData"
-      v-bind="$attrs"
-      v-on="tableListeners"
-    >
+    <el-table v-loading="loading" :data="tableData" v-bind="$attrs" v-on="tableListeners">
       <template v-for="col in columns">
+        <!-- 展开列 -->
+        <el-table-column
+          v-if="col.slot === 'expand'"
+          :key="'expand'"
+          type="expand"
+          :width="col.width"
+          :align="col.align || 'center'"
+        >
+          <template slot-scope="scope">
+            <slot name="expand" :row="scope.row" :index="scope.$index" />
+          </template>
+        </el-table-column>
         <!-- 有自定义插槽的列 -->
         <el-table-column
-          v-if="col.slot"
+          v-else-if="col.slot"
           :key="col.prop || col.slot"
           :label="col.label"
           :prop="col.prop"
@@ -111,6 +93,7 @@
           :min-width="col.minWidth"
           :align="col.align || 'center'"
           :show-overflow-tooltip="col.showOverflowTooltip !== false"
+          :render-header="col.renderHeader"
           v-bind="col.attrs"
         >
           <template slot-scope="scope">
@@ -127,6 +110,7 @@
           :min-width="col.minWidth"
           :align="col.align || 'center'"
           :show-overflow-tooltip="col.showOverflowTooltip !== false"
+          :render-header="col.renderHeader"
           v-bind="col.attrs"
         />
       </template>
@@ -145,7 +129,7 @@
 
 <script>
 export default {
-  name: "ProTable",
+  name: 'ProTable',
   props: {
     /**
      * 列表请求接口函数
@@ -189,7 +173,7 @@ export default {
      */
     searchLabelWidth: {
       type: String,
-      default: "90px",
+      default: '90px',
     },
     /**
      * 每页条数，默认 10
@@ -291,8 +275,7 @@ export default {
       // 根据 searchFields 初始化各字段
       if (this.searchFields && this.searchFields.length > 0) {
         this.searchFields.forEach((field) => {
-          params[field.prop] =
-            field.defaultValue !== undefined ? field.defaultValue : undefined;
+          params[field.prop] = field.defaultValue !== undefined ? field.defaultValue : undefined;
         });
       }
       return params;
@@ -317,10 +300,10 @@ export default {
           this.tableData = rows;
           this.total = total;
           this.loading = false;
-          this.$emit("data-loaded", { rows, total });
+          this.$emit('data-loaded', { rows, total });
         })
         .catch((err) => {
-          console.error("ProTable 查询列表失败：", err);
+          console.error('ProTable 查询列表失败：', err);
           this.loading = false;
         });
     },
@@ -334,11 +317,7 @@ export default {
       this.$refs.queryForm && this.$refs.queryForm.resetFields();
       // 手动重置所有搜索字段
       this.searchFields.forEach((field) => {
-        this.$set(
-          this.queryParams,
-          field.prop,
-          field.defaultValue !== undefined ? field.defaultValue : undefined
-        );
+        this.$set(this.queryParams, field.prop, field.defaultValue !== undefined ? field.defaultValue : undefined);
       });
       this.handleQuery();
     },
@@ -359,10 +338,10 @@ export default {
           }
           this.tableData = rows;
           this.total = total;
-          this.$emit("data-loaded", { rows, total });
+          this.$emit('data-loaded', { rows, total });
         })
         .catch((err) => {
-          console.error("ProTable 静默刷新失败：", err);
+          console.error('ProTable 静默刷新失败：', err);
         });
     },
     /** 启动静默刷新定时器 */
