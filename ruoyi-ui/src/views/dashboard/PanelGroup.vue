@@ -1,73 +1,94 @@
 <template>
-  <el-row :gutter="40" class="panel-group">
-    <el-col :xs="12" :sm="12" :lg="6" class="card-panel-col">
-      <div class="card-panel" @click="handleSetLineChartData('newVisitis')">
-        <div class="card-panel-icon-wrapper icon-people">
-          <svg-icon icon-class="peoples" class-name="card-panel-icon" />
-        </div>
-        <div class="card-panel-description">
-          <div class="card-panel-text">
-            访客
-          </div>
-          <count-to :start-val="0" :end-val="102400" :duration="2600" class="card-panel-num" />
-        </div>
-      </div>
-    </el-col>
-    <el-col :xs="12" :sm="12" :lg="6" class="card-panel-col">
-      <div class="card-panel" @click="handleSetLineChartData('messages')">
-        <div class="card-panel-icon-wrapper icon-message">
-          <svg-icon icon-class="message" class-name="card-panel-icon" />
-        </div>
-        <div class="card-panel-description">
-          <div class="card-panel-text">
-            消息
-          </div>
-          <count-to :start-val="0" :end-val="81212" :duration="3000" class="card-panel-num" />
-        </div>
-      </div>
-    </el-col>
-    <el-col :xs="12" :sm="12" :lg="6" class="card-panel-col">
-      <div class="card-panel" @click="handleSetLineChartData('purchases')">
-        <div class="card-panel-icon-wrapper icon-money">
+  <el-row :gutter="20" class="panel-group">
+    <!-- API余额 -->
+    <el-col :xs="12" :sm="12" :lg="4" class="card-panel-col">
+      <div class="card-panel">
+        <div class="card-panel-icon-wrapper icon-balance">
           <svg-icon icon-class="money" class-name="card-panel-icon" />
         </div>
         <div class="card-panel-description">
-          <div class="card-panel-text">
-            金额
+          <div class="card-panel-text">API余额</div>
+          <div class="card-panel-num">
+            <span class="card-panel-unit">¥</span>
+            <count-to :start-val="0" :end-val="statistics.apiBalance || 0" :duration="2000" :decimals="2" />
           </div>
-          <count-to :start-val="0" :end-val="9280" :duration="3200" class="card-panel-num" />
+          <div class="card-panel-sub">{{ statistics.balanceStatus || '余额充足' }}</div>
         </div>
       </div>
     </el-col>
-    <el-col :xs="12" :sm="12" :lg="6" class="card-panel-col">
-      <div class="card-panel" @click="handleSetLineChartData('shoppings')">
-        <div class="card-panel-icon-wrapper icon-shopping">
-          <svg-icon icon-class="shopping" class-name="card-panel-icon" />
+    <!-- 订单总数 -->
+    <el-col :xs="12" :sm="12" :lg="4" class="card-panel-col">
+      <div class="card-panel">
+        <div class="card-panel-icon-wrapper icon-order">
+          <svg-icon icon-class="list" class-name="card-panel-icon" />
         </div>
         <div class="card-panel-description">
-          <div class="card-panel-text">
-            订单
-          </div>
-          <count-to :start-val="0" :end-val="13600" :duration="3600" class="card-panel-num" />
+          <div class="card-panel-text">订单总数</div>
+          <count-to :start-val="0" :end-val="statistics.orderTotal || 0" :duration="2000" class="card-panel-num" />
+        </div>
+      </div>
+    </el-col>
+    <!-- 今日新增 -->
+    <el-col :xs="12" :sm="12" :lg="4" class="card-panel-col">
+      <div class="card-panel">
+        <div class="card-panel-icon-wrapper icon-today">
+          <svg-icon icon-class="date" class-name="card-panel-icon" />
+        </div>
+        <div class="card-panel-description">
+          <div class="card-panel-text">今日新增</div>
+          <count-to :start-val="0" :end-val="statistics.todayNew || 0" :duration="2000" class="card-panel-num" />
+          <div class="card-panel-sub">{{ statistics.todayNewChange || '较昨日没有变化' }}</div>
+        </div>
+      </div>
+    </el-col>
+    <!-- 已激活设备 -->
+    <el-col :xs="12" :sm="12" :lg="4" class="card-panel-col">
+      <div class="card-panel">
+        <div class="card-panel-icon-wrapper icon-activate">
+          <svg-icon icon-class="component" class-name="card-panel-icon" />
+        </div>
+        <div class="card-panel-description">
+          <div class="card-panel-text">已激活设备</div>
+          <count-to :start-val="0" :end-val="statistics.activatedDevices || 0" :duration="2000" class="card-panel-num" />
+          <div class="card-panel-sub">激活率 {{ statistics.activationRate || 0 }}%</div>
+        </div>
+      </div>
+    </el-col>
+    <!-- 已签约 -->
+    <el-col :xs="12" :sm="12" :lg="4" class="card-panel-col">
+      <div class="card-panel">
+        <div class="card-panel-icon-wrapper icon-sign">
+          <svg-icon icon-class="documentation" class-name="card-panel-icon" />
+        </div>
+        <div class="card-panel-description">
+          <div class="card-panel-text">已签约</div>
+          <count-to :start-val="0" :end-val="statistics.signedDevices || 0" :duration="2000" class="card-panel-num" />
+          <div class="card-panel-sub">签约率 {{ statistics.signRate || 0 }}%</div>
         </div>
       </div>
     </el-col>
   </el-row>
 </template>
 
-<script>
-import CountTo from 'vue-count-to'
+<script setup>
+import CountTo from '@/components/CountTo/index.vue'
 
-export default {
-  components: {
-    CountTo
+defineProps({
+  statistics: {
+    type: Object,
+    default: () => ({
+      apiBalance: 0,
+      balanceStatus: '余额充足',
+      orderTotal: 0,
+      todayNew: 0,
+      todayNewChange: '较昨日没有变化',
+      activatedDevices: 0,
+      activationRate: 0,
+      signedDevices: 0,
+      signRate: 0,
+    }),
   },
-  methods: {
-    handleSetLineChartData(type) {
-      this.$emit('handleSetLineChartData', type)
-    }
-  }
-}
+})
 </script>
 
 <style lang="scss" scoped>
@@ -75,57 +96,35 @@ export default {
   margin-top: 18px;
 
   .card-panel-col {
-    margin-bottom: 32px;
+    margin-bottom: 24px;
   }
 
   .card-panel {
-    height: 108px;
-    cursor: pointer;
+    height: 130px;
     font-size: 12px;
     position: relative;
     overflow: hidden;
     color: #666;
     background: #fff;
-    box-shadow: 4px 4px 40px rgba(0, 0, 0, .05);
-    border-color: rgba(0, 0, 0, .05);
+    box-shadow: 0 2px 12px 0 rgba(0, 0, 0, .05);
+    border-radius: 4px;
 
     &:hover {
       .card-panel-icon-wrapper {
         color: #fff;
       }
-
-      .icon-people {
-        background: #40c9c6;
-      }
-
-      .icon-message {
-        background: #36a3f7;
-      }
-
-      .icon-money {
-        background: #f4516c;
-      }
-
-      .icon-shopping {
-        background: #34bfa3
-      }
+      .icon-balance { background: #40c9c6; }
+      .icon-order { background: #36a3f7; }
+      .icon-today { background: #f4516c; }
+      .icon-activate { background: #34bfa3; }
+      .icon-sign { background: #ffa800; }
     }
 
-    .icon-people {
-      color: #40c9c6;
-    }
-
-    .icon-message {
-      color: #36a3f7;
-    }
-
-    .icon-money {
-      color: #f4516c;
-    }
-
-    .icon-shopping {
-      color: #34bfa3
-    }
+    .icon-balance { color: #40c9c6; }
+    .icon-order { color: #36a3f7; }
+    .icon-today { color: #f4516c; }
+    .icon-activate { color: #34bfa3; }
+    .icon-sign { color: #ffa800; }
 
     .card-panel-icon-wrapper {
       float: left;
@@ -143,37 +142,46 @@ export default {
     .card-panel-description {
       float: right;
       font-weight: bold;
-      margin: 26px;
-      margin-left: 0px;
+      margin: 18px 20px 18px 0;
 
       .card-panel-text {
         line-height: 18px;
         color: rgba(0, 0, 0, 0.45);
-        font-size: 16px;
-        margin-bottom: 12px;
+        font-size: 14px;
+        margin-bottom: 8px;
       }
 
       .card-panel-num {
-        font-size: 20px;
+        font-size: 24px;
+        color: #333;
+      }
+
+      .card-panel-unit {
+        font-size: 16px;
+        color: #666;
+      }
+
+      .card-panel-sub {
+        font-size: 12px;
+        font-weight: normal;
+        color: #999;
+        margin-top: 4px;
       }
     }
   }
 }
 
-@media (max-width:550px) {
+@media (max-width: 768px) {
   .card-panel-description {
     display: none;
   }
-
   .card-panel-icon-wrapper {
     float: none !important;
-    width: 100%;
-    height: 100%;
-    margin: 0 !important;
-
+    display: block;
+    margin: 20px auto 0 !important;
+    text-align: center;
     .svg-icon {
-      display: block;
-      margin: 14px auto !important;
+      display: inline-block;
       float: none !important;
     }
   }

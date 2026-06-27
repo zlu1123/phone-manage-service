@@ -1,30 +1,27 @@
 <template>
   <div class="app-container">
     <el-card class="box-card">
-      <div slot="header" class="clearfix">
-        <span>系统时间设置</span>
-      </div>
-      <el-form ref="form" :model="form" :rules="rules" label-width="100px">
+      <template #header>
+        <div class="clearfix">
+          <span>系统时间设置</span>
+        </div>
+      </template>
+      <el-form ref="formRef" :model="formModel" :rules="rules" label-width="100px">
         <el-form-item label="系统时间" prop="configValue">
-          <!-- 只读展示模式 -->
-          <span v-if="!isEditing" class="sys-time-display">{{
-            form.configValue || "暂未设置"
-          }}</span>
-          <!-- 编辑模式 -->
+          <!-- 只读展示模式：只取日期部分 -->
+          <span v-if="!isEditing" class="sys-time-display">{{ displayDate || '暂未设置' }}</span>
+          <!-- 编辑模式：点击修改后创建，默认值使用接口返回的系统时间 -->
           <el-date-picker
-            v-else
-            v-model="form.configValue"
+            v-if="isEditing"
+            v-model="pickerDate"
             type="date"
             placeholder="请选择系统时间"
-            value-format="yyyy-MM-dd"
             style="width: 300px"
           />
         </el-form-item>
         <el-form-item>
           <template v-if="!isEditing">
-            <el-button type="primary" icon="el-icon-edit" @click="handleEdit"
-              >修改</el-button
-            >
+            <el-button type="primary" :icon="Edit" @click="handleEdit">修改</el-button>
           </template>
           <template v-else>
             <el-button type="primary" @click="handleSubmit">确认</el-button>
@@ -36,82 +33,90 @@
   </div>
 </template>
 
-<script>
-import { getConfigKey, updateSysTime } from "@/api/system/config";
+<script setup name="Setting">
+import { ref, computed } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Edit } from '@element-plus/icons-vue'
+import { getConfigKey, updateSysTime } from '@/api/system/config'
 
-export default {
-  name: "SysTime",
-  data() {
-    return {
-      // 是否处于编辑模式
-      isEditing: false,
-      // 编辑前的原始值，用于取消时恢复
-      originalValue: "",
-      // 表单参数
-      form: {
-        configKey: "sys.time",
-        configValue: "",
-      },
-      // 表单校验
-      rules: {
-        configValue: [
-          { required: true, message: "请选择系统时间", trigger: "change" },
-        ],
-      },
-    };
-  },
-  created() {
-    this.getSysTime();
-  },
-  methods: {
-    /** 获取当前系统时间 */
-    getSysTime() {
-      getConfigKey("sys.time").then((response) => {
-        this.form.configValue = response.msg;
-        this.originalValue = response.msg;
-      });
-    },
-    /** 点击修改按钮，进入编辑模式 */
-    handleEdit() {
-      this.isEditing = true;
-    },
-    /** 确认提交 */
-    handleSubmit() {
-      this.$refs["form"].validate((valid) => {
-        if (!valid) return;
+const formRef = ref(null)
+const isEditing = ref(false)
+const configValue = ref('')
+const originalValue = ref('')
+const pickerDate = ref(null)
 
-        const data = {
-          configKey: this.form.configKey,
-          configValue: this.form.configValue,
-        };
+const formModel = computed(() => ({
+  configKey: 'sys.time',
+  configValue: configValue.value,
+}))
 
-        this.$modal
-          .confirm('是否确认修改系统时间为 "' + this.form.configValue + '" ？')
-          .then(() => {
-            return updateSysTime(data);
-          })
-          .then(() => {
-            this.$modal.msgSuccess("修改成功");
-            this.originalValue = this.form.configValue;
-            this.isEditing = false;
-          })
-          .catch(() => {});
-      });
-    },
-    /** 取消编辑，恢复原始值 */
-    handleCancel() {
-      this.form.configValue = this.originalValue;
-      this.isEditing = false;
-    },
-  },
-};
+/** 提取日期部分（yyyy-MM-dd），兼容完整时间戳格式 */
+function extractDate(val) {
+  if (!val) return ''
+  return String(val).substring(0, 10)
+}
+
+/** 将 Date 对象格式化为 yyyy-MM-dd */
+function formatDate(date) {
+  if (!date) return ''
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+/** 只读展示的日期字符串 */
+const displayDate = computed(() => extractDate(configValue.value))
+
+const rules = {
+  configValue: [{ required: true, message: '请选择系统时间', trigger: 'change' }],
+}
+
+/** 获取当前系统时间 */
+function getSysTime() {
+  getConfigKey('sys.time').then((response) => {
+    configValue.value = response.msg
+    originalValue.value = response.msg
+  })
+}
+
+/** 进入编辑模式 */
+function handleEdit() {
+  const dateStr = extractDate(originalValue.value)
+  pickerDate.value = dateStr ? new Date(dateStr) : null
+  isEditing.value = true
+}
+
+/** 确认提交 */
+function handleSubmit() {
+  if (!formRef.value) return
+  // 将 Date 对象格式化为 yyyy-MM-dd 字符串
+  configValue.value = formatDate(pickerDate.value)
+  formRef.value.validate((valid) => {
+    if (!valid) return
+
+    ElMessageBox.confirm(
+      '是否确认修改系统时间为 "' + configValue.value + '" ？',
+      '提示',
+      { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
+    )
+      .then(() => updateSysTime({ configKey: 'sys.time', configValue: configValue.value }))
+      .then(() => {
+        ElMessage.success('修改成功')
+        originalValue.value = configValue.value
+        isEditing.value = false
+      })
+      .catch(() => {})
+  })
+}
+
+/** 取消编辑，恢复原始值 */
+function handleCancel() {
+  isEditing.value = false
+}
+
+getSysTime()
 </script>
 
 <style scoped>
-.sys-time-display {
-  font-size: 16px;
-  font-weight: bold;
-  color: #606266;
-  line-height: 40px;
-}
 </style>

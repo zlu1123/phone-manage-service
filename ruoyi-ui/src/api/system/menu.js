@@ -58,3 +58,12 @@ export function delMenu(menuId) {
     method: 'delete'
   })
 }
+
+// 修改菜单排序
+export function updateMenuSort(data) {
+  return request({
+    url: '/system/menu/changeSort',
+    method: 'put',
+    data: data
+  })
+}

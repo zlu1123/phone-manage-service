@@ -1,9 +1,3 @@
-import Vue from 'vue'
-import SvgIcon from '@/components/SvgIcon'// svg component
-
-// register globally
-Vue.component('svg-icon', SvgIcon)
-
-const req = require.context('./svg', false, /\.svg$/)
-const requireAll = requireContext => requireContext.keys().map(requireContext)
-requireAll(req)
+// SVG icon auto-registration migrated to main.js via 'virtual:svg-icons-register'
+// This file is no longer needed - kept for reference
+export { }

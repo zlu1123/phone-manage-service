@@ -58,3 +58,12 @@ export function getCodeImg() {
     timeout: 20000
   })
 }
+
+// 解锁屏幕
+export function unlockScreen(password) {
+  return request({
+    url: '/unlock',
+    method: 'post',
+    data: { password }
+  })
+}

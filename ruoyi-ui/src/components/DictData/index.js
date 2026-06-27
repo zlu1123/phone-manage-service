@@ -1,49 +1,16 @@
-import Vue from 'vue'
-import store from '@/store'
+import { useDictStore } from '@/store/modules/dict'
 import DataDict from '@/utils/dict'
-import { getDicts as getDicts } from '@/api/system/dict/data'
+import { getDicts } from '@/api/system/dict/data'
 
-function searchDictByKey(dict, key) {
-  if (key == null && key == "") {
-    return null
-  }
-  try {
-    for (let i = 0; i < dict.length; i++) {
-      if (dict[i].key == key) {
-        return dict[i].value
-      }
-    }
-  } catch (e) {
-    return null
-  }
-}
+function install(app) {
+  app.config.globalProperties.$dict = DataDict
+  app.provide('dict', DataDict)
 
-function install() {
-  Vue.use(DataDict, {
-    metas: {
-      '*': {
-        labelField: 'dictLabel',
-        valueField: 'dictValue',
-        request(dictMeta) {
-          const storeDict = searchDictByKey(store.getters.dict, dictMeta.type)
-          if (storeDict) {
-            return new Promise(resolve => { resolve(storeDict) })
-          } else {
-            return new Promise((resolve, reject) => {
-              getDicts(dictMeta.type).then(res => {
-                store.dispatch('dict/setDict', { key: dictMeta.type, value: res.data })
-                resolve(res.data)
-              }).catch(error => {
-                reject(error)
-              })
-            })
-          }
-        },
-      },
-    },
+  // 预加载 * 类型字典
+  const dictStore = useDictStore()
+  getDicts('*').then(res => {
+    dictStore.setDict(res.data)
   })
 }
 
-export default {
-  install,
-}
+export default { install }

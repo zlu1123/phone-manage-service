@@ -1,9 +1,0 @@
-node_modules/
-dist/
-*.min.js
-*.min.css
-public/
-bin/
-build/
-package.json
-yarn.lock

@@ -4,76 +4,85 @@
 
 <script>
 import * as echarts from 'echarts'
-require('echarts/theme/macarons') // echarts theme
+import 'echarts/theme/macarons'
 import resize from './mixins/resize'
 
 export default {
   mixins: [resize],
   props: {
-    className: {
-      type: String,
-      default: 'chart'
+    className: { type: String, default: 'chart' },
+    width: { type: String, default: '100%' },
+    height: { type: String, default: '350px' },
+    title: { type: String, default: '' },
+    chartData: {
+      type: Array,
+      default: () => [],
     },
-    width: {
-      type: String,
-      default: '100%'
-    },
-    height: {
-      type: String,
-      default: '300px'
-    }
   },
   data() {
-    return {
-      chart: null
-    }
+    return { chart: null }
+  },
+  watch: {
+    chartData: {
+      deep: true,
+      handler(val) { this.setOptions(val) },
+    },
   },
   mounted() {
-    this.$nextTick(() => {
-      this.initChart()
-    })
+    this.$nextTick(() => { this.initChart() })
   },
-  beforeDestroy() {
-    if (!this.chart) {
-      return
-    }
+  beforeUnmount() {
+    if (!this.chart) return
     this.chart.dispose()
     this.chart = null
   },
   methods: {
     initChart() {
       this.chart = echarts.init(this.$el, 'macarons')
-
+      this.setOptions(this.chartData)
+    },
+    setOptions(data) {
+      if (!this.chart) return
       this.chart.setOption({
+        title: {
+          text: this.title,
+          left: 'center',
+          textStyle: { fontSize: 16, fontWeight: 'normal' },
+        },
         tooltip: {
           trigger: 'item',
-          formatter: '{a} <br/>{b} : {c} ({d}%)'
+          formatter: '{b}: {c} ({d}%)',
         },
         legend: {
-          left: 'center',
-          bottom: '10',
-          data: ['Industries', 'Technology', 'Forex', 'Gold', 'Forecasts']
+          orient: 'vertical',
+          right: '5%',
+          top: 'middle',
+          formatter(name) {
+            const item = (data || []).find((d) => d.name === name)
+            return item ? `${name}  ${item.value}` : name
+          },
         },
-        series: [
-          {
-            name: 'WEEKLY WRITE ARTICLES',
-            type: 'pie',
-            roseType: 'radius',
-            radius: [15, 95],
-            center: ['50%', '38%'],
-            data: [
-              { value: 320, name: 'Industries' },
-              { value: 240, name: 'Technology' },
-              { value: 149, name: 'Forex' },
-              { value: 100, name: 'Gold' },
-              { value: 59, name: 'Forecasts' }
-            ],
-            animationEasing: 'cubicInOut',
-            animationDuration: 2600
-          }
-        ]
+        series: [{
+          type: 'pie',
+          radius: ['45%', '70%'],
+          center: ['35%', '55%'],
+          avoidLabelOverlap: false,
+          itemStyle: {
+            borderRadius: 4,
+            borderColor: '#fff',
+            borderWidth: 2,
+          },
+          label: {
+            show: true,
+            formatter: '{d}%',
+          },
+          emphasis: {
+            label: { show: true, fontSize: 16, fontWeight: 'bold' },
+          },
+          data: data || [],
+        }],
       })
-    }
-  }
+    },
+  },
 }
 </script>

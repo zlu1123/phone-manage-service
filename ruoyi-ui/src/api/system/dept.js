@@ -50,3 +50,12 @@ export function delDept(deptId) {
     method: 'delete'
   })
 }
+
+// 保存部门排序
+export function updateDeptSort(data) {
+  return request({
+    url: '/system/dept/updateSort',
+    method: 'put',
+    data: data
+  })
+}

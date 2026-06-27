@@ -4,55 +4,36 @@
 
 <script>
 import * as echarts from 'echarts'
-require('echarts/theme/macarons') // echarts theme
+import 'echarts/theme/macarons'
 import resize from './mixins/resize'
 
 export default {
   mixins: [resize],
   props: {
-    className: {
-      type: String,
-      default: 'chart'
-    },
-    width: {
-      type: String,
-      default: '100%'
-    },
-    height: {
-      type: String,
-      default: '350px'
-    },
-    autoResize: {
-      type: Boolean,
-      default: true
-    },
+    className: { type: String, default: 'chart' },
+    width: { type: String, default: '100%' },
+    height: { type: String, default: '350px' },
+    autoResize: { type: Boolean, default: true },
+    title: { type: String, default: '' },
     chartData: {
       type: Object,
-      required: true
-    }
+      default: () => ({ dates: [], series: [] }),
+    },
   },
   data() {
-    return {
-      chart: null
-    }
+    return { chart: null }
   },
   watch: {
     chartData: {
       deep: true,
-      handler(val) {
-        this.setOptions(val)
-      }
-    }
+      handler(val) { this.setOptions(val) },
+    },
   },
   mounted() {
-    this.$nextTick(() => {
-      this.initChart()
-    })
+    this.$nextTick(() => { this.initChart() })
   },
-  beforeDestroy() {
-    if (!this.chart) {
-      return
-    }
+  beforeUnmount() {
+    if (!this.chart) return
     this.chart.dispose()
     this.chart = null
   },
@@ -61,75 +42,44 @@ export default {
       this.chart = echarts.init(this.$el, 'macarons')
       this.setOptions(this.chartData)
     },
-    setOptions({ expectedData, actualData } = {}) {
+    setOptions({ dates, series } = {}) {
+      if (!this.chart) return
       this.chart.setOption({
-        xAxis: {
-          data: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-          boundaryGap: false,
-          axisTick: {
-            show: false
-          }
-        },
-        grid: {
-          left: 10,
-          right: 10,
-          bottom: 20,
-          top: 30,
-          containLabel: true
+        title: {
+          text: this.title,
+          left: 'center',
+          textStyle: { fontSize: 16, fontWeight: 'normal' },
         },
         tooltip: {
           trigger: 'axis',
-          axisPointer: {
-            type: 'cross'
-          },
-          padding: [5, 10]
-        },
-        yAxis: {
-          axisTick: {
-            show: false
-          }
+          axisPointer: { type: 'cross' },
         },
         legend: {
-          data: ['expected', 'actual']
+          data: (series || []).map((s) => s.name),
+          bottom: 0,
         },
-        series: [{
-          name: 'expected', itemStyle: {
-            normal: {
-              color: '#FF005A',
-              lineStyle: {
-                color: '#FF005A',
-                width: 2
-              }
-            }
-          },
-          smooth: true,
-          type: 'line',
-          data: expectedData,
-          animationDuration: 2800,
-          animationEasing: 'cubicInOut'
+        grid: {
+          left: '3%',
+          right: '4%',
+          bottom: '12%',
+          top: this.title ? '18%' : '10%',
+          containLabel: true,
         },
-        {
-          name: 'actual',
-          smooth: true,
+        xAxis: {
+          type: 'category',
+          data: dates || [],
+          boundaryGap: false,
+        },
+        yAxis: { type: 'value' },
+        series: (series || []).map((s) => ({
+          name: s.name,
           type: 'line',
-          itemStyle: {
-            normal: {
-              color: '#3888fa',
-              lineStyle: {
-                color: '#3888fa',
-                width: 2
-              },
-              areaStyle: {
-                color: '#f3f8ff'
-              }
-            }
-          },
-          data: actualData,
-          animationDuration: 2800,
-          animationEasing: 'quadraticOut'
-        }]
+          smooth: true,
+          data: s.data || [],
+          animationDuration: 2000,
+        })),
       })
-    }
-  }
+    },
+  },
 }
 </script>

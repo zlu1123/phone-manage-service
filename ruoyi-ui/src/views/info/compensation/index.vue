@@ -1,10 +1,10 @@
 <template>
   <div class="app-container">
-    <pro-table ref="proTable" :fetch-api="getListApi" :search-fields="searchFields" :columns="columns">
+    <pro-table ref="proTableRef" :fetch-api="getListApi" :search-fields="searchFields" :columns="columns">
       <!-- 工具栏：新增按钮 -->
       <template #toolbar>
         <el-col :span="1.5">
-          <el-button type="primary" plain icon="el-icon-plus" size="mini" @click="handleAdd">新增</el-button>
+          <el-button type="primary" plain :icon="Plus" size="small" @click="handleAdd">新增</el-button>
         </el-col>
       </template>
 
@@ -29,33 +29,35 @@
       <template #action="{ row }">
         <el-button
           v-if="Number(row.status) === 0"
-          size="mini"
-          type="text"
-          icon="el-icon-edit"
+          size="small"
+          type="primary"
+          link
+          :icon="Edit"
           @click="handleReview(row)"
           >审核</el-button
         >
         <el-button
           v-if="Number(row.status) === 1 && Number(row.amount) === 0"
-          size="mini"
-          type="text"
-          icon="el-icon-edit"
+          size="small"
+          type="warning"
+          link
+          :icon="Edit"
           @click="handleEditAmount(row)"
           >修改金额</el-button
         >
-        <el-button size="mini" type="text" icon="el-icon-delete" @click="handleDelete(row)">删除</el-button>
+        <el-button size="small" type="danger" link :icon="Delete" @click="handleDelete(row)">删除</el-button>
       </template>
     </pro-table>
 
     <!-- 新增对话框 -->
     <el-dialog
       title="新增赔付订单"
-      :visible.sync="addDialogVisible"
+      v-model="addDialogVisible"
       width="450px"
       append-to-body
       :close-on-click-modal="false"
     >
-      <el-form ref="addForm" :model="addForm" :rules="addRules" label-width="100px" size="small">
+      <el-form ref="addFormRef" :model="addForm" :rules="addRules" label-width="100px" size="small">
         <el-form-item label="订单ID" prop="orderId">
           <el-input v-model.number="addForm.orderId" placeholder="请输入订单ID" clearable />
         </el-form-item>
@@ -63,21 +65,23 @@
           <el-input v-model.number="addForm.infoId" placeholder="请输入留资人ID" clearable />
         </el-form-item>
       </el-form>
-      <div slot="footer" class="dialog-footer">
-        <el-button size="small" @click="addDialogVisible = false">取 消</el-button>
-        <el-button type="primary" size="small" :loading="submitLoading" @click="handleAddSubmit">确 定</el-button>
-      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button size="small" @click="addDialogVisible = false">取 消</el-button>
+          <el-button type="primary" size="small" :loading="submitLoading" @click="handleAddSubmit">确 定</el-button>
+        </div>
+      </template>
     </el-dialog>
 
     <!-- 审核对话框 -->
     <el-dialog
       title="审核赔付订单"
-      :visible.sync="reviewDialogVisible"
+      v-model="reviewDialogVisible"
       width="500px"
       append-to-body
       :close-on-click-modal="false"
     >
-      <el-form ref="reviewForm" :model="reviewForm" :rules="reviewRules" label-width="100px" size="small">
+      <el-form ref="reviewFormRef" :model="reviewForm" :rules="reviewRules" label-width="100px" size="small">
         <el-form-item label="审核状态" prop="status">
           <el-select v-model="reviewForm.status" placeholder="请选择审核状态" style="width: 100%">
             <el-option label="审核通过" :value="1" />
@@ -106,27 +110,29 @@
           <el-input v-model="reviewForm.remark" type="textarea" :rows="2" placeholder="请输入备注" />
         </el-form-item>
       </el-form>
-      <div slot="footer" class="dialog-footer">
-        <el-button size="small" @click="reviewDialogVisible = false">取 消</el-button>
-        <el-button type="primary" size="small" :loading="submitLoading" @click="handleReviewSubmit">确 定</el-button>
-      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button size="small" @click="reviewDialogVisible = false">取 消</el-button>
+          <el-button type="primary" size="small" :loading="submitLoading" @click="handleReviewSubmit">确 定</el-button>
+        </div>
+      </template>
     </el-dialog>
 
     <!-- 修改金额对话框 -->
     <el-dialog
       title="修改赔付金额"
-      :visible.sync="editAmountDialogVisible"
+      v-model="editAmountDialogVisible"
       width="450px"
       append-to-body
       :close-on-click-modal="false"
     >
       <el-form
-        ref="editAmountForm"
+        ref="editAmountFormRef"
         :model="editAmountForm"
         :rules="editAmountRules"
         label-width="100px"
         size="small"
-        @submit.native.prevent
+        @submit.prevent
       >
         <el-form-item label="赔付金额" prop="amount">
           <el-input-number
@@ -139,242 +145,259 @@
           />
         </el-form-item>
       </el-form>
-      <div slot="footer" class="dialog-footer">
-        <el-button size="small" @click="editAmountDialogVisible = false">取 消</el-button>
-        <el-button type="primary" size="small" :loading="submitLoading" @click="handleEditAmountSubmit"
-          >确 定</el-button
-        >
-      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button size="small" @click="editAmountDialogVisible = false">取 消</el-button>
+          <el-button type="primary" size="small" :loading="submitLoading" @click="handleEditAmountSubmit"
+            >确 定</el-button
+          >
+        </div>
+      </template>
     </el-dialog>
   </div>
 </template>
 
-<script>
+<script setup>
+import { ref, reactive, nextTick } from 'vue';
+import { ElMessage, ElMessageBox } from 'element-plus';
+import { Plus, Edit, Delete } from '@element-plus/icons-vue';
 import { getCompensationList, addCompensation, updateCompensation, deleteCompensation } from '@/api/order/compensation';
+import { parseTime } from '@/utils/ruoyi';
 
-export default {
-  name: 'CompensationOrder',
-  data() {
-    return {
-      // 列表请求 API
-      getListApi: getCompensationList,
-      // 新增对话框
-      addDialogVisible: false,
-      addForm: {},
-      addRules: {
-        orderId: [
-          { required: true, message: '请输入订单ID', trigger: 'blur' },
-          { type: 'number', message: '订单ID必须为数字', trigger: 'blur' },
-        ],
-        infoId: [
-          { required: true, message: '请输入留资人ID', trigger: 'blur' },
-          { type: 'number', message: '留资人ID必须为数字', trigger: 'blur' },
-        ],
+// 列表请求 API
+const getListApi = getCompensationList;
+
+// 表格引用
+const proTableRef = ref(null);
+
+// 提交按钮loading
+const submitLoading = ref(false);
+
+// 新增对话框
+const addDialogVisible = ref(false);
+const addFormRef = ref(null);
+const addForm = reactive({
+  orderId: undefined,
+  infoId: undefined,
+});
+const addRules = {
+  orderId: [
+    { required: true, message: '请输入订单ID', trigger: 'blur' },
+    { type: 'number', message: '订单ID必须为数字', trigger: 'blur' },
+  ],
+  infoId: [
+    { required: true, message: '请输入留资人ID', trigger: 'blur' },
+    { type: 'number', message: '留资人ID必须为数字', trigger: 'blur' },
+  ],
+};
+
+// 审核对话框
+const reviewDialogVisible = ref(false);
+const reviewFormRef = ref(null);
+const reviewForm = reactive({
+  id: undefined,
+  amount: undefined,
+  status: undefined,
+  rejectionReason: '',
+  remark: '',
+});
+const reviewRules = {
+  status: [{ required: true, message: '请选择审核状态', trigger: 'change' }],
+  rejectionReason: [
+    {
+      validator: (rule, value, callback) => {
+        if (reviewForm.status === 2 && !value) {
+          callback(new Error('请输入拒绝原因'));
+        } else {
+          callback();
+        }
       },
-      // 审核对话框
-      reviewDialogVisible: false,
-      reviewForm: {},
-      reviewRules: {
-        status: [{ required: true, message: '请选择审核状态', trigger: 'change' }],
-        rejectionReason: [
-          {
-            validator: (rule, value, callback) => {
-              if (this.reviewForm.status === 2 && !value) {
-                callback(new Error('请输入拒绝原因'));
-              } else {
-                callback();
-              }
-            },
-            trigger: 'blur',
-          },
-        ],
-      },
-      // 提交按钮loading
-      submitLoading: false,
-      // 修改金额对话框
-      editAmountDialogVisible: false,
-      editAmountForm: {},
-      editAmountRules: {
-        amount: [{ required: true, message: '请输入赔付金额', trigger: 'blur' }],
-      },
-      // 搜索字段配置
-      searchFields: [
-        { prop: 'name', label: '留资人姓名', type: 'input' },
-        { prop: 'phoneNum', label: '留资人电话', type: 'input' },
-        { prop: 'signatureImei', label: '签约IMEI', type: 'input' },
-        { prop: 'createBy', label: '创建人', type: 'input' },
-      ],
-      // 表格列配置
-      columns: [
-        { label: 'ID', prop: 'id', width: '60' },
-        { label: '订单ID', prop: 'orderId', width: '80' },
-        { label: '留资人ID', prop: 'infoId', width: '90' },
-        { label: '留资人姓名', prop: 'name', minWidth: '100' },
-        { label: '留资人电话', prop: 'phoneNum', minWidth: '120' },
-        { label: '签约IMEI', prop: 'signatureImei', minWidth: '140' },
-        { label: '赔付金额', prop: 'amount', slot: 'amount', width: '110' },
-        { label: '状态', prop: 'status', slot: 'status', width: '100' },
-        {
-          label: '拒绝原因',
-          prop: 'rejectionReason',
-          minWidth: '150',
-          showOverflowTooltip: true,
-        },
-        {
-          label: '备注',
-          prop: 'remark',
-          minWidth: '120',
-          showOverflowTooltip: true,
-        },
-        { label: '创建人', prop: 'createByName', width: '100' },
-        {
-          label: '创建时间',
-          prop: 'createTime',
-          slot: 'createTime',
-          width: '160',
-        },
-        {
-          label: '操作',
-          slot: 'action',
-          width: '120',
-          fixed: 'right',
-          showOverflowTooltip: false,
-        },
-      ],
-    };
+      trigger: 'blur',
+    },
+  ],
+};
+
+// 修改金额对话框
+const editAmountDialogVisible = ref(false);
+const editAmountFormRef = ref(null);
+const editAmountForm = reactive({
+  id: undefined,
+  amount: undefined,
+});
+const editAmountRules = {
+  amount: [{ required: true, message: '请输入赔付金额', trigger: 'blur' }],
+};
+
+// 搜索字段配置
+const searchFields = [
+  { prop: 'name', label: '留资人姓名', type: 'input' },
+  { prop: 'phoneNum', label: '留资人电话', type: 'input' },
+  { prop: 'signatureImei', label: '签约IMEI', type: 'input' },
+  { prop: 'createBy', label: '创建人', type: 'input' },
+];
+
+// 表格列配置
+const columns = [
+  { label: 'ID', prop: 'id', width: '60' },
+  { label: '订单ID', prop: 'orderId', width: '80' },
+  { label: '留资人ID', prop: 'infoId', width: '90' },
+  { label: '留资人姓名', prop: 'name', minWidth: '100' },
+  { label: '留资人电话', prop: 'phoneNum', minWidth: '120' },
+  { label: '签约IMEI', prop: 'signatureImei', minWidth: '140' },
+  { label: '赔付金额', prop: 'amount', slot: 'amount', width: '110' },
+  { label: '状态', prop: 'status', slot: 'status', width: '100' },
+  {
+    label: '拒绝原因',
+    prop: 'rejectionReason',
+    minWidth: '150',
+    showOverflowTooltip: true,
   },
-  methods: {
-    /** 获取状态文本 */
-    getStatusText(status) {
-      const map = { 0: '待审核', 1: '审核通过', 2: '审核不通过' };
-      return map[Number(status)] || '未知';
-    },
-    /** 获取状态标签类型 */
-    getStatusTagType(status) {
-      const map = { 0: 'info', 1: 'success', 2: 'danger' };
-      return map[Number(status)] || 'info';
-    },
-    /** 重置新增表单 */
-    resetAddForm() {
-      this.addForm = {
-        orderId: undefined,
-        infoId: undefined,
-      };
-      this.$nextTick(() => {
-        if (this.$refs.addForm) {
-          this.$refs.addForm.clearValidate();
-        }
-      });
-    },
-    /** 重置审核表单 */
-    resetReviewForm() {
-      this.reviewForm = {
-        id: undefined,
-        amount: undefined,
-        status: undefined,
-        rejectionReason: '',
-        remark: '',
-      };
-      this.$nextTick(() => {
-        if (this.$refs.reviewForm) {
-          this.$refs.reviewForm.clearValidate();
-        }
-      });
-    },
-    /** 新增按钮 */
-    handleAdd() {
-      this.resetAddForm();
-      this.addDialogVisible = true;
-    },
-    /** 提交新增 */
-    handleAddSubmit() {
-      this.$refs.addForm.validate((valid) => {
-        if (!valid) return;
-        this.submitLoading = true;
-        addCompensation(this.addForm)
-          .then(() => {
-            this.$message.success('新增成功');
-            this.addDialogVisible = false;
-            this.$refs.proTable.refresh();
-          })
-          .finally(() => {
-            this.submitLoading = false;
-          });
-      });
-    },
-    /** 审核按钮 */
-    handleReview(row) {
-      this.resetReviewForm();
-      // 打开审核对话框时不预填充审核状态，由管理员主动选择
-      this.reviewForm = {
-        id: row.id,
-        amount: row.amount,
-        rejectionReason: row.rejectionReason || '',
-        remark: row.remark || '',
-      };
-      this.reviewDialogVisible = true;
-    },
-    /** 提交审核 */
-    handleReviewSubmit() {
-      this.$refs.reviewForm.validate((valid) => {
-        if (!valid) return;
-        this.submitLoading = true;
-        updateCompensation(this.reviewForm)
-          .then(() => {
-            this.$message.success('审核提交成功');
-            this.reviewDialogVisible = false;
-            this.$refs.proTable.refresh();
-          })
-          .finally(() => {
-            this.submitLoading = false;
-          });
-      });
-    },
-    /** 修改金额按钮 */
-    handleEditAmount(row) {
-      this.editAmountForm = {
-        id: row.id,
-        amount: undefined,
-      };
-      this.editAmountDialogVisible = true;
-      this.$nextTick(() => {
-        if (this.$refs.editAmountForm) {
-          this.$refs.editAmountForm.clearValidate();
-        }
-      });
-    },
-    /** 提交修改金额 */
-    handleEditAmountSubmit() {
-      this.$refs.editAmountForm.validate((valid) => {
-        if (!valid) return;
-        this.submitLoading = true;
-        updateCompensation(this.editAmountForm)
-          .then(() => {
-            this.$message.success('金额修改成功');
-            this.editAmountDialogVisible = false;
-            this.$refs.proTable.refresh();
-          })
-          .finally(() => {
-            this.submitLoading = false;
-          });
-      });
-    },
-    /** 删除按钮 */
-    handleDelete(row) {
-      this.$confirm(`是否确认删除该赔付订单（ID：${row.id}）？`, '提示', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning',
+  {
+    label: '备注',
+    prop: 'remark',
+    minWidth: '120',
+    showOverflowTooltip: true,
+  },
+  { label: '创建人', prop: 'createByName', width: '100' },
+  {
+    label: '创建时间',
+    prop: 'createTime',
+    slot: 'createTime',
+    width: '160',
+  },
+  {
+    label: '操作',
+    slot: 'action',
+    width: '120',
+    fixed: 'right',
+    showOverflowTooltip: false,
+  },
+];
+
+/** 获取状态文本 */
+const getStatusText = (status) => {
+  const map = { 0: '待审核', 1: '审核通过', 2: '审核不通过' };
+  return map[Number(status)] || '未知';
+};
+
+/** 获取状态标签类型 */
+const getStatusTagType = (status) => {
+  const map = { 0: 'info', 1: 'success', 2: 'danger' };
+  return map[Number(status)] || 'info';
+};
+
+/** 重置新增表单 */
+const resetAddForm = () => {
+  addForm.orderId = undefined;
+  addForm.infoId = undefined;
+  nextTick(() => {
+    addFormRef.value?.clearValidate();
+  });
+};
+
+/** 重置审核表单 */
+const resetReviewForm = () => {
+  reviewForm.id = undefined;
+  reviewForm.amount = undefined;
+  reviewForm.status = undefined;
+  reviewForm.rejectionReason = '';
+  reviewForm.remark = '';
+  nextTick(() => {
+    reviewFormRef.value?.clearValidate();
+  });
+};
+
+/** 新增按钮 */
+const handleAdd = () => {
+  resetAddForm();
+  addDialogVisible.value = true;
+};
+
+/** 提交新增 */
+const handleAddSubmit = () => {
+  addFormRef.value.validate((valid) => {
+    if (!valid) return;
+    submitLoading.value = true;
+    addCompensation(addForm)
+      .then(() => {
+        ElMessage.success('新增成功');
+        addDialogVisible.value = false;
+        proTableRef.value.refresh();
       })
-        .then(() => {
-          return deleteCompensation(row.id);
-        })
-        .then(() => {
-          this.$message.success('删除成功');
-          this.$refs.proTable.refresh();
-        })
-        .catch(() => {});
-    },
-  },
+      .finally(() => {
+        submitLoading.value = false;
+      });
+  });
+};
+
+/** 审核按钮 */
+const handleReview = (row) => {
+  resetReviewForm();
+  reviewForm.id = row.id;
+  reviewForm.amount = row.amount;
+  reviewForm.rejectionReason = row.rejectionReason || '';
+  reviewForm.remark = row.remark || '';
+  reviewDialogVisible.value = true;
+};
+
+/** 提交审核 */
+const handleReviewSubmit = () => {
+  reviewFormRef.value.validate((valid) => {
+    if (!valid) return;
+    submitLoading.value = true;
+    updateCompensation(reviewForm)
+      .then(() => {
+        ElMessage.success('审核提交成功');
+        reviewDialogVisible.value = false;
+        proTableRef.value.refresh();
+      })
+      .finally(() => {
+        submitLoading.value = false;
+      });
+  });
+};
+
+/** 修改金额按钮 */
+const handleEditAmount = (row) => {
+  editAmountForm.id = row.id;
+  editAmountForm.amount = undefined;
+  editAmountDialogVisible.value = true;
+  nextTick(() => {
+    editAmountFormRef.value?.clearValidate();
+  });
+};
+
+/** 提交修改金额 */
+const handleEditAmountSubmit = () => {
+  editAmountFormRef.value.validate((valid) => {
+    if (!valid) return;
+    submitLoading.value = true;
+    updateCompensation(editAmountForm)
+      .then(() => {
+        ElMessage.success('金额修改成功');
+        editAmountDialogVisible.value = false;
+        proTableRef.value.refresh();
+      })
+      .finally(() => {
+        submitLoading.value = false;
+      });
+  });
+};
+
+/** 删除按钮 */
+const handleDelete = (row) => {
+  ElMessageBox.confirm(`是否确认删除该赔付订单（ID：${row.id}）？`, '提示', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning',
+  })
+    .then(() => {
+      return deleteCompensation(row.id);
+    })
+    .then(() => {
+      ElMessage.success('删除成功');
+      proTableRef.value.refresh();
+    })
+    .catch(() => {});
 };
 </script>
