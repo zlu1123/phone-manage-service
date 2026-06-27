@@ -990,10 +990,31 @@ public class ExcelUtil<T>
     {
         // 创建列
         Cell cell = row.createCell(column);
-        // 写入列信息
-        cell.setCellValue(attr.name());
+        // 写入列信息，必填列加（必填）后缀
+        String headerName = attr.name();
+        if (attr.required())
+        {
+            headerName = headerName + "（必填）";
+        }
+        cell.setCellValue(headerName);
         setDataValidation(attr, row, column);
-        cell.setCellStyle(styles.get(StringUtils.format("header_{}_{}", attr.headerColor(), attr.headerBackgroundColor())));
+        String styleKey = StringUtils.format("header_{}_{}", attr.headerColor(), attr.headerBackgroundColor());
+        if (attr.required() && Type.IMPORT.equals(type))
+        {
+            // 必填列：红色字体加粗
+            CellStyle requiredStyle = wb.createCellStyle();
+            requiredStyle.cloneStyleFrom(styles.get(styleKey));
+            Font requiredFont = wb.createFont();
+            requiredFont.setBold(true);
+            requiredFont.setColor(IndexedColors.RED.getIndex());
+            requiredFont.setFontHeightInPoints((short) 11);
+            requiredStyle.setFont(requiredFont);
+            cell.setCellStyle(requiredStyle);
+        }
+        else
+        {
+            cell.setCellStyle(styles.get(styleKey));
+        }
         if (isSubList())
         {
             // 填充默认样式，防止合并单元格样式失效

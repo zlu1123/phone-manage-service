@@ -39,4 +39,12 @@ public interface PhoneActiveInfoMapper {
     Map<String, Object> selectWarrantyStatus(@Param("currentDate") String currentDate);
 
     List<PhoneActiveInfo> selectRecentOrders(@Param("createBy") String createBy, @Param("limit") int limit);
+
+    /**
+     * 根据订单ID查询签约时的协议内容快照
+     *
+     * @param id 订单ID
+     * @return 协议内容（富文本HTML），可能为null
+     */
+    String selectContractContentById(@Param("id") Long id);
 }

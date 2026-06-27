@@ -2,17 +2,17 @@ package com.ruoyi.web.controller.system;
 
 import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.R;
+import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.web.domain.PhoneActiveInfo;
 import com.ruoyi.web.service.IPhoneActiveInfoService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import javax.servlet.http.HttpServletResponse;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -115,5 +115,46 @@ public class PhoneActiveOrderController extends BaseController {
         phoneActiveInfo.setIsSignature(1);
         List<PhoneActiveInfo> list = phoneActiveInfoService.queryActiveList(phoneActiveInfo);
         return R.ok(getDataTable(list));
+    }
+
+    /**
+     * 下载导入模板
+     */
+    @ApiOperation("下载订单导入模板")
+    @PostMapping("/importTemplate")
+    public void importTemplate(HttpServletResponse response) {
+        ExcelUtil<PhoneActiveInfo> util = new ExcelUtil<>(PhoneActiveInfo.class);
+        util.importTemplateExcel(response, "订单数据");
+    }
+
+    /**
+     * 导入订单数据
+     *
+     * @param file 上传的Excel文件
+     * @param updateSupport 是否更新已存在的数据
+     */
+    @ApiOperation("导入订单数据")
+    @PostMapping("/importData")
+    public R importData(MultipartFile file, @RequestParam(defaultValue = "false") boolean updateSupport) throws Exception {
+        ExcelUtil<PhoneActiveInfo> util = new ExcelUtil<>(PhoneActiveInfo.class);
+        List<PhoneActiveInfo> list = util.importExcel(file.getInputStream());
+        String message = phoneActiveInfoService.importActiveInfo(list, updateSupport, getUsername());
+        return R.ok(message);
+    }
+
+    /**
+     * 获取订单签约时的协议内容（历史快照，不受协议模板表变更影响）
+     *
+     * @param id 订单ID
+     * @return 协议内容（富文本HTML）
+     */
+    @ApiOperation("获取订单签约协议内容")
+    @GetMapping("/getContractContent")
+    public R getContractContent(@RequestParam("id") Long id) {
+        String content = phoneActiveInfoService.getContractContent(id);
+        if (content == null || content.trim().isEmpty()) {
+            return R.fail("该订单暂无协议内容");
+        }
+        return R.ok(content);
     }
 }

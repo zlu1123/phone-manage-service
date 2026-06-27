@@ -159,6 +159,11 @@ public @interface Excel
     public String[] args() default {};
 
     /**
+     * 是否必填（导入模板中列头红色加粗标注，且后端/前端强制校验）
+     */
+    public boolean required() default false;
+
+    /**
      * 字段类型（0：导出导入；1：仅导出；2：仅导入）
      */
     Type type() default Type.ALL;

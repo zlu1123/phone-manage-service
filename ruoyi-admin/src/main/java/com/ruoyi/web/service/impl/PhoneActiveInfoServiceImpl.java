@@ -1,5 +1,6 @@
 package com.ruoyi.web.service.impl;
 
+import com.ruoyi.common.annotation.Excel;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.framework.config.ServerConfig;
 import com.ruoyi.web.domain.PhoneActiveInfo;
@@ -9,6 +10,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
@@ -49,6 +52,115 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
         phoneActiveInfoMapper.insert(info);
         System.out.println("生成的主键ID: " + info.getId());
         return info.getId();
+    }
+
+    @Override
+    public String importActiveInfo(List<PhoneActiveInfo> list, boolean updateSupport, String operName) {
+        if (list == null || list.isEmpty()) {
+            return "导入数据为空";
+        }
+
+        int successCount = 0;
+        int failCount = 0;
+        int updateCount = 0;
+        StringBuilder failMsg = new StringBuilder();
+
+        for (int i = 0; i < list.size(); i++) {
+            PhoneActiveInfo info = list.get(i);
+            try {
+                // 基于 @Excel(required=true) 注解校验必填字段
+                String requiredError = validateRequiredFields(info);
+                if (requiredError != null) {
+                    failCount++;
+                    failMsg.append("<br/>第").append(i + 1).append("行：").append(requiredError);
+                    continue;
+                }
+                String sn = info.getSn().trim();
+                info.setSn(sn);
+
+                PhoneActiveInfo exist = phoneActiveInfoMapper.selectBySn(sn);
+                if (exist != null) {
+                    if (updateSupport) {
+                        info.setId(exist.getId());
+                        info.setUpdateBy(operName);
+                        phoneActiveInfoMapper.updateById(info);
+                        updateCount++;
+                    } else {
+                        failCount++;
+                        failMsg.append("<br/>序列号 ").append(sn).append(" 已存在（第").append(i + 1).append("行）");
+                    }
+                } else {
+                    info.setCreateBy(operName);
+                    info.setUpdateBy(operName);
+                    phoneActiveInfoMapper.insert(info);
+                    successCount++;
+                }
+            } catch (Exception e) {
+                failCount++;
+                failMsg.append("<br/>第").append(i + 1).append("行导入失败：").append(e.getMessage());
+            }
+        }
+
+        StringBuilder resultMsg = new StringBuilder();
+        resultMsg.append("共 ").append(list.size()).append(" 条数据，成功导入 ").append(successCount).append(" 条");
+        if (updateCount > 0) {
+            resultMsg.append("，更新 ").append(updateCount).append(" 条");
+        }
+        if (failCount > 0) {
+            resultMsg.append("，失败 ").append(failCount).append(" 条");
+            resultMsg.append(failMsg);
+        }
+        return resultMsg.toString();
+    }
+
+    /**
+     * 基于 @Excel(required=true) 注解校验必填字段
+     *
+     * @param info 待校验的订单对象
+     * @return 错误消息，校验通过返回 null
+     */
+    private String validateRequiredFields(PhoneActiveInfo info) {
+        Field[] fields = PhoneActiveInfo.class.getDeclaredFields();
+        for (Field field : fields) {
+            Excel excel = field.getAnnotation(Excel.class);
+            if (excel == null || !excel.required()) {
+                continue;
+            }
+            try {
+                // 使用getter方法获取值
+                Method getter = findGetter(field);
+                if (getter == null) {
+                    continue;
+                }
+                Object value = getter.invoke(info);
+                if (isNullOrEmpty(value)) {
+                    return excel.name() + "不能为空";
+                }
+            } catch (Exception e) {
+                return excel.name() + "校验失败：" + e.getMessage();
+            }
+        }
+        return null;
+    }
+
+    private boolean isNullOrEmpty(Object value) {
+        if (value == null) {
+            return true;
+        }
+        if (value instanceof String) {
+            return ((String) value).trim().isEmpty();
+        }
+        return false;
+    }
+
+    private Method findGetter(Field field) {
+        String name = field.getName();
+        String getterName = "get" + Character.toUpperCase(name.charAt(0)) + name.substring(1);
+        try {
+            return PhoneActiveInfo.class.getMethod(getterName);
+        } catch (NoSuchMethodException e) {
+            return null;
+        }
     }
 
     @Override
@@ -390,5 +502,13 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
             return ((Number) value).longValue();
         }
         return Long.parseLong(String.valueOf(value));
+    }
+
+    @Override
+    public String getContractContent(Long id) {
+        if (id == null) {
+            return null;
+        }
+        return phoneActiveInfoMapper.selectContractContentById(id);
     }
 }

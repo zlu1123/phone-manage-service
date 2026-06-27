@@ -268,4 +268,8 @@
         LIMIT #{limit}
     </select>
 
+    <select id="selectContractContentById" resultType="java.lang.String">
+        SELECT contract_content FROM phone_active_info WHERE id = #{id}
+    </select>
+
 </mapper>
