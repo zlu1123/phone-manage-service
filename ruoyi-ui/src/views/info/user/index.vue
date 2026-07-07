@@ -10,7 +10,7 @@
             :icon="Plus"
             size="small"
             @click="handleAdd"
-            v-hasPermi="['system:leaveInfo:add']"
+            v-hasRole="['admin', 'user']"
             >新增</el-button
           >
         </el-col>
@@ -29,7 +29,7 @@
           link
           :icon="Edit"
           @click="handleUpdate(row)"
-          v-hasPermi="['system:leaveInfo:edit']"
+          v-hasRole="['admin', 'user']"
           >修改</el-button
         >
         <el-button
@@ -38,7 +38,7 @@
           link
           :icon="Delete"
           @click="handleDelete(row)"
-          v-hasPermi="['system:leaveInfo:remove']"
+          v-hasRole="['admin', 'user']"
           >删除</el-button
         >
       </template>

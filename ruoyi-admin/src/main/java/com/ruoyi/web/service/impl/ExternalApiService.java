@@ -66,7 +66,9 @@ public class ExternalApiService {
                 log.warn("查询失败，错误码: {}, 信息: {}", response.getCode(), response.getMessage());
             }
         } catch (Exception e) {
-            log.error("JSON 解析失败", e);
+            log.error("JSON 解析失败，原始响应: {}", jsonString, e);
+            result.setSuccess(false);
+            result.setData("查询失败，API返回异常：" + jsonString);
         }
         return result;
     }

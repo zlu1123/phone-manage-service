@@ -13,7 +13,7 @@ public enum PhoneType {
     HONOR("4", "荣耀", "honor"),
     OPPO("5", "OPPO/真我/一加", "oppo"),
     VIVO("6", "VIVO/iQOO", "vivo"),
-    SAMSUNG("7", "三星", "samsung");
+    SAMSUNG("7", "三星", "sumsung");
 
     private final String code;
     private final String name;
