@@ -1,10 +1,18 @@
 package com.ruoyi.web.service.impl;
 
 import com.ruoyi.common.annotation.Excel;
+import com.ruoyi.common.core.domain.entity.SysDept;
+import com.ruoyi.common.core.domain.entity.SysUser;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.framework.config.ServerConfig;
+import com.ruoyi.system.mapper.SysDeptMapper;
+import com.ruoyi.system.mapper.SysUserMapper;
+import com.ruoyi.web.domain.PhoneActiveDetail;
 import com.ruoyi.web.domain.PhoneActiveInfo;
+import com.ruoyi.web.domain.PhoneOrderContract;
+import com.ruoyi.web.mapper.PhoneActiveDetailMapper;
 import com.ruoyi.web.mapper.PhoneActiveInfoMapper;
+import com.ruoyi.web.mapper.PhoneOrderContractMapper;
 import com.ruoyi.web.service.IPhoneActiveInfoService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -33,7 +41,22 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
     private PhoneActiveInfoMapper phoneActiveInfoMapper;
 
     @Autowired
+    private PhoneActiveDetailMapper phoneActiveDetailMapper;
+
+    @Autowired
+    private PhoneOrderContractMapper phoneOrderContractMapper;
+
+    @Autowired
+    private SysUserMapper sysUserMapper;
+
+    @Autowired
+    private SysDeptMapper sysDeptMapper;
+
+    @Autowired
     private ServerConfig serverConfig;
+
+    /** 通信源手机的部门ID，其直接子节点即为门店 */
+    private static final Long STORE_PARENT_DEPT_ID = 201L;
 
     @Override
     @Transactional
@@ -41,17 +64,45 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
         if (info == null) {
             return null;
         }
+        // 更新：仅更新主表（详情和签约由各自方法处理）
         if (info.getId() != null) {
             info.setUpdateTime(new Date());
-            int i = phoneActiveInfoMapper.updateById(info);
-            return (long) i;
+            phoneActiveInfoMapper.updateById(info);
+            return info.getId();
         }
+        // 新增：先插主表获取 order_id，再插详情表
         info.setImagePath(normalizeImagePath(info.getImagePath()));
         info.setCreateTime(new Date());
         info.setUpdateTime(new Date());
         phoneActiveInfoMapper.insert(info);
-        System.out.println("生成的主键ID: " + info.getId());
-        return info.getId();
+        Long orderId = info.getId();
+
+        // 插入详情表（只要有任意详情字段就插入，因为详情与订单 1:1）
+        PhoneActiveDetail detail = new PhoneActiveDetail();
+        detail.setOrderId(orderId);
+        detail.setActivated(info.getActivated());
+        detail.setActivateDate(info.getActivateDate());
+        detail.setCoverage(info.getCoverage());
+        detail.setActiveInfo(info.getActiveInfo());
+        detail.setSysTime(info.getSysTime());
+        detail.setImagePath(info.getImagePath());
+        phoneActiveDetailMapper.insert(detail);
+
+        return orderId;
+    }
+
+    @Override
+    @Transactional
+    public void saveOrUpdateContract(PhoneOrderContract contract) {
+        if (contract == null || contract.getOrderId() == null) {
+            return;
+        }
+        PhoneOrderContract exist = phoneOrderContractMapper.selectByOrderId(contract.getOrderId());
+        if (exist != null) {
+            phoneOrderContractMapper.updateByOrderId(contract);
+        } else {
+            phoneOrderContractMapper.insert(contract);
+        }
     }
 
     @Override
@@ -68,7 +119,6 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
         for (int i = 0; i < list.size(); i++) {
             PhoneActiveInfo info = list.get(i);
             try {
-                // 基于 @Excel(required=true) 注解校验必填字段
                 String requiredError = validateRequiredFields(info);
                 if (requiredError != null) {
                     failCount++;
@@ -92,7 +142,25 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
                 } else {
                     info.setCreateBy(operName);
                     info.setUpdateBy(operName);
+                    if (info.getStoreId() == null) {
+                        info.setStoreId(resolveStoreIdByUsername(operName));
+                    }
+                    info.setCreateTime(new Date());
+                    info.setUpdateTime(new Date());
                     phoneActiveInfoMapper.insert(info);
+                    Long orderId = info.getId();
+
+                    // 插入详情表
+                    PhoneActiveDetail detail = new PhoneActiveDetail();
+                    detail.setOrderId(orderId);
+                    detail.setActivated(info.getActivated());
+                    detail.setActivateDate(info.getActivateDate());
+                    detail.setCoverage(info.getCoverage());
+                    detail.setActiveInfo(info.getActiveInfo());
+                    detail.setSysTime(info.getSysTime());
+                    detail.setImagePath(info.getImagePath());
+                    phoneActiveDetailMapper.insert(detail);
+
                     successCount++;
                 }
             } catch (Exception e) {
@@ -165,7 +233,19 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
 
     @Override
     public List<PhoneActiveInfo> queryActiveList(PhoneActiveInfo info) {
-        return fillImageUrls(phoneActiveInfoMapper.selectByExample(info));
+        return fillImageUrls(phoneActiveInfoMapper.selectListByExample(info));
+    }
+
+    @Override
+    public PhoneActiveInfo getActiveDetail(Long id) {
+        if (id == null) {
+            return null;
+        }
+        PhoneActiveInfo detail = phoneActiveInfoMapper.selectDetailById(id);
+        if (detail != null) {
+            fillImageUrl(detail);
+        }
+        return detail;
     }
 
     @Override
@@ -510,5 +590,49 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
             return null;
         }
         return phoneActiveInfoMapper.selectContractContentById(id);
+    }
+
+    /**
+     * 根据用户名解析其所属门店ID
+     * 从用户的部门出发，向上查找 parent_id == 201（通信源手机）的直接子部门即为门店
+     *
+     * @param username 用户名
+     * @return 门店ID，null表示无法解析
+     */
+    public Long resolveStoreIdByUsername(String username) {
+        if (username == null) {
+            return null;
+        }
+        SysUser user = sysUserMapper.selectUserByUserName(username);
+        if (user == null || user.getDeptId() == null) {
+            return null;
+        }
+        return resolveStoreId(user.getDeptId());
+    }
+
+    /**
+     * 递归向上查找门店ID
+     */
+    private Long resolveStoreId(Long deptId) {
+        if (deptId == null) {
+            return null;
+        }
+        SysDept dept = sysDeptMapper.selectDeptById(deptId);
+        if (dept == null) {
+            return null;
+        }
+        // 父部门是通信源手机 (201) → 这就是一个门店
+        if (dept.getParentId() != null && dept.getParentId().equals(STORE_PARENT_DEPT_ID)) {
+            return deptId;
+        }
+        // 本身就是通信源手机 → 不归属于某个具体门店
+        if (deptId.equals(STORE_PARENT_DEPT_ID)) {
+            return null;
+        }
+        // 继续向上找
+        if (dept.getParentId() != null && dept.getParentId() != 0L) {
+            return resolveStoreId(dept.getParentId());
+        }
+        return null;
     }
 }

@@ -18,8 +18,11 @@ import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.framework.web.service.SysLoginService;
 import com.ruoyi.framework.web.service.SysPermissionService;
 import com.ruoyi.framework.web.service.TokenService;
+import com.ruoyi.system.mapper.SysDeptMapper;
+import com.ruoyi.common.core.domain.entity.SysDept;
 import com.ruoyi.system.service.ISysConfigService;
 import com.ruoyi.system.service.ISysMenuService;
+import com.ruoyi.web.service.IPhoneActiveInfoService;
 
 /**
  * 登录验证
@@ -43,6 +46,12 @@ public class SysLoginController
 
     @Autowired
     private ISysConfigService configService;
+
+    @Autowired
+    private IPhoneActiveInfoService phoneActiveInfoService;
+
+    @Autowired
+    private SysDeptMapper sysDeptMapper;
 
     /**
      * 登录方法
@@ -74,6 +83,14 @@ public class SysLoginController
                 // 返回角色信息
                 Set<String> roles = permissionService.getRolePermission(user);
                 ajax.put("roles", roles);
+                // 返回门店信息，用于前端权限控制（非店员隐藏下单入口）
+                Long storeId = phoneActiveInfoService.resolveStoreIdByUsername(user.getUserName());
+                ajax.put("storeId", storeId);
+                ajax.put("canPlaceOrder", storeId != null);
+                if (storeId != null) {
+                    SysDept dept = sysDeptMapper.selectDeptById(storeId);
+                    ajax.put("storeName", dept != null ? dept.getDeptName() : null);
+                }
             }
         }
         return ajax;

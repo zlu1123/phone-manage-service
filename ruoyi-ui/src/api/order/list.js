@@ -9,6 +9,15 @@ export function queryOrderList(query) {
   })
 }
 
+// 查询订单详情（全字段，包含详情表和签约表）
+export function getOrderDetail(id) {
+  return request({
+    url: '/system/order/getDetail',
+    method: 'get',
+    params: { id }
+  })
+}
+
 // 查询手机品牌列表
 export function queryPhoneTypeList() {
   return request({

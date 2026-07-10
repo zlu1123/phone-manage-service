@@ -16,7 +16,9 @@ import com.ruoyi.web.domain.CompensationOrder;
 import com.ruoyi.web.domain.Contract;
 import com.ruoyi.web.domain.LeaveInformation;
 import com.ruoyi.web.domain.PhoneActiveInfo;
+import com.ruoyi.web.domain.PhoneOrderContract;
 import com.ruoyi.web.enums.PhoneType;
+import com.ruoyi.web.mapper.PhoneActiveInfoMapper;
 import com.ruoyi.web.model.CompensationOrderDto;
 import com.ruoyi.web.model.CompensationOrderReturnDto;
 import com.ruoyi.web.model.LeaveInformationDto;
@@ -53,6 +55,9 @@ public class WechatApiController extends BaseController {
     private PhoneInfoConverterContext converterContext;
     @Autowired
     private IPhoneActiveInfoService phoneActiveInfoService;
+
+    @Autowired
+    private PhoneActiveInfoMapper phoneActiveInfoMapper;
 
     @Autowired
     private ContractService contractService;
@@ -210,22 +215,26 @@ public class WechatApiController extends BaseController {
                           @RequestParam(value = "signatureModel", required = false) String signatureModel,
                           @RequestParam(value = "signatureImei", required = false) String signatureImei,
                           @RequestParam(value = "signatureDate", required = false) String signatureDate) {
-        PhoneActiveInfo info = new PhoneActiveInfo();
+        PhoneOrderContract orderContract = new PhoneOrderContract();
         // 根据协议id查询协议
         Contract contract = new Contract();
         contract.setId(contractId.intValue());
         Contract contract1 = contractService.queryContractById(contract);
         if (contract1 != null && contract1.getStatus()) {
-            info.setContractContent(contract1.getContent());
+            orderContract.setContractContent(contract1.getContent());
         } else {
+            log.warn("签约失败：协议不存在或不是生效中协议，contractId={}", contractId);
             return R.fail("协议不存在或不是生效中协议，请检查后重试");
         }
-        info.setId(id);
-        info.setContractId(contractId);
-        info.setContractPath(contractPath);
-        info.setSignatureModel(signatureModel);
-        info.setSignatureImei(signatureImei);
-        info.setSignatureDate(signatureDate);
+        orderContract.setOrderId(id);
+        orderContract.setContractId(contractId);
+        orderContract.setContractPath(contractPath);
+        orderContract.setSignatureModel(signatureModel);
+        orderContract.setSignatureImei(signatureImei);
+        orderContract.setSignatureDate(signatureDate);
+
+        log.info("开始签约，orderId={}, contractId={}, signatureModel={}, signatureImei={}, signatureDate={}",
+                id, contractId, signatureModel, signatureImei, signatureDate);
 
         // 处理手写签名图片
         String resolvedSignaturePath = null;
@@ -235,10 +244,12 @@ public class WechatApiController extends BaseController {
             log.error("处理手写签名图片失败", e);
             return R.fail("签名图片处理失败：" + e.getMessage());
         }
-        info.setSignaturePath(resolvedSignaturePath);
+        orderContract.setSignaturePath(resolvedSignaturePath);
 
-        Long l = phoneActiveInfoService.saveOrUpdateActiveInfo(info);
-        if (l == null) {
+        try {
+            phoneActiveInfoService.saveOrUpdateContract(orderContract);
+        } catch (Exception e) {
+            log.error("签约保存失败，orderId={}", id, e);
             return R.fail("协议签订失败，请稍后重试");
         }
         return R.ok();
@@ -329,6 +340,12 @@ public class WechatApiController extends BaseController {
         info.setCreateBy(getUsername());
         info.setUpdateBy(getUsername());
         info.setNickName(getNickName());
+        // 快照当前店员的所属门店
+        Long storeId = phoneActiveInfoService.resolveStoreIdByUsername(getUsername());
+        if (storeId == null) {
+            throw new RuntimeException("当前账号未归属任何门店，无法下单");
+        }
+        info.setStoreId(storeId);
         return phoneActiveInfoService.saveOrUpdateActiveInfo(info);
     }
 
@@ -567,7 +584,7 @@ public class WechatApiController extends BaseController {
     public R querySignContractOrderList(PhoneActiveInfo phoneActiveInfo) {
         startPage();
         phoneActiveInfo.setIsSignature(1);
-        List<PhoneActiveInfo> list = phoneActiveInfoService.queryActiveList(phoneActiveInfo);
+        List<PhoneActiveInfo> list = phoneActiveInfoMapper.selectByExample(phoneActiveInfo);
         return R.ok(getDataTable(list));
     }
 }

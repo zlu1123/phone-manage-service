@@ -7,7 +7,6 @@ import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.common.utils.file.FileUploadUtils;
 import com.ruoyi.framework.config.ServerConfig;
 import com.ruoyi.web.domain.Contract;
-import com.ruoyi.web.domain.PhoneActiveInfo;
 import com.ruoyi.web.model.ContractDto;
 import com.ruoyi.web.service.ContractService;
 import io.swagger.annotations.Api;

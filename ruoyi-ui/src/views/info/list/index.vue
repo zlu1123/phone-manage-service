@@ -7,6 +7,7 @@
       :columns="columns"
       :extra-params="extraParams"
       row-key="id"
+      @expand-change="handleExpandChange"
     >
       <!-- 工具栏：导出/导入按钮 -->
       <template #toolbar>
@@ -72,7 +73,10 @@
 
       <!-- 展开行：旧手机详情 + 签约信息 -->
       <template #expand="{ row }">
-        <div class="expand-content">
+        <div class="expand-content" v-loading="detailLoadingMap[row.id]">
+          <!-- 加载中占位 -->
+          <div v-if="detailLoadingMap[row.id]" class="expand-loading-tip">正在加载详情...</div>
+          <template v-else>
           <div class="expand-section">
             <h4 class="expand-title">旧手机详情</h4>
             <el-descriptions :column="3" size="small" border>
@@ -145,6 +149,7 @@
               </el-descriptions-item>
             </el-descriptions>
           </div>
+          </template>
         </div>
       </template>
 
@@ -247,7 +252,7 @@ import { ref, reactive, computed, onMounted, getCurrentInstance } from 'vue';
 import { useRoute } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Download, Upload, Picture, View, Printer, UploadFilled } from '@element-plus/icons-vue';
-import { queryOrderList, queryPhoneTypeList, getOrderContractContent } from '@/api/order/list';
+import { queryOrderList, queryPhoneTypeList, getOrderContractContent, getOrderDetail } from '@/api/order/list';
 import { exportExcel } from '@/utils/export';
 import { getToken } from '@/utils/auth';
 import * as XLSX from 'xlsx';
@@ -288,6 +293,29 @@ const printAreaRef = ref(null);
 const previewVisible = ref(false);
 const previewUrlList = ref([]);
 
+// 展开行详情加载状态（key: row.id, value: true=loading）
+const detailLoadingMap = reactive({});
+
+/** 处理展开行：按需加载详情数据 */
+const handleExpandChange = (row, expanded) => {
+  if (!expanded) return;
+  // 已加载过详情或正在加载中，则跳过
+  if (detailLoadingMap[row.id] || row.activated !== undefined) return;
+  detailLoadingMap[row.id] = true;
+  getOrderDetail(row.id)
+    .then((res) => {
+      const detail = res.data || res;
+      // 将详情字段合并到 row 中，展开面板即可自动展示
+      Object.assign(row, detail);
+    })
+    .catch((err) => {
+      console.error('加载订单详情失败：', err);
+    })
+    .finally(() => {
+      detailLoadingMap[row.id] = false;
+    });
+};
+
 /** 抽屉水印文本 */
 const drawerWatermarkText = computed(() => {
   const row = currentRow.value;
@@ -311,6 +339,7 @@ const searchFields = [
   },
   { prop: 'createBy', label: '创建者', type: 'input' },
   { prop: 'nickName', label: '昵称', type: 'input' },
+  { prop: 'storeId', label: '所属门店', type: 'input' },
   { prop: 'name', label: '留资人姓名', type: 'input' },
   { prop: 'phoneNum', label: '留资人电话', type: 'input' },
   {
@@ -364,6 +393,7 @@ const columns = [
   { label: '留资人姓名', prop: 'name', width: '100' },
   { label: '留资人电话', prop: 'phoneNum' },
   { label: '创建者', prop: 'createBy' },
+  { label: '所属门店', prop: 'storeName', width: '130' },
   {
     label: '鸭宝激活状态',
     prop: 'activated',
@@ -672,6 +702,7 @@ const handleExport = () => {
           { label: '质保状态', formatter: (row) => getWarrantyInfo(row).status },
           { label: '查询时系统时间', prop: 'sysTime' },
           { label: '创建者', prop: 'createBy' },
+          { label: '所属门店', prop: 'storeName' },
           { label: '昵称', prop: 'nickName' },
           { label: '留资人姓名', prop: 'name' },
           { label: '留资人电话', prop: 'phoneNum' },
@@ -849,6 +880,13 @@ onMounted(() => {
   font-size: 14px;
   color: #303133;
   font-weight: 600;
+}
+
+.expand-loading-tip {
+  padding: 20px 0;
+  text-align: center;
+  color: #909399;
+  font-size: 13px;
 }
 
 .contract-content-wrapper {

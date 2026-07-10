@@ -1,7 +1,6 @@
 package com.ruoyi.web.mapper;
 
 import com.ruoyi.web.domain.Contract;
-import com.ruoyi.web.domain.PhoneActiveInfo;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 

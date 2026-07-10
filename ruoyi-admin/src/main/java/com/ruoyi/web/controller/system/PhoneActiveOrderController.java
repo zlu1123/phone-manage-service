@@ -4,6 +4,7 @@ import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.R;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.web.domain.PhoneActiveInfo;
+import com.ruoyi.web.mapper.PhoneActiveInfoMapper;
 import com.ruoyi.web.service.IPhoneActiveInfoService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -31,6 +32,9 @@ public class PhoneActiveOrderController extends BaseController {
 
     @Autowired
     private IPhoneActiveInfoService phoneActiveInfoService;
+
+    @Autowired
+    private PhoneActiveInfoMapper phoneActiveInfoMapper;
 
     /**
      * @param phoneActiveInfo 查询条件
@@ -106,15 +110,31 @@ public class PhoneActiveOrderController extends BaseController {
 
     /**
      * @param phoneActiveInfo 查询条件
-     * @return 订单分页列表
+     * @return 已签约订单分页列表
      */
     @ApiOperation("查询已签约订单列表")
     @GetMapping("/querySignContractOrderList")
     public R querySignContractOrderList(PhoneActiveInfo phoneActiveInfo) {
         startPage();
         phoneActiveInfo.setIsSignature(1);
-        List<PhoneActiveInfo> list = phoneActiveInfoService.queryActiveList(phoneActiveInfo);
+        List<PhoneActiveInfo> list = phoneActiveInfoMapper.selectByExample(phoneActiveInfo);
         return R.ok(getDataTable(list));
+    }
+
+    /**
+     * 获取订单详情（全字段，包含详情表、签约表等所有关联数据）
+     *
+     * @param id 订单ID
+     * @return 订单详情
+     */
+    @ApiOperation("获取订单详情")
+    @GetMapping("/getDetail")
+    public R getOrderDetail(@RequestParam("id") Long id) {
+        PhoneActiveInfo detail = phoneActiveInfoService.getActiveDetail(id);
+        if (detail == null) {
+            return R.fail("订单不存在");
+        }
+        return R.ok(detail);
     }
 
     /**

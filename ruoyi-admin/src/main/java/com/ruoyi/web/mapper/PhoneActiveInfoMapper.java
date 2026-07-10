@@ -15,6 +15,16 @@ public interface PhoneActiveInfoMapper {
     int deleteBySn(@Param("sn") String sn);
     List<PhoneActiveInfo> selectByExample(PhoneActiveInfo phoneActiveInfo);
 
+    /**
+     * 列表查询（轻量：仅 JOIN 留资 + 部门，不 JOIN 详情表和签约表）
+     */
+    List<PhoneActiveInfo> selectListByExample(PhoneActiveInfo phoneActiveInfo);
+
+    /**
+     * 查询订单详情（全字段，JOIN 所有关联表）
+     */
+    PhoneActiveInfo selectDetailById(@Param("id") Long id);
+
     Map<String, Object> selectDashboardStatistics(@Param("currentDate") String currentDate,
                                                   @Param("previousDate") String previousDate,
                                                   @Param("currentMonth") String currentMonth,

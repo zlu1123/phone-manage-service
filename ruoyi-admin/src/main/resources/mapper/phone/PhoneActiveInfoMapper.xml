@@ -5,18 +5,31 @@
 <mapper namespace="com.ruoyi.web.mapper.PhoneActiveInfoMapper">
 
     <resultMap id="BaseResultMap" type="com.ruoyi.web.domain.PhoneActiveInfo">
+        <!-- 主表 phone_active_info -->
         <id column="id" property="id"/>
         <result column="sn" property="sn"/>
         <result column="phone_type" property="phoneType"/>
         <result column="imei1" property="imei1"/>
         <result column="imei2" property="imei2"/>
         <result column="model" property="model"/>
+        <result column="info_id" property="infoId"/>
+        <result column="store_id" property="storeId"/>
+        <result column="skip_api_call" property="skipApiCall"/>
+        <result column="old_phone_status" property="oldPhoneStatus"/>
+        <result column="old_phone_usage_months" property="oldPhoneUsageMonths"/>
+        <result column="create_time" property="createTime"/>
+        <result column="create_by" property="createBy"/>
+        <result column="nick_name" property="nickName"/>
+        <result column="update_time" property="updateTime"/>
+        <result column="update_by" property="updateBy"/>
+        <!-- 详情表 phone_active_detail (LEFT JOIN) -->
         <result column="activated" property="activated"/>
         <result column="activate_date" property="activateDate"/>
         <result column="coverage" property="coverage"/>
-        <result column="image_path" property="imagePath"/>
         <result column="active_info" property="activeInfo"/>
         <result column="sys_time" property="sysTime"/>
+        <result column="image_path" property="imagePath"/>
+        <!-- 签约表 phone_order_contract (LEFT JOIN) -->
         <result column="contract_id" property="contractId"/>
         <result column="contract_path" property="contractPath"/>
         <result column="contract_content" property="contractContent"/>
@@ -24,48 +37,61 @@
         <result column="signature_imei" property="signatureImei"/>
         <result column="signature_date" property="signatureDate"/>
         <result column="signature_path" property="signaturePath"/>
-        <result column="create_time" property="createTime"/>
-        <result column="create_by" property="createBy"/>
-        <result column="nick_name" property="nickName"/>
-        <result column="update_time" property="updateTime"/>
-        <result column="update_by" property="updateBy"/>
+        <!-- 关联表 -->
         <result column="phone_num" property="phoneNum"/>
-        <result column="info_id" property="infoId"/>
-        <result column="skip_api_call" property="skipApiCall"/>
-        <result column="old_phone_status" property="oldPhoneStatus"/>
-        <result column="old_phone_usage_months" property="oldPhoneUsageMonths"/>
+        <result column="store_name" property="storeName"/>
     </resultMap>
 
+    <!-- 主表所有列 -->
     <sql id="Base_Column_List">
-        id, sn, phone_type, imei1, imei2, model, activated, activate_date, coverage, image_path, active_info, sys_time,
-          contract_id, contract_path, signature_path, contract_content, signature_model, signature_imei, signature_date,
-        create_time, create_by, nick_name, update_time, update_by, info_id, skip_api_call, old_phone_status, old_phone_usage_months
+        id, sn, phone_type, imei1, imei2, model, info_id, store_id,
+        skip_api_call, old_phone_status, old_phone_usage_months,
+        create_time, create_by, nick_name, update_time, update_by
     </sql>
 
+    <!-- 主表列（不含 active_info 大字段，用于列表查询） -->
     <sql id="Base_Column_List_Q">
-        id, sn, phone_type, imei1, imei2, model, activated, activate_date, coverage, image_path, sys_time,
-          contract_id, contract_path, signature_path, signature_model, signature_imei, signature_date,
-        create_time, create_by, nick_name, update_time, update_by, info_id, skip_api_call, old_phone_status, old_phone_usage_months
+        pai.id, pai.sn, pai.phone_type, pai.imei1, pai.imei2, pai.model, pai.info_id, pai.store_id,
+        pai.skip_api_call, pai.old_phone_status, pai.old_phone_usage_months,
+        pai.create_time, pai.create_by, pai.nick_name, pai.update_time, pai.update_by
+    </sql>
+
+    <!-- 详情表列 -->
+    <sql id="Detail_Column_List">
+        pad.activated, pad.activate_date, pad.coverage, pad.active_info, pad.sys_time, pad.image_path
+    </sql>
+
+    <!-- 签约表列 -->
+    <sql id="Contract_Column_List">
+        poc.contract_id, poc.contract_path, poc.contract_content,
+        poc.signature_model, poc.signature_imei, poc.signature_date, poc.signature_path
     </sql>
 
     <select id="selectBySn" resultMap="BaseResultMap">
-        SELECT <include refid="Base_Column_List_Q"/>
-        FROM phone_active_info
-        WHERE sn = #{sn}
+        SELECT
+            <include refid="Base_Column_List_Q"/>,
+            <include refid="Detail_Column_List"/>,
+            <include refid="Contract_Column_List"/>
+        FROM phone_active_info pai
+        LEFT JOIN phone_active_detail pad ON pai.id = pad.order_id
+        LEFT JOIN phone_order_contract poc ON pai.id = poc.order_id
+        WHERE pai.sn = #{sn}
     </select>
 
+    <!-- 仅插入主表，详情表由 Service 层单独处理 -->
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO phone_active_info (
-            sn, phone_type, imei1, imei2, model, activated, activate_date, coverage, image_path, active_info, sys_time,
-             contract_id, contract_path, signature_path, contract_content, signature_model, signature_imei, signature_date,
-            create_time, create_by, nick_name, update_time, update_by, info_id, skip_api_call, old_phone_status, old_phone_usage_months
+            sn, phone_type, imei1, imei2, model, info_id, store_id,
+            skip_api_call, old_phone_status, old_phone_usage_months,
+            create_time, create_by, nick_name, update_time, update_by
         ) VALUES (
-                     #{sn}, #{phoneType}, #{imei1}, #{imei2}, #{model}, #{activated}, #{activateDate}, #{coverage}, #{imagePath}, #{activeInfo}, #{sysTime},
-                     #{contractId}, #{contractPath}, #{signaturePath}, #{contractContent}, #{signatureModel}, #{signatureImei}, #{signatureDate},
-                     #{createTime}, #{createBy}, #{nickName}, #{updateTime}, #{updateBy}, #{infoId}, #{skipApiCall}, #{oldPhoneStatus}, #{oldPhoneUsageMonths}
-                 )
+            #{sn}, #{phoneType}, #{imei1}, #{imei2}, #{model}, #{infoId}, #{storeId},
+            #{skipApiCall}, #{oldPhoneStatus}, #{oldPhoneUsageMonths},
+            #{createTime}, #{createBy}, #{nickName}, #{updateTime}, #{updateBy}
+        )
     </insert>
 
+    <!-- 仅更新主表 -->
     <update id="updateById">
         UPDATE phone_active_info
         <set>
@@ -73,25 +99,11 @@
             <if test="imei1 != null">imei1 = #{imei1},</if>
             <if test="imei2 != null">imei2 = #{imei2},</if>
             <if test="model != null">model = #{model},</if>
-            <if test="activated != null">activated = #{activated},</if>
-            <if test="activateDate != null">activate_date = #{activateDate},</if>
-            <if test="coverage != null">coverage = #{coverage},</if>
-            <if test="imagePath != null">image_path = #{imagePath},</if>
-            <if test="activeInfo != null">active_info = #{activeInfo},</if>
-            <if test="sysTime != null">sys_time = #{sysTime},</if>
-            <if test="contractId != null">contract_id = #{contractId},</if>
-            <if test="contractPath != null">contract_path = #{contractPath},</if>
-            <if test="signaturePath != null">signature_path = #{signaturePath},</if>
-
-            <if test="contractContent != null">contract_content = #{contractContent},</if>
-            <if test="signatureModel != null">signature_model = #{signatureModel},</if>
-            <if test="signatureImei != null">signature_imei = #{signatureImei},</if>
-            <if test="signatureDate != null">signature_date = #{signatureDate},</if>
             <if test="infoId != null">info_id = #{infoId},</if>
+            <if test="storeId != null">store_id = #{storeId},</if>
             <if test="skipApiCall != null">skip_api_call = #{skipApiCall},</if>
             <if test="oldPhoneStatus != null">old_phone_status = #{oldPhoneStatus},</if>
             <if test="oldPhoneUsageMonths != null">old_phone_usage_months = #{oldPhoneUsageMonths},</if>
-
             update_time = now()
             <if test="updateBy != null">, update_by = #{updateBy}</if>
         </set>
@@ -102,13 +114,14 @@
         DELETE FROM phone_active_info WHERE sn = #{sn}
     </delete>
 
-    <select id="selectByExample" resultMap="BaseResultMap" parameterType="com.ruoyi.web.domain.PhoneActiveInfo">
-        SELECT 
-            pai.id, pai.sn, pai.phone_type, pai.imei1, pai.imei2, pai.model, pai.activated, pai.activate_date, pai.coverage, pai.image_path, pai.sys_time,
-            pai.contract_id, pai.contract_path, pai.signature_path, pai.signature_model, pai.signature_imei, pai.signature_date,
-            pai.create_time, pai.create_by, pai.nick_name, pai.update_time, pai.update_by, pai.info_id, pai.skip_api_call, pai.old_phone_status, pai.old_phone_usage_months,
-            li.name, li.phone_num
-        FROM phone_active_info pai left join leave_information li on pai.info_id = li.id
+    <!-- 列表查询（轻量）：仅 JOIN 留资 + 部门，不 JOIN 详情表和签约表 -->
+    <select id="selectListByExample" resultMap="BaseResultMap" parameterType="com.ruoyi.web.domain.PhoneActiveInfo">
+        SELECT
+            <include refid="Base_Column_List_Q"/>,
+            li.name, li.phone_num, sd.dept_name AS store_name
+        FROM phone_active_info pai
+        LEFT JOIN leave_information li ON pai.info_id = li.id
+        LEFT JOIN sys_dept sd ON pai.store_id = sd.dept_id
         <where>
             <if test="id != null"> AND pai.id = #{id}</if>
             <if test="sn != null and sn != ''"> AND pai.sn = #{sn}</if>
@@ -116,91 +129,137 @@
             <if test="imei1 != null and imei1 != ''"> AND pai.imei1 = #{imei1}</if>
             <if test="imei2 != null and imei2 != ''"> AND pai.imei2 = #{imei2}</if>
             <if test="model != null and model != ''"> AND pai.model = #{model}</if>
-            <if test="activated != null"> AND pai.activated = #{activated}</if>
-            <if test="sysTime != null and sysTime != ''"> AND pai.sys_time = #{sysTime}</if>
-            <if test="contractId != null"> AND pai.contract_id = #{contractId}</if>
-            <!-- create_time 范围查询 -->
-<!--            <if test="beginCreateTime != null and beginCreateTime != ''">-->
-<!--                AND create_time >= #{beginCreateTime}-->
-<!--            </if>-->
-<!--            <if test="endCreateTime != null and endCreateTime != ''">-->
-<!--                AND create_time &lt;= #{endCreateTime}-->
-<!--            </if>-->
             <if test="createBy != null and createBy != ''"> AND pai.create_by = #{createBy}</if>
             <if test="nickName != null and nickName != ''"> AND pai.nick_name like CONCAT('%', #{nickName}, '%')</if>
+            <if test="storeId != null"> AND pai.store_id = #{storeId}</if>
             <if test="skipApiCall != null"> AND pai.skip_api_call = #{skipApiCall}</if>
             <if test="oldPhoneStatus != null"> AND pai.old_phone_status = #{oldPhoneStatus}</if>
-
-            <if test="signatureModel != null and signatureModel != ''"> AND pai.signature_model like CONCAT('%', #{signatureModel}, '%')</if>
-            <if test="signatureImei != null and signatureImei != ''"> AND pai.signature_imei like CONCAT('%', #{signatureImei}, '%')</if>
-            <if test="signatureDate != null and signatureDate != ''"> AND pai.signature_date = #{signatureDate}</if>
             <if test="name != null and name != ''"> AND li.name LIKE CONCAT('%', #{name}, '%')</if>
             <if test="phoneNum != null and phoneNum != ''"> AND li.phone_num LIKE CONCAT('%', #{phoneNum}, '%')</if>
-            <if test="isSignature != null and isSignature == 1"> AND pai.signature_imei is not null</if>
         </where>
-        order by pai.create_time desc
+        ORDER BY pai.create_time DESC
     </select>
 
+    <!-- 详情查询（全字段）：JOIN 所有关联表 -->
+    <select id="selectDetailById" resultMap="BaseResultMap">
+        SELECT
+            <include refid="Base_Column_List_Q"/>,
+            <include refid="Detail_Column_List"/>,
+            <include refid="Contract_Column_List"/>,
+            li.name, li.phone_num, sd.dept_name AS store_name
+        FROM phone_active_info pai
+        LEFT JOIN phone_active_detail pad ON pai.id = pad.order_id
+        LEFT JOIN phone_order_contract poc ON pai.id = poc.order_id
+        LEFT JOIN leave_information li ON pai.info_id = li.id
+        LEFT JOIN sys_dept sd ON pai.store_id = sd.dept_id
+        WHERE pai.id = #{id}
+    </select>
+    <select id="selectByExample" resultMap="BaseResultMap" parameterType="com.ruoyi.web.domain.PhoneActiveInfo">
+        SELECT
+            <include refid="Base_Column_List_Q"/>,
+            <include refid="Detail_Column_List"/>,
+            <include refid="Contract_Column_List"/>,
+            li.name, li.phone_num, sd.dept_name AS store_name
+        FROM phone_active_info pai
+        LEFT JOIN phone_active_detail pad ON pai.id = pad.order_id
+        LEFT JOIN phone_order_contract poc ON pai.id = poc.order_id
+        LEFT JOIN leave_information li ON pai.info_id = li.id
+        LEFT JOIN sys_dept sd ON pai.store_id = sd.dept_id
+        <where>
+            <if test="id != null"> AND pai.id = #{id}</if>
+            <if test="sn != null and sn != ''"> AND pai.sn = #{sn}</if>
+            <if test="phoneType != null and phoneType != ''"> AND pai.phone_type = #{phoneType}</if>
+            <if test="imei1 != null and imei1 != ''"> AND pai.imei1 = #{imei1}</if>
+            <if test="imei2 != null and imei2 != ''"> AND pai.imei2 = #{imei2}</if>
+            <if test="model != null and model != ''"> AND pai.model = #{model}</if>
+            <if test="activated != null"> AND pad.activated = #{activated}</if>
+            <if test="sysTime != null and sysTime != ''"> AND pad.sys_time = #{sysTime}</if>
+            <if test="contractId != null"> AND poc.contract_id = #{contractId}</if>
+            <if test="createBy != null and createBy != ''"> AND pai.create_by = #{createBy}</if>
+            <if test="nickName != null and nickName != ''"> AND pai.nick_name like CONCAT('%', #{nickName}, '%')</if>
+            <if test="storeId != null"> AND pai.store_id = #{storeId}</if>
+            <if test="skipApiCall != null"> AND pai.skip_api_call = #{skipApiCall}</if>
+            <if test="oldPhoneStatus != null"> AND pai.old_phone_status = #{oldPhoneStatus}</if>
+            <if test="signatureModel != null and signatureModel != ''"> AND poc.signature_model like CONCAT('%', #{signatureModel}, '%')</if>
+            <if test="signatureImei != null and signatureImei != ''"> AND poc.signature_imei like CONCAT('%', #{signatureImei}, '%')</if>
+            <if test="signatureDate != null and signatureDate != ''"> AND poc.signature_date = #{signatureDate}</if>
+            <if test="name != null and name != ''"> AND li.name LIKE CONCAT('%', #{name}, '%')</if>
+            <if test="phoneNum != null and phoneNum != ''"> AND li.phone_num LIKE CONCAT('%', #{phoneNum}, '%')</if>
+            <if test="isSignature != null and isSignature == 1"> AND poc.signature_imei is not null</if>
+        </where>
+        ORDER BY pai.create_time DESC
+    </select>
+
+    <!-- 仪表盘统计：需要 JOIN 详情表和签约表 -->
     <select id="selectDashboardStatistics" resultType="java.util.HashMap">
         SELECT
             COUNT(*) AS totalOrders,
-            COALESCE(SUM(CASE WHEN DATE(create_time) = STR_TO_DATE(#{currentDate}, '%Y-%m-%d') THEN 1 ELSE 0 END), 0) AS todayOrders,
-            COALESCE(SUM(CASE WHEN activated = 1 THEN 1 ELSE 0 END), 0) AS activatedDevices,
-            COALESCE(SUM(CASE WHEN activated = 0 OR activated IS NULL THEN 1 ELSE 0 END), 0) AS pendingOrders,
-            COALESCE(SUM(CASE WHEN signature_date IS NOT NULL AND signature_date != '' THEN 1 ELSE 0 END), 0) AS signedOrders,
-            COALESCE(SUM(CASE WHEN signature_date IS NOT NULL AND signature_date != '' AND DATE(create_time) = STR_TO_DATE(#{currentDate}, '%Y-%m-%d') THEN 1 ELSE 0 END), 0) AS todaySignedOrders,
-            COALESCE(SUM(CASE WHEN signature_date IS NOT NULL AND signature_date != '' AND DATE(create_time) = STR_TO_DATE(#{previousDate}, '%Y-%m-%d') THEN 1 ELSE 0 END), 0) AS yesterdaySignedOrders,
-            COALESCE(SUM(CASE WHEN DATE(create_time) = STR_TO_DATE(#{previousDate}, '%Y-%m-%d') THEN 1 ELSE 0 END), 0) AS yesterdayOrders,
-            COALESCE(SUM(CASE WHEN DATE_FORMAT(create_time, '%Y-%m') = #{currentMonth} THEN 1 ELSE 0 END), 0) AS currentMonthOrders,
-            COALESCE(SUM(CASE WHEN DATE_FORMAT(create_time, '%Y-%m') = #{previousMonth} THEN 1 ELSE 0 END), 0) AS previousMonthOrders
-        FROM phone_active_info
+            COALESCE(SUM(CASE WHEN DATE(pai.create_time) = STR_TO_DATE(#{currentDate}, '%Y-%m-%d') THEN 1 ELSE 0 END), 0) AS todayOrders,
+            COALESCE(SUM(CASE WHEN pad.activated = 1 THEN 1 ELSE 0 END), 0) AS activatedDevices,
+            COALESCE(SUM(CASE WHEN pad.activated = 0 OR pad.activated IS NULL THEN 1 ELSE 0 END), 0) AS pendingOrders,
+            COALESCE(SUM(CASE WHEN poc.signature_date IS NOT NULL AND poc.signature_date != '' THEN 1 ELSE 0 END), 0) AS signedOrders,
+            COALESCE(SUM(CASE WHEN poc.signature_date IS NOT NULL AND poc.signature_date != '' AND DATE(pai.create_time) = STR_TO_DATE(#{currentDate}, '%Y-%m-%d') THEN 1 ELSE 0 END), 0) AS todaySignedOrders,
+            COALESCE(SUM(CASE WHEN poc.signature_date IS NOT NULL AND poc.signature_date != '' AND DATE(pai.create_time) = STR_TO_DATE(#{previousDate}, '%Y-%m-%d') THEN 1 ELSE 0 END), 0) AS yesterdaySignedOrders,
+            COALESCE(SUM(CASE WHEN DATE(pai.create_time) = STR_TO_DATE(#{previousDate}, '%Y-%m-%d') THEN 1 ELSE 0 END), 0) AS yesterdayOrders,
+            COALESCE(SUM(CASE WHEN DATE_FORMAT(pai.create_time, '%Y-%m') = #{currentMonth} THEN 1 ELSE 0 END), 0) AS currentMonthOrders,
+            COALESCE(SUM(CASE WHEN DATE_FORMAT(pai.create_time, '%Y-%m') = #{previousMonth} THEN 1 ELSE 0 END), 0) AS previousMonthOrders
+        FROM phone_active_info pai
+        LEFT JOIN phone_active_detail pad ON pai.id = pad.order_id
+        LEFT JOIN phone_order_contract poc ON pai.id = poc.order_id
     </select>
 
     <select id="selectUserStatistics" resultType="java.util.HashMap">
         SELECT
             COUNT(*) AS myTotalOrders,
-            COALESCE(SUM(CASE WHEN DATE(create_time) = STR_TO_DATE(#{currentDate}, '%Y-%m-%d') THEN 1 ELSE 0 END), 0) AS myTodayOrders,
-            COALESCE(SUM(CASE WHEN activated = 1 THEN 1 ELSE 0 END), 0) AS myActivatedDevices,
-            COALESCE(SUM(CASE WHEN activated = 0 OR activated IS NULL THEN 1 ELSE 0 END), 0) AS myPendingOrders,
-            COALESCE(SUM(CASE WHEN signature_date IS NOT NULL AND signature_date != '' THEN 1 ELSE 0 END), 0) AS mySignedOrders,
-            COALESCE(SUM(CASE WHEN signature_date IS NOT NULL AND signature_date != '' AND DATE(create_time) = STR_TO_DATE(#{currentDate}, '%Y-%m-%d') THEN 1 ELSE 0 END), 0) AS myTodaySignedOrders,
-            COALESCE(SUM(CASE WHEN signature_date IS NOT NULL AND signature_date != '' AND DATE(create_time) = STR_TO_DATE(#{previousDate}, '%Y-%m-%d') THEN 1 ELSE 0 END), 0) AS myYesterdaySignedOrders,
-            COALESCE(SUM(CASE WHEN DATE(create_time) = STR_TO_DATE(#{previousDate}, '%Y-%m-%d') THEN 1 ELSE 0 END), 0) AS myYesterdayOrders,
-            COALESCE(SUM(CASE WHEN DATE(create_time) BETWEEN STR_TO_DATE(#{recentSevenDaysStart}, '%Y-%m-%d') AND STR_TO_DATE(#{currentDate}, '%Y-%m-%d') THEN 1 ELSE 0 END), 0) AS myRecentSevenDaysOrders,
-            COALESCE(SUM(CASE WHEN DATE(create_time) BETWEEN STR_TO_DATE(#{previousSevenDaysStart}, '%Y-%m-%d') AND STR_TO_DATE(#{previousSevenDaysEnd}, '%Y-%m-%d') THEN 1 ELSE 0 END), 0) AS myPreviousSevenDaysOrders
-        FROM phone_active_info
-        WHERE create_by = #{createBy}
+            COALESCE(SUM(CASE WHEN DATE(pai.create_time) = STR_TO_DATE(#{currentDate}, '%Y-%m-%d') THEN 1 ELSE 0 END), 0) AS myTodayOrders,
+            COALESCE(SUM(CASE WHEN pad.activated = 1 THEN 1 ELSE 0 END), 0) AS myActivatedDevices,
+            COALESCE(SUM(CASE WHEN pad.activated = 0 OR pad.activated IS NULL THEN 1 ELSE 0 END), 0) AS myPendingOrders,
+            COALESCE(SUM(CASE WHEN poc.signature_date IS NOT NULL AND poc.signature_date != '' THEN 1 ELSE 0 END), 0) AS mySignedOrders,
+            COALESCE(SUM(CASE WHEN poc.signature_date IS NOT NULL AND poc.signature_date != '' AND DATE(pai.create_time) = STR_TO_DATE(#{currentDate}, '%Y-%m-%d') THEN 1 ELSE 0 END), 0) AS myTodaySignedOrders,
+            COALESCE(SUM(CASE WHEN poc.signature_date IS NOT NULL AND poc.signature_date != '' AND DATE(pai.create_time) = STR_TO_DATE(#{previousDate}, '%Y-%m-%d') THEN 1 ELSE 0 END), 0) AS myYesterdaySignedOrders,
+            COALESCE(SUM(CASE WHEN DATE(pai.create_time) = STR_TO_DATE(#{previousDate}, '%Y-%m-%d') THEN 1 ELSE 0 END), 0) AS myYesterdayOrders,
+            COALESCE(SUM(CASE WHEN DATE(pai.create_time) BETWEEN STR_TO_DATE(#{recentSevenDaysStart}, '%Y-%m-%d') AND STR_TO_DATE(#{currentDate}, '%Y-%m-%d') THEN 1 ELSE 0 END), 0) AS myRecentSevenDaysOrders,
+            COALESCE(SUM(CASE WHEN DATE(pai.create_time) BETWEEN STR_TO_DATE(#{previousSevenDaysStart}, '%Y-%m-%d') AND STR_TO_DATE(#{previousSevenDaysEnd}, '%Y-%m-%d') THEN 1 ELSE 0 END), 0) AS myPreviousSevenDaysOrders
+        FROM phone_active_info pai
+        LEFT JOIN phone_active_detail pad ON pai.id = pad.order_id
+        LEFT JOIN phone_order_contract poc ON pai.id = poc.order_id
+        WHERE pai.create_by = #{createBy}
     </select>
 
     <select id="selectOrderTrend" resultType="java.util.HashMap">
         SELECT
-            DATE_FORMAT(create_time, '%Y-%m-%d') AS day,
+            DATE_FORMAT(pai.create_time, '%Y-%m-%d') AS day,
             COUNT(*) AS orderCount,
-            SUM(CASE WHEN activated = 1 THEN 1 ELSE 0 END) AS activatedCount,
-            SUM(CASE WHEN signature_date IS NOT NULL AND signature_date != '' THEN 1 ELSE 0 END) AS signedCount
-        FROM phone_active_info
-        WHERE DATE(create_time) &gt;= STR_TO_DATE(#{startDate}, '%Y-%m-%d')
-          AND DATE(create_time) &lt;= STR_TO_DATE(#{endDate}, '%Y-%m-%d')
+            SUM(CASE WHEN pad.activated = 1 THEN 1 ELSE 0 END) AS activatedCount,
+            SUM(CASE WHEN poc.signature_date IS NOT NULL AND poc.signature_date != '' THEN 1 ELSE 0 END) AS signedCount
+        FROM phone_active_info pai
+        LEFT JOIN phone_active_detail pad ON pai.id = pad.order_id
+        LEFT JOIN phone_order_contract poc ON pai.id = poc.order_id
+        WHERE DATE(pai.create_time) &gt;= STR_TO_DATE(#{startDate}, '%Y-%m-%d')
+          AND DATE(pai.create_time) &lt;= STR_TO_DATE(#{endDate}, '%Y-%m-%d')
         <if test="createBy != null and createBy != ''">
-            AND create_by = #{createBy}
+            AND pai.create_by = #{createBy}
         </if>
-        GROUP BY DATE_FORMAT(create_time, '%Y-%m-%d')
+        GROUP BY DATE_FORMAT(pai.create_time, '%Y-%m-%d')
         ORDER BY day ASC
     </select>
 
     <select id="selectMonthlyOrderStats" resultType="java.util.HashMap">
         SELECT
-            DATE_FORMAT(create_time, '%Y-%m') AS month,
+            DATE_FORMAT(pai.create_time, '%Y-%m') AS month,
             COUNT(*) AS orderCount,
-            SUM(CASE WHEN activated = 1 THEN 1 ELSE 0 END) AS activatedCount,
-            SUM(CASE WHEN signature_date IS NOT NULL AND signature_date != '' THEN 1 ELSE 0 END) AS signedCount
-        FROM phone_active_info
-        WHERE DATE_FORMAT(create_time, '%Y-%m') &gt;= #{startMonth}
-          AND DATE_FORMAT(create_time, '%Y-%m') &lt;= #{endMonth}
-        GROUP BY DATE_FORMAT(create_time, '%Y-%m')
+            SUM(CASE WHEN pad.activated = 1 THEN 1 ELSE 0 END) AS activatedCount,
+            SUM(CASE WHEN poc.signature_date IS NOT NULL AND poc.signature_date != '' THEN 1 ELSE 0 END) AS signedCount
+        FROM phone_active_info pai
+        LEFT JOIN phone_active_detail pad ON pai.id = pad.order_id
+        LEFT JOIN phone_order_contract poc ON pai.id = poc.order_id
+        WHERE DATE_FORMAT(pai.create_time, '%Y-%m') &gt;= #{startMonth}
+          AND DATE_FORMAT(pai.create_time, '%Y-%m') &lt;= #{endMonth}
+        GROUP BY DATE_FORMAT(pai.create_time, '%Y-%m')
         ORDER BY month ASC
     </select>
 
+    <!-- 设备型号分布：仅查主表即可 -->
     <select id="selectDeviceModelDistribution" resultType="java.util.HashMap">
         SELECT
             CASE
@@ -214,14 +273,15 @@
         LIMIT 10
     </select>
 
+    <!-- 保修状态统计：需 JOIN 详情表 -->
     <select id="selectWarrantyStatus" resultType="java.util.HashMap">
         SELECT
             COALESCE(
                 SUM(
                     CASE
-                        WHEN coverage IS NOT NULL
-                             AND TRIM(coverage) != ''
-                             AND STR_TO_DATE(SUBSTRING(coverage, 1, 10), '%Y-%m-%d') &gt; DATE_ADD(STR_TO_DATE(#{currentDate}, '%Y-%m-%d'), INTERVAL 30 DAY)
+                        WHEN pad.coverage IS NOT NULL
+                             AND TRIM(pad.coverage) != ''
+                             AND STR_TO_DATE(SUBSTRING(pad.coverage, 1, 10), '%Y-%m-%d') &gt; DATE_ADD(STR_TO_DATE(#{currentDate}, '%Y-%m-%d'), INTERVAL 30 DAY)
                         THEN 1 ELSE 0
                     END
                 ),
@@ -230,10 +290,10 @@
             COALESCE(
                 SUM(
                     CASE
-                        WHEN coverage IS NOT NULL
-                             AND TRIM(coverage) != ''
-                             AND STR_TO_DATE(SUBSTRING(coverage, 1, 10), '%Y-%m-%d') &gt;= STR_TO_DATE(#{currentDate}, '%Y-%m-%d')
-                             AND STR_TO_DATE(SUBSTRING(coverage, 1, 10), '%Y-%m-%d') &lt;= DATE_ADD(STR_TO_DATE(#{currentDate}, '%Y-%m-%d'), INTERVAL 30 DAY)
+                        WHEN pad.coverage IS NOT NULL
+                             AND TRIM(pad.coverage) != ''
+                             AND STR_TO_DATE(SUBSTRING(pad.coverage, 1, 10), '%Y-%m-%d') &gt;= STR_TO_DATE(#{currentDate}, '%Y-%m-%d')
+                             AND STR_TO_DATE(SUBSTRING(pad.coverage, 1, 10), '%Y-%m-%d') &lt;= DATE_ADD(STR_TO_DATE(#{currentDate}, '%Y-%m-%d'), INTERVAL 30 DAY)
                         THEN 1 ELSE 0
                     END
                 ),
@@ -242,34 +302,40 @@
             COALESCE(
                 SUM(
                     CASE
-                        WHEN coverage IS NULL
-                             OR TRIM(coverage) = ''
-                             OR STR_TO_DATE(SUBSTRING(coverage, 1, 10), '%Y-%m-%d') IS NULL
-                             OR STR_TO_DATE(SUBSTRING(coverage, 1, 10), '%Y-%m-%d') &lt; STR_TO_DATE(#{currentDate}, '%Y-%m-%d')
+                        WHEN pad.coverage IS NULL
+                             OR TRIM(pad.coverage) = ''
+                             OR STR_TO_DATE(SUBSTRING(pad.coverage, 1, 10), '%Y-%m-%d') IS NULL
+                             OR STR_TO_DATE(SUBSTRING(pad.coverage, 1, 10), '%Y-%m-%d') &lt; STR_TO_DATE(#{currentDate}, '%Y-%m-%d')
                         THEN 1 ELSE 0
                     END
                 ),
                 0
             ) AS expiredCount
-        FROM phone_active_info
+        FROM phone_active_info pai
+        LEFT JOIN phone_active_detail pad ON pai.id = pad.order_id
     </select>
 
+    <!-- 最近订单：JOIN 详情和签约 -->
     <select id="selectRecentOrders" resultMap="BaseResultMap">
-        SELECT <include refid="Base_Column_List_Q"/>
-        FROM phone_active_info
+        SELECT
+            <include refid="Base_Column_List_Q"/>,
+            <include refid="Detail_Column_List"/>,
+            <include refid="Contract_Column_List"/>
+        FROM phone_active_info pai
+        LEFT JOIN phone_active_detail pad ON pai.id = pad.order_id
+        LEFT JOIN phone_order_contract poc ON pai.id = poc.order_id
         <where>
             <if test="createBy != null and createBy != ''">
-                AND create_by = #{createBy}
+                AND pai.create_by = #{createBy}
             </if>
         </where>
-        ORDER BY
-<!--        STR_TO_DATE(COALESCE(NULLIF(sys_time, ''), DATE_FORMAT(create_time, '%Y-%m-%d')), '%Y-%m-%d') DESC,  -->
-                 create_time DESC
+        ORDER BY pai.create_time DESC
         LIMIT #{limit}
     </select>
 
+    <!-- 协议内容从签约表查询 -->
     <select id="selectContractContentById" resultType="java.lang.String">
-        SELECT contract_content FROM phone_active_info WHERE id = #{id}
+        SELECT contract_content FROM phone_order_contract WHERE order_id = #{id}
     </select>
 
 </mapper>
