@@ -25,6 +25,11 @@ public interface PhoneActiveInfoMapper {
      */
     PhoneActiveInfo selectDetailById(@Param("id") Long id);
 
+    /**
+     * 导出查询（全字段 JOIN 详情表和签约表，不分页）
+     */
+    List<PhoneActiveInfo> selectExportList(PhoneActiveInfo phoneActiveInfo);
+
     Map<String, Object> selectDashboardStatistics(@Param("currentDate") String currentDate,
                                                   @Param("previousDate") String previousDate,
                                                   @Param("currentMonth") String currentMonth,

@@ -48,6 +48,19 @@ public class PhoneActiveOrderController extends BaseController {
         return R.ok(getDataTable(list));
     }
 
+    /**
+     * 导出订单数据（全字段，不分页）
+     *
+     * @param phoneActiveInfo 筛选条件
+     * @return 订单全量数据（不含分页包装）
+     */
+    @ApiOperation("导出订单数据")
+    @GetMapping("/exportOrderList")
+    public R exportOrderList(PhoneActiveInfo phoneActiveInfo) {
+        List<PhoneActiveInfo> list = phoneActiveInfoService.queryExportList(phoneActiveInfo);
+        return R.ok(list);
+    }
+
     @ApiOperation("首页统计卡片-管理员")
     @GetMapping("/dashboard/statistics")
     public R getStatistics() {

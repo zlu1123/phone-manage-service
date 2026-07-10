@@ -10,10 +10,12 @@ import com.ruoyi.system.mapper.SysUserMapper;
 import com.ruoyi.web.domain.PhoneActiveDetail;
 import com.ruoyi.web.domain.PhoneActiveInfo;
 import com.ruoyi.web.domain.PhoneOrderContract;
+import com.ruoyi.web.domain.LeaveInformation;
 import com.ruoyi.web.mapper.PhoneActiveDetailMapper;
 import com.ruoyi.web.mapper.PhoneActiveInfoMapper;
 import com.ruoyi.web.mapper.PhoneOrderContractMapper;
 import com.ruoyi.web.service.IPhoneActiveInfoService;
+import com.ruoyi.web.service.LeaveInformationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -51,6 +53,9 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
 
     @Autowired
     private SysDeptMapper sysDeptMapper;
+
+    @Autowired
+    private LeaveInformationService leaveInformationService;
 
     @Autowired
     private ServerConfig serverConfig;
@@ -106,6 +111,7 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
     }
 
     @Override
+    @Transactional
     public String importActiveInfo(List<PhoneActiveInfo> list, boolean updateSupport, String operName) {
         if (list == null || list.isEmpty()) {
             return "导入数据为空";
@@ -119,16 +125,22 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
         for (int i = 0; i < list.size(); i++) {
             PhoneActiveInfo info = list.get(i);
             try {
-                String requiredError = validateRequiredFields(info);
-                if (requiredError != null) {
+                // 1. 字段逻辑校验
+                String validateError = validateImportRow(info, i + 1);
+                if (validateError != null) {
                     failCount++;
-                    failMsg.append("<br/>第").append(i + 1).append("行：").append(requiredError);
+                    failMsg.append("<br/>").append(validateError);
                     continue;
                 }
-                String sn = info.getSn().trim();
-                info.setSn(sn);
+                String sn = info.getSn();
+                if (sn != null) {
+                    info.setSn(sn.trim());
+                }
 
-                PhoneActiveInfo exist = phoneActiveInfoMapper.selectBySn(sn);
+                // 根据留资人电话匹配 infoId
+                resolveLeaveInfoId(info, i + 1, failMsg);
+
+                PhoneActiveInfo exist = info.getSn() != null ? phoneActiveInfoMapper.selectBySn(info.getSn()) : null;
                 if (exist != null) {
                     if (updateSupport) {
                         info.setId(exist.getId());
@@ -137,7 +149,7 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
                         updateCount++;
                     } else {
                         failCount++;
-                        failMsg.append("<br/>序列号 ").append(sn).append(" 已存在（第").append(i + 1).append("行）");
+                        failMsg.append("<br/>序列号 ").append(info.getSn()).append(" 已存在（第").append(i + 1).append("行）");
                     }
                 } else {
                     info.setCreateBy(operName);
@@ -161,6 +173,16 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
                     detail.setImagePath(info.getImagePath());
                     phoneActiveDetailMapper.insert(detail);
 
+                    // 插入签约表（签名信息存在时）
+                    if (hasContractData(info)) {
+                        PhoneOrderContract contract = new PhoneOrderContract();
+                        contract.setOrderId(orderId);
+                        contract.setSignatureModel(info.getSignatureModel());
+                        contract.setSignatureImei(info.getSignatureImei());
+                        contract.setSignatureDate(info.getSignatureDate());
+                        phoneOrderContractMapper.insert(contract);
+                    }
+
                     successCount++;
                 }
             } catch (Exception e) {
@@ -179,6 +201,93 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
             resultMsg.append(failMsg);
         }
         return resultMsg.toString();
+    }
+
+    /** 判断是否存在签约数据 */
+    private boolean hasContractData(PhoneActiveInfo info) {
+        return (info.getSignatureModel() != null && !info.getSignatureModel().trim().isEmpty())
+                || (info.getSignatureImei() != null && !info.getSignatureImei().trim().isEmpty())
+                || (info.getSignatureDate() != null && !info.getSignatureDate().trim().isEmpty());
+    }
+
+    /**
+     * 根据留资人电话匹配 leave_information 的 id
+     * <p>
+     * 手机号在留资表中唯一，通过精确匹配查找。
+     * 如果匹配到多条（历史脏数据），取最新一条。
+     * 如果匹配不到，不阻断导入，infoId 保持 null。
+     */
+    private void resolveLeaveInfoId(PhoneActiveInfo info, int rowNum, StringBuilder failMsg) {
+        String phoneNum = info.getPhoneNum();
+        if (phoneNum == null || phoneNum.trim().isEmpty()) {
+            return;
+        }
+        phoneNum = phoneNum.trim();
+        LeaveInformation query = new LeaveInformation();
+        query.setPhoneNum(phoneNum);
+        List<LeaveInformation> results = leaveInformationService.queryLeaveInformationByCondition(query);
+
+        if (results == null || results.isEmpty()) {
+            failMsg.append("<br/>第").append(rowNum).append("行提示：留资人电话「")
+                    .append(phoneNum).append("」未在留资库中找到，请先导入留资人数据");
+            return;
+        }
+
+        // 手机号唯一，取第一条；若历史存在多条脏数据取最新
+        LeaveInformation match = results.get(results.size() - 1);
+        info.setInfoId(match.getId());
+
+        // 如果 Excel 未填留资人姓名，用匹配到的姓名回填
+        if (info.getName() == null || info.getName().trim().isEmpty()) {
+            info.setName(match.getName());
+        }
+
+        if (results.size() > 1) {
+            failMsg.append("<br/>第").append(rowNum).append("行提示：留资人电话「")
+                    .append(phoneNum).append("」匹配到多条记录，已取最新一条（id=")
+                    .append(match.getId()).append("）");
+        }
+    }
+
+    /**
+     * 导入行级字段逻辑校验
+     *
+     * @return 错误信息，null 表示通过
+     */
+    private String validateImportRow(PhoneActiveInfo info, int rowNum) {
+        String prefix = "第" + rowNum + "行：";
+
+        // 创建时间必填
+        if (info.getCreateTime() == null) {
+            return prefix + "创建时间不能为空";
+        }
+
+        // 跳过API 必填
+        if (info.getSkipApiCall() == null) {
+            return prefix + "跳过API不能为空（0=旧手机识别, 1=自有渠道）";
+        }
+        if (info.getSkipApiCall() != 0 && info.getSkipApiCall() != 1) {
+            return prefix + "跳过API值无效，必须为 0 或 1";
+        }
+
+        // 旧手机识别模式：sn 必填
+        if (info.getSkipApiCall() == 0) {
+            if (info.getSn() == null || info.getSn().trim().isEmpty()) {
+                return prefix + "跳过API=0（旧手机识别）时，旧手机序列号不能为空";
+            }
+        }
+
+        // 自有渠道模式：旧手机状态必填
+        if (info.getSkipApiCall() == 1) {
+            if (info.getOldPhoneStatus() == null) {
+                return prefix + "跳过API=1（自有渠道）时，旧手机状态不能为空（0=无旧手机, 1=丢失/损坏）";
+            }
+            if (info.getOldPhoneStatus() != 0 && info.getOldPhoneStatus() != 1) {
+                return prefix + "旧手机状态值无效，必须为 0 或 1";
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -234,6 +343,11 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
     @Override
     public List<PhoneActiveInfo> queryActiveList(PhoneActiveInfo info) {
         return fillImageUrls(phoneActiveInfoMapper.selectListByExample(info));
+    }
+
+    @Override
+    public List<PhoneActiveInfo> queryExportList(PhoneActiveInfo info) {
+        return fillImageUrls(phoneActiveInfoMapper.selectExportList(info));
     }
 
     @Override

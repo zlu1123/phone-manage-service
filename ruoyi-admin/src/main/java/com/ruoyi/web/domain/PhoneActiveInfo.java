@@ -1,5 +1,6 @@
 package com.ruoyi.web.domain;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.ruoyi.common.annotation.Excel;
 import com.ruoyi.common.core.domain.BaseEntity;
 import lombok.Data;
@@ -7,6 +8,7 @@ import lombok.Data;
 import java.util.Date;
 
 @Data
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class PhoneActiveInfo extends BaseEntity {
 
     // ==================== phone_active_info 主表字段（轻量、高频） ====================
@@ -68,6 +70,7 @@ public class PhoneActiveInfo extends BaseEntity {
     @Excel(name = "查询时系统时间")
     private String sysTime;
 
+    @Excel(name = "图片路径")
     private String imagePath;    // 上传图片相对路径，多个用逗号分隔
 
     // ==================== phone_order_contract 签约表字段（LEFT JOIN） ====================
@@ -94,8 +97,10 @@ public class PhoneActiveInfo extends BaseEntity {
 
     private String storeName;     // 所属门店名称（sys_dept.dept_name）
 
+    @Excel(name = "留资人电话")
     private String phoneNum;      // 留资人电话（leave_information.phone_num）
 
+    @Excel(name = "留资人姓名")
     private String name;          // 留资人姓名（leave_information.name）
 
     private Integer isSignature;  // 是否已签约（phone_order_contract.signature_imei IS NOT NULL）

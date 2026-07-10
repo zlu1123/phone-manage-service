@@ -27,6 +27,11 @@ public interface IPhoneActiveInfoService {
     PhoneActiveInfo getActiveDetail(Long id);
 
     /**
+     * 导出查询（全字段，不分页）
+     */
+    List<PhoneActiveInfo> queryExportList(PhoneActiveInfo info);
+
+    /**
      * 批量导入订单数据
      *
      * @param list 导入的数据列表
