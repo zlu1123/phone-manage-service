@@ -9,6 +9,15 @@ export function queryOrderList(query) {
   })
 }
 
+// 导出订单数据（全字段，不分页）
+export function exportOrderList(query) {
+  return request({
+    url: '/system/order/exportOrderList',
+    method: 'get',
+    params: query
+  })
+}
+
 // 查询订单详情（全字段，包含详情表和签约表）
 export function getOrderDetail(id) {
   return request({

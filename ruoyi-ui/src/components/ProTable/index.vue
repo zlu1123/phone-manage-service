@@ -383,5 +383,5 @@ onBeforeUnmount(() => {
 });
 
 // 暴露方法给父组件
-defineExpose({ refresh, getQueryParams, queryParams });
+defineExpose({ refresh, getQueryParams, queryParams, tableData });
 </script>

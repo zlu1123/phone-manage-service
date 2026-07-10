@@ -2,7 +2,7 @@
   <div class="app-container">
     <pro-table
       ref="proTableRef"
-      :fetch-api="queryOrderList"
+      :fetch-api="fetchOrderList"
       :search-fields="searchFields"
       :columns="columns"
       :extra-params="extraParams"
@@ -38,12 +38,12 @@
         </el-col>
       </template>
 
-      <!-- 表格顶部说明：质保状态计算方案 -->
+      <!-- 表格顶部说明：鸭宝查询质保状态计算方案 -->
       <template #table-tip>
         <el-alert type="info" :closable="false" show-icon style="margin-bottom: 10px">
           <template #title>
             <span style="font-size: 13px">
-              质保状态计算规则：<strong>未激活</strong> → 显示「未激活」； <strong>已激活但无保修到期时间</strong> →
+              鸭宝查询质保状态计算规则：<strong>未激活</strong> → 显示「未激活」； <strong>已激活但无保修到期时间</strong> →
               「已激活」（视为未过期）； <strong>保修到期时间 ≤ 查询时间</strong> → 「已过保」；
               <strong>保修到期时间 &gt; 查询时间</strong> → 「保修中」
             </span>
@@ -106,6 +106,16 @@
               <el-descriptions-item label="激活日期">{{ formatDate(row.activateDate) }}</el-descriptions-item>
               <el-descriptions-item label="保修到期">{{ formatDate(row.coverage) }}</el-descriptions-item>
               <el-descriptions-item label="系统时间">{{ row.sysTime || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="鸭宝激活状态">
+                <el-tag :type="row.activated ? 'success' : 'info'" size="small">
+                  {{ row.activated ? '已激活' : '--' }}
+                </el-tag>
+              </el-descriptions-item>
+              <el-descriptions-item label="鸭宝查询质保状态">
+                <el-tag :type="getWarrantyTagType(row)" size="small">
+                  {{ getWarrantyInfo(row).status }}
+                </el-tag>
+              </el-descriptions-item>
             </el-descriptions>
           </div>
           <div class="expand-section">
@@ -153,20 +163,6 @@
         </div>
       </template>
 
-      <!-- 自定义列：激活状态 -->
-      <template #activated="{ row }">
-        <el-tag :type="row.activated ? 'success' : 'info'" size="small">
-          {{ row.activated ? '已激活' : '--' }}
-        </el-tag>
-      </template>
-
-      <!-- 自定义列：质保状态 -->
-      <template #expired="{ row }">
-        <el-tag :type="getWarrantyTagType(row)" size="small">
-          {{ getWarrantyInfo(row).status }}
-        </el-tag>
-      </template>
-
       <!-- 自定义列：创建时间 -->
       <template #createTime="{ row }">
         <span>{{ parseTime(row.createTime) }}</span>
@@ -200,7 +196,16 @@
     </el-drawer>
 
     <!-- 订单导入对话框 -->
-    <el-dialog :title="upload.title" v-model="upload.open" width="400px" append-to-body>
+    <el-dialog :title="upload.title" v-model="upload.open" width="450px" append-to-body>
+      <el-alert type="info" :closable="false" style="margin-bottom: 16px">
+        <template #title>
+          <ol style="margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.8">
+            <li>先进入<a href="javascript:void(0)" style="color: #409eff; text-decoration: underline" @click="goToLeaveInfo">「留资用户」</a>页面，导入留资人（姓名 + 电话）</li>
+            <li>下载模板，按格式填写订单数据（含留资人电话）</li>
+            <li>上传后系统自动根据<strong>留资人电话</strong>匹配 infoId</li>
+          </ol>
+        </template>
+      </el-alert>
       <el-upload
         ref="uploadRef"
         :limit="1"
@@ -219,14 +224,20 @@
         <template #tip>
           <span>仅允许导入xls、xlsx格式文件。</span>
           <br />
-          <span style="color: #e6a23c">必填列：旧手机序列号、创建时间（模板中已红色加粗标注）</span>
+          <span style="color: #e6a23c">
+            必填列：创建时间、跳过API；旧手机识别时序列号必填，自有渠道时旧手机状态必填
+          </span>
+          <br />
+          <span style="color: #909399; font-size: 12px">
+            留资人电话用于匹配已有留资记录，请先在「留资用户」中导入后再上传订单
+          </span>
           <br />
           <el-link
             type="primary"
             :underline="false"
             style="font-size: 12px; vertical-align: baseline"
             @click="importTemplate"
-            >下载模板</el-link
+            >下载模板（含示例数据）</el-link
           >
         </template>
       </el-upload>
@@ -249,13 +260,12 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, getCurrentInstance } from 'vue';
-import { useRoute } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Download, Upload, Picture, View, Printer, UploadFilled } from '@element-plus/icons-vue';
-import { queryOrderList, queryPhoneTypeList, getOrderContractContent, getOrderDetail } from '@/api/order/list';
-import { exportExcel } from '@/utils/export';
+import { queryOrderList, queryPhoneTypeList, getOrderContractContent, getOrderDetail, exportOrderList } from '@/api/order/list';
 import { getToken } from '@/utils/auth';
 import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
 import useUserStore from '@/store/modules/user';
 
 const { proxy } = getCurrentInstance();
@@ -296,17 +306,21 @@ const previewUrlList = ref([]);
 // 展开行详情加载状态（key: row.id, value: true=loading）
 const detailLoadingMap = reactive({});
 
+// 展开行详情已加载标记（key: row.id, value: true=已加载）
+const detailLoadedMap = reactive({});
+
 /** 处理展开行：按需加载详情数据 */
 const handleExpandChange = (row, expanded) => {
   if (!expanded) return;
   // 已加载过详情或正在加载中，则跳过
-  if (detailLoadingMap[row.id] || row.activated !== undefined) return;
+  if (detailLoadingMap[row.id] || detailLoadedMap[row.id]) return;
   detailLoadingMap[row.id] = true;
   getOrderDetail(row.id)
     .then((res) => {
       const detail = res.data || res;
       // 将详情字段合并到 row 中，展开面板即可自动展示
       Object.assign(row, detail);
+      detailLoadedMap[row.id] = true;
     })
     .catch((err) => {
       console.error('加载订单详情失败：', err);
@@ -330,49 +344,46 @@ const selectedFile = ref(null);
 
 // 搜索字段配置
 const searchFields = [
-  { prop: 'sn', label: '序列号', type: 'input' },
   {
-    prop: 'phoneType',
-    label: '旧手机品牌',
+    prop: 'orderSource',
+    label: '订单来源',
     type: 'select',
-    options: [],
+    options: [
+      { label: '全部', value: null },
+      { label: '旧手机识别', value: 'old_phone' },
+      { label: '无旧手机签约', value: 'no_old_phone' },
+      { label: '损坏/遗失签约', value: 'damaged' },
+    ],
   },
   { prop: 'createBy', label: '创建者', type: 'input' },
   { prop: 'nickName', label: '昵称', type: 'input' },
   { prop: 'storeId', label: '所属门店', type: 'input' },
   { prop: 'name', label: '留资人姓名', type: 'input' },
   { prop: 'phoneNum', label: '留资人电话', type: 'input' },
-  {
-    prop: 'activated',
-    label: '激活状态',
-    type: 'select',
-    options: [
-      { label: '全部', value: null },
-      { label: '已激活', value: true },
-      { label: '未激活', value: false },
-    ],
-  },
-  {
-    prop: 'oldPhoneStatus',
-    label: '订单类型',
-    type: 'select',
-    options: [
-      { label: '全部', value: null },
-      { label: '无旧手机', value: 0 },
-      { label: '旧手机已损坏/遗失', value: 1 },
-    ],
-  },
-  {
-    prop: 'skipApiCall',
-    label: '签约渠道',
-    type: 'select',
-    options: [
-      { label: '全部', value: null },
-      { label: '自有', value: 1 },
-      { label: '亚丁', value: 0 },
-    ],
-  },
 ];
+
+/** 将前端「订单来源」映射为后端 skipApiCall + oldPhoneStatus 参数 */
+const mapOrderSource = (params) => {
+  const mapped = { ...params };
+  const source = mapped.orderSource;
+  delete mapped.orderSource;
+
+  if (source === 'old_phone') {
+    mapped.skipApiCall = 0;
+  } else if (source === 'no_old_phone') {
+    mapped.skipApiCall = 1;
+    mapped.oldPhoneStatus = 0;
+  } else if (source === 'damaged') {
+    mapped.skipApiCall = 1;
+    mapped.oldPhoneStatus = 1;
+  }
+  return mapped;
+};
+
+/** 列表查询：映射 orderSource 后调 queryOrderList */
+const fetchOrderList = (params) => {
+  return queryOrderList(mapOrderSource(params));
+};
 
 // 表格列配置
 const columns = [
@@ -395,13 +406,6 @@ const columns = [
   { label: '创建者', prop: 'createBy' },
   { label: '所属门店', prop: 'storeName', width: '130' },
   {
-    label: '鸭宝激活状态',
-    prop: 'activated',
-    slot: 'activated',
-    width: '120',
-  },
-  { label: '质保状态', slot: 'expired' },
-  {
     label: '创建时间',
     prop: 'createTime',
     slot: 'createTime',
@@ -409,18 +413,11 @@ const columns = [
   },
 ];
 
-/** 获取手机品牌列表 */
+/** 获取手机品牌列表（展开面板展示品牌名称用） */
 const getPhoneTypeList = () => {
   queryPhoneTypeList()
     .then((response) => {
       phoneTypeList.value = response.data || [];
-      const phoneTypeField = searchFields.find((f) => f.prop === 'phoneType');
-      if (phoneTypeField) {
-        phoneTypeField.options = phoneTypeList.value.map((item) => ({
-          label: item.name,
-          value: item.code,
-        }));
-      }
     })
     .catch((err) => {
       console.error('获取手机品牌列表失败：', err);
@@ -471,7 +468,7 @@ const formatDate = (value) => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
-/** 计算质保状态 */
+/** 计算鸭宝查询质保状态 */
 const getWarrantyInfo = (row) => {
   if (!row || !row.activated) {
     return { status: '未激活', expired: true };
@@ -493,7 +490,7 @@ const getWarrantyInfo = (row) => {
   return { status: expired ? '已过保' : '保修中', expired };
 };
 
-/** 质保状态 tag 类型 */
+/** 鸭宝查询质保状态 tag 类型 */
 const getWarrantyTagType = (row) => {
   const info = getWarrantyInfo(row);
   if (info.expired) return 'danger';
@@ -649,98 +646,137 @@ const handlePrint = () => {
   }, 3000);
 };
 
+/** 导出列配置 */
+const exportColumns = [
+  { label: 'ID', prop: 'id', width: 6 },
+  {
+    label: '订单类型',
+    formatter: (row) => {
+      if (row.skipApiCall === 1 && row.oldPhoneStatus === 0) return '无旧手机新手机签约';
+      if (row.oldPhoneStatus === 0) return '无旧手机';
+      if (row.skipApiCall === 1 && row.oldPhoneStatus === 1) return '旧手机丢失/遗失新签约';
+      if (row.oldPhoneStatus === 1) return '旧手机丢失/遗失去亚丁';
+      return '旧手机识别';
+    },
+    width: 10,
+  },
+  {
+    label: '渠道',
+    formatter: (row) => (row.skipApiCall === 1 ? '自有' : '亚丁'),
+    width: 8,
+  },
+  {
+    label: '旧手机使用月数',
+    prop: 'oldPhoneUsageMonths',
+    width: 12,
+    formatter: (row) => {
+      if (row.oldPhoneUsageMonths === 0) return '小于24个月';
+      if (row.oldPhoneUsageMonths === 24) return '大于24个月';
+      if (row.oldPhoneUsageMonths) return '> ' + row.oldPhoneUsageMonths;
+      return '-';
+    },
+  },
+  { label: '旧手机品牌', prop: 'phoneType', formatter: (row) => getPhoneTypeName(row.phoneType), width: 12 },
+  { label: '旧手机型号', prop: 'model' },
+  { label: '旧手机序列号', prop: 'sn', width: 18 },
+  { label: '旧手机IMEI1', prop: 'imei1', width: 18 },
+  { label: '旧手机IMEI2', prop: 'imei2', width: 18 },
+  { label: '旧手机激活状态', prop: 'activated', formatter: (row) => (row.activated ? '已激活' : '--') },
+  { label: '旧手机激活日期', prop: 'activateDate', formatter: (row) => formatDate(row.activateDate) },
+  { label: '旧手机保修到期时间', prop: 'coverage', formatter: (row) => formatDate(row.coverage) },
+  { label: '鸭宝查询质保状态', formatter: (row) => getWarrantyInfo(row).status },
+  { label: '查询时系统时间', prop: 'sysTime' },
+  { label: '创建者', prop: 'createBy' },
+  { label: '所属门店', prop: 'storeName' },
+  { label: '昵称', prop: 'nickName' },
+  { label: '留资人姓名', prop: 'name' },
+  { label: '留资人电话', prop: 'phoneNum' },
+  {
+    label: '用户协议',
+    prop: 'contractPath',
+    formatter: (row) => (row.contractPath ? baseApi + row.contractPath : '-'),
+    width: 40,
+  },
+  {
+    label: '用户签名',
+    prop: 'signaturePath',
+    formatter: (row) => (row.signaturePath ? baseApi + row.signaturePath : '-'),
+    width: 40,
+  },
+  { label: '签名型号', prop: 'signatureModel' },
+  { label: '签名IMEI', prop: 'signatureImei', width: 18 },
+  { label: '签名日期', prop: 'signatureDate' },
+  { label: '创建时间', prop: 'createTime', width: 20 },
+];
+
+/** 生成 Excel 并下载 */
+const generateExcel = (rows, fileName) => {
+  if (!rows || rows.length === 0) {
+    ElMessage.warning('没有可导出的数据');
+    return;
+  }
+  const exportData = rows.map((row) => {
+    const mapped = {};
+    exportColumns.forEach((col) => {
+      let val;
+      if (typeof col.formatter === 'function') {
+        val = col.formatter(row);
+      } else if (col.prop) {
+        val = row[col.prop];
+        if (val === undefined || val === null) val = '-';
+      } else {
+        val = '-';
+      }
+      mapped[col.label] = val;
+    });
+    return mapped;
+  });
+
+  const ws = XLSX.utils.json_to_sheet(exportData);
+  ws['!cols'] = exportColumns.map((col) => ({ wch: col.width || 14 }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '订单数据');
+  const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  saveAs(new Blob([wbout], { type: 'application/octet-stream' }), `${fileName}_${new Date().getTime()}.xlsx`);
+};
+
 /** 导出 */
 const handleExport = () => {
-  ElMessageBox.confirm('是否确认导出订单数据？', '提示', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    type: 'warning',
+  ElMessageBox.confirm('请选择导出范围', '导出订单数据', {
+    confirmButtonText: '导出全部数据',
+    cancelButtonText: '导出当前页',
+    distinguishCancelAndClose: true,
+    type: 'info',
   })
     .then(() => {
+      // 导出全部数据
       exportLoading.value = true;
       const queryParams = proTableRef.value.getQueryParams();
-      exportExcel({
-        fetchApi: queryOrderList,
-        queryParams,
-        columns: [
-          { label: 'ID', prop: 'id', width: 6 },
-          {
-            label: '订单类型',
-            formatter: (row) => {
-              if (row.skipApiCall === 1 && row.oldPhoneStatus === 0) return '无旧手机新手机签约';
-              if (row.oldPhoneStatus === 0) return '无旧手机';
-              if (row.skipApiCall === 1 && row.oldPhoneStatus === 1) return '旧手机丢失/遗失新签约';
-              if (row.oldPhoneStatus === 1) return '旧手机丢失/遗失去亚丁';
-              return '旧手机识别';
-            },
-            width: 10,
-          },
-          {
-            label: '渠道',
-            formatter: (row) => (row.skipApiCall === 1 ? '自有' : '亚丁'),
-            width: 8,
-          },
-          {
-            label: '旧手机使用月数',
-            prop: 'oldPhoneUsageMonths',
-            width: 12,
-            formatter: (row) => {
-              if (row.oldPhoneUsageMonths === 0) return '小于24个月';
-              if (row.oldPhoneUsageMonths === 24) return '大于24个月';
-              if (row.oldPhoneUsageMonths) return '> ' + row.oldPhoneUsageMonths;
-              return '-';
-            },
-          },
-          { label: '旧手机品牌', prop: 'phoneType', formatter: (row) => getPhoneTypeName(row.phoneType), width: 12 },
-          { label: '旧手机型号', prop: 'model' },
-          { label: '旧手机序列号', prop: 'sn', width: 18 },
-          { label: '旧手机IMEI1', prop: 'imei1', width: 18 },
-          { label: '旧手机IMEI2', prop: 'imei2', width: 18 },
-          { label: '旧手机激活状态', prop: 'activated', formatter: (row) => (row.activated ? '已激活' : '--') },
-          { label: '旧手机激活日期', prop: 'activateDate', formatter: (row) => formatDate(row.activateDate) },
-          { label: '旧手机保修到期时间', prop: 'coverage', formatter: (row) => formatDate(row.coverage) },
-          { label: '质保状态', formatter: (row) => getWarrantyInfo(row).status },
-          { label: '查询时系统时间', prop: 'sysTime' },
-          { label: '创建者', prop: 'createBy' },
-          { label: '所属门店', prop: 'storeName' },
-          { label: '昵称', prop: 'nickName' },
-          { label: '留资人姓名', prop: 'name' },
-          { label: '留资人电话', prop: 'phoneNum' },
-          {
-            label: '用户协议',
-            prop: 'contractPath',
-            formatter: (row) => (row.contractPath ? baseApi + row.contractPath : '-'),
-            width: 40,
-          },
-          {
-            label: '用户签名',
-            prop: 'signaturePath',
-            formatter: (row) => (row.signaturePath ? baseApi + row.signaturePath : '-'),
-            width: 40,
-          },
-          { label: '签名型号', prop: 'signatureModel' },
-          { label: '签名IMEI', prop: 'signatureImei', width: 18 },
-          { label: '签名日期', prop: 'signatureDate' },
-          { label: '创建时间', prop: 'createTime', width: 20 },
-        ],
-        fileName: '订单数据',
-        sheetName: '订单数据',
-      })
-        .then((count) => {
-          ElMessage.success(`导出成功，共 ${count} 条数据`);
-          exportLoading.value = false;
+      exportOrderList(mapOrderSource(queryParams))
+        .then((res) => {
+          const rows = res.data || res || [];
+          generateExcel(rows, '订单数据');
+          ElMessage.success(`导出成功，共 ${rows.length} 条数据`);
         })
         .catch((err) => {
-          if (err.message === 'EMPTY_DATA') {
-            ElMessage.warning('没有可导出的数据');
-          } else {
-            console.error('导出订单数据失败：', err);
-            ElMessage.error('导出失败，请稍后重试');
-          }
+          console.error('导出订单数据失败：', err);
+          ElMessage.error('导出失败，请稍后重试');
+        })
+        .finally(() => {
           exportLoading.value = false;
         });
     })
-    .catch(() => {});
+    .catch((action) => {
+      if (action === 'cancel') {
+        // 导出当前页
+        const rows = proTableRef.value.tableData || [];
+        generateExcel(rows, '订单数据_当前页');
+        if (rows.length > 0) {
+          ElMessage.success(`导出成功，共 ${rows.length} 条数据`);
+        }
+      }
+      // dismiss（点叉关闭）：不操作
+    });
 };
 
 /** 导入 */
@@ -750,9 +786,103 @@ const handleImport = () => {
   selectedFile.value = null;
 };
 
-/** 下载模板 */
+/** 跳转到留资用户页面 */
+const goToLeaveInfo = () => {
+  upload.open = false;
+  const router = useRouter();
+  router.push('/info/user');
+};
+
+/** 导入模板列定义（列名必须匹配后端 @Excel 注解的 name 值） */
+const importTemplateHeaders = [
+  '创建时间',
+  '跳过API',
+  '旧手机状态',
+  '旧手机序列号',
+  '旧手机品牌',
+  '旧手机型号',
+  '旧手机IMEI1',
+  '旧手机IMEI2',
+  '旧手机使用月数',
+  '昵称',
+  '所属门店',
+  '留资人电话',
+  '留资人姓名',
+  '鸭宝激活状态',
+  '旧手机激活日期',
+  '旧手机保修到期时间',
+  '查询时系统时间',
+  '图片路径',
+  '签名型号',
+  '签名IMEI',
+  '签名日期',
+];
+
+/** 导入模板示例行（含两个场景示例） */
+const importTemplateExample1 = [
+  '2025-06-01 10:00:00',
+  '0',
+  '',
+  'ABC123456789',
+  '1',
+  'iPhone 16',
+  '123456789012345',
+  '123456789012346',
+  '12',
+  '张璐',
+  '101',
+  '13800000000',
+  '张三',
+  'false',
+  '2025-01-15',
+  '2026-01-15',
+  '2025-06-01 10:00:00',
+  '',
+  'iPhone 16',
+  '123456789012345',
+  '2025-06-01',
+];
+
+const importTemplateExample2 = [
+  '2025-06-01 11:00:00',
+  '1',
+  '1',
+  '',
+  '',
+  '',
+  '',
+  '',
+  '24',
+  '张浩',
+  '',
+  '18189201567',
+  '张浩',
+  '',
+  '',
+  '',
+  '',
+  '',
+  '平板3',
+  '12312312312312312',
+  '2025-06-01',
+];
+
+/** 下载模板（前端生成，含两个场景示例数据） */
 const importTemplate = () => {
-  proxy.download('system/order/importTemplate', {}, `order_template_${new Date().getTime()}.xlsx`);
+  const sheetData = [importTemplateHeaders, importTemplateExample1, importTemplateExample2];
+  const ws = XLSX.utils.aoa_to_sheet(sheetData);
+  ws['!cols'] = [
+    { wch: 22 }, { wch: 10 }, { wch: 12 }, { wch: 18 },
+    { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 18 },
+    { wch: 16 }, { wch: 12 }, { wch: 10 },
+    { wch: 16 }, { wch: 12 },
+    { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 18 },
+    { wch: 34 }, { wch: 14 }, { wch: 22 }, { wch: 14 },
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '订单导入模板');
+  const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  saveAs(new Blob([wbout], { type: 'application/octet-stream' }), '订单导入模板.xlsx');
 };
 
 /** 文件上传进度 */
@@ -785,17 +915,17 @@ const handleFileChange = (uploadFile) => {
 const submitFileForm = () => {
   const file = selectedFile.value;
   if (!file) {
-    proxy.$modal.msgError('请先选择文件');
+    ElMessage.warning('请先选择文件');
     return;
   }
   const fileName = (file.name || '').toLowerCase();
   if (!fileName.endsWith('.xls') && !fileName.endsWith('.xlsx')) {
-    proxy.$modal.msgError('请选择后缀为"xls"或"xlsx"的文件。');
+    ElMessage.warning('请选择后缀为"xls"或"xlsx"的文件。');
     return;
   }
   const raw = file.raw;
   if (!raw) {
-    proxy.$modal.msgError('文件读取失败，请重新选择文件');
+    ElMessage.warning('文件读取失败，请重新选择文件');
     return;
   }
   const reader = new FileReader();
@@ -806,52 +936,93 @@ const submitFileForm = () => {
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
       if (!rows || rows.length < 2) {
-        proxy.$modal.msgError('Excel 文件中没有数据行，请填写至少一行数据');
+        ElMessage.warning('Excel 文件中没有数据行，请填写至少一行数据');
         return;
       }
+
+      // 解析表头，构建列索引映射
       const headerRow = rows[0];
-      const columnMap = {};
+      const colMap = {}; // { '列名' : 列索引 }
+      const requiredHeaders = ['创建时间', '跳过API'];
       headerRow.forEach((h, idx) => {
-        const clean = String(h || '')
-          .replace(/[（(]必填[）)]/g, '')
-          .trim();
-        if (clean) columnMap[clean] = idx;
+        const clean = String(h || '').trim();
+        if (clean) colMap[clean] = idx;
       });
-      const requiredColumns = ['旧手机序列号', '创建时间'];
-      const missingCols = requiredColumns.filter((col) => !(col in columnMap));
-      if (missingCols.length > 0) {
-        proxy.$modal.msgError('Excel 缺必填列：' + missingCols.join('、') + '，请使用最新模板');
+
+      // 检查必填列是否存在
+      const missingHeaders = requiredHeaders.filter((col) => !(col in colMap));
+      if (missingHeaders.length > 0) {
+        ElMessage.warning('Excel 缺少必填列：' + missingHeaders.join('、') + '，请使用最新模板');
         return;
       }
+
+      // 逐行校验
       for (let r = 1; r < rows.length; r++) {
         const row = rows[r];
+        // 跳过全空行
         if (!row || row.every((cell) => cell === undefined || String(cell).trim() === '')) {
           continue;
         }
-        for (const col of requiredColumns) {
-          const idx = columnMap[col];
-          const val = row[idx];
-          if (val === undefined || val === null || String(val).trim() === '') {
-            proxy.$modal.msgError(`第 ${r + 1} 行「${col}」不能为空，请修正后重新上传`);
+        const rowLabel = `第 ${r + 1} 行`;
+
+        // 辅助取值函数
+        const getVal = (colName) => {
+          const idx = colMap[colName];
+          if (idx === undefined) return undefined;
+          const v = row[idx];
+          return v !== undefined && v !== null ? String(v).trim() : '';
+        };
+
+        // 1. 创建时间必填
+        const createTimeVal = getVal('创建时间');
+        if (!createTimeVal) {
+          ElMessage.warning(`${rowLabel}「创建时间」不能为空`);
+          return;
+        }
+
+        // 2. 跳过API 必填 + 值域校验
+        const skipApiCallVal = getVal('跳过API');
+        if (!skipApiCallVal) {
+          ElMessage.warning(`${rowLabel}「跳过API」不能为空（0=旧手机识别, 1=自有渠道）`);
+          return;
+        }
+        if (skipApiCallVal !== '0' && skipApiCallVal !== '1') {
+          ElMessage.warning(`${rowLabel}「跳过API」值无效（${skipApiCallVal}），必须为 0 或 1`);
+          return;
+        }
+
+        const oldPhoneStatusVal = getVal('旧手机状态');
+        const snVal = getVal('旧手机序列号');
+
+        if (skipApiCallVal === '0') {
+          // 旧手机识别：序列号必填
+          if (!snVal) {
+            ElMessage.warning(`${rowLabel}跳过API=0（旧手机识别），「旧手机序列号」不能为空`);
+            return;
+          }
+        } else {
+          // 自有渠道：旧手机状态必填
+          if (!oldPhoneStatusVal) {
+            ElMessage.warning(`${rowLabel}跳过API=1（自有渠道），「旧手机状态」不能为空（0=无旧手机, 1=丢失/损坏）`);
+            return;
+          }
+          if (oldPhoneStatusVal !== '0' && oldPhoneStatusVal !== '1') {
+            ElMessage.warning(`${rowLabel}「旧手机状态」值无效（${oldPhoneStatusVal}），必须为 0 或 1`);
             return;
           }
         }
       }
+
       uploadRef.value.submit();
     } catch (err) {
       console.error('Excel 解析失败：', err);
-      proxy.$modal.msgError('Excel 文件解析失败，请检查文件格式');
+      ElMessage.warning('Excel 文件解析失败，请检查文件格式');
     }
   };
   reader.readAsArrayBuffer(raw);
 };
 
 onMounted(() => {
-  if (route.query.sn) {
-    const params = proTableRef.value?.queryParams;
-    if (params) params.sn = route.query.sn;
-    proTableRef.value?.refresh();
-  }
   getPhoneTypeList();
 });
 </script>
