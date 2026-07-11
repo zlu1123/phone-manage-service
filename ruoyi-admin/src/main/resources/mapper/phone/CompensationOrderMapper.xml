@@ -62,9 +62,10 @@
 
     <!-- 条件查询赔付订单列表 -->
     <select id="selectByCondition" resultMap="BaseResultDtoMap">
-        SELECT co.*, li.name, li.phone_num, pai.signature_imei, su.nick_name as create_by_name
+        SELECT co.*, li.name, li.phone_num, poc.signature_imei, su.nick_name as create_by_name
         FROM compensation_order co
             left join phone_active_info pai on co.order_id = pai.id
+            left join phone_order_contract poc on co.order_id = poc.order_id
             left join leave_information li on co.info_id = li.id
             left join sys_user su on co.create_by = su.user_name
         <where>
@@ -78,7 +79,7 @@
                 AND co.status = #{status}
             </if>
             <if test="signatureImei != null and signatureImei != ''">
-                AND pai.signature_imei LIKE CONCAT('%', #{signatureImei}, '%')
+                AND poc.signature_imei LIKE CONCAT('%', #{signatureImei}, '%')
             </if>
             <if test="createBy != null and createBy != ''">
                 AND co.create_by LIKE CONCAT('%', #{createBy}, '%')
