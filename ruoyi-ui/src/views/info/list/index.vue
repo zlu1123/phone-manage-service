@@ -403,7 +403,7 @@ const columns = [
   },
   { label: '留资人姓名', prop: 'name', width: '100' },
   { label: '留资人电话', prop: 'phoneNum' },
-  { label: '创建者', prop: 'createBy' },
+  { label: '创建者', prop: 'nickName' },
   { label: '所属门店', prop: 'storeName', width: '130' },
   {
     label: '创建时间',
@@ -693,9 +693,7 @@ const exportColumns = [
   { label: '鸭宝查询保修到期时间', prop: 'coverage', formatter: (row) => formatDate(row.coverage) },
   { label: '旧手机质保状态', formatter: (row) => getWarrantyInfo(row).status },
   { label: '查询时系统时间', prop: 'sysTime' },
-  { label: '创建者', prop: 'createBy' },
-  { label: '所属门店', prop: 'storeName' },
-  { label: '昵称', prop: 'nickName' },
+  { label: '创建者', prop: 'nickName' },
   { label: '留资人姓名', prop: 'name' },
   { label: '留资人电话', prop: 'phoneNum' },
   {
