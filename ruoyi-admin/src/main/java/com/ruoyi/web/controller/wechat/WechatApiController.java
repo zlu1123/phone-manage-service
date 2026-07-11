@@ -428,8 +428,9 @@ public class WechatApiController extends BaseController {
     }
 
     /**
-     * @param ContractDto 查询条件
-     * @return 订单分页列表
+     * 查询生效中的协议信息
+     *
+     * @return 协议信息
      */
     @ApiOperation("查询协议信息")
     @GetMapping("/getContract")
