@@ -38,12 +38,12 @@
         </el-col>
       </template>
 
-      <!-- 表格顶部说明：鸭宝查询质保状态计算方案 -->
+      <!-- 表格顶部说明：旧手机质保状态计算方案 -->
       <template #table-tip>
         <el-alert type="info" :closable="false" show-icon style="margin-bottom: 10px">
           <template #title>
             <span style="font-size: 13px">
-              鸭宝查询质保状态计算规则：<strong>未激活</strong> → 显示「未激活」； <strong>已激活但无保修到期时间</strong> →
+              旧手机质保状态计算规则：<strong>未激活</strong> → 显示「未激活」； <strong>已激活但无保修到期时间</strong> →
               「已激活」（视为未过期）； <strong>保修到期时间 ≤ 查询时间</strong> → 「已过保」；
               <strong>保修到期时间 &gt; 查询时间</strong> → 「保修中」
             </span>
@@ -104,14 +104,14 @@
                 <span v-else>-</span>
               </el-descriptions-item>
               <el-descriptions-item label="激活日期">{{ formatDate(row.activateDate) }}</el-descriptions-item>
-              <el-descriptions-item label="保修到期">{{ formatDate(row.coverage) }}</el-descriptions-item>
+              <el-descriptions-item label="鸭宝查询保修到期时间">{{ formatDate(row.coverage) }}</el-descriptions-item>
               <el-descriptions-item label="系统时间">{{ row.sysTime || '-' }}</el-descriptions-item>
               <el-descriptions-item label="鸭宝激活状态">
                 <el-tag :type="row.activated ? 'success' : 'info'" size="small">
                   {{ row.activated ? '已激活' : '--' }}
                 </el-tag>
               </el-descriptions-item>
-              <el-descriptions-item label="鸭宝查询质保状态">
+              <el-descriptions-item label="旧手机质保状态">
                 <el-tag :type="getWarrantyTagType(row)" size="small">
                   {{ getWarrantyInfo(row).status }}
                 </el-tag>
@@ -468,9 +468,16 @@ const formatDate = (value) => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
-/** 计算鸭宝查询质保状态 */
+/** 计算旧手机质保状态 */
 const getWarrantyInfo = (row) => {
-  if (!row || !row.activated) {
+  if (!row) {
+    return { status: '--', expired: false };
+  }
+  // 鸭宝没有返回激活状态
+  if (row.activated === undefined || row.activated === null) {
+    return { status: '--', expired: false };
+  }
+  if (!row.activated) {
     return { status: '未激活', expired: true };
   }
   const coverage = row.coverage;
@@ -490,7 +497,7 @@ const getWarrantyInfo = (row) => {
   return { status: expired ? '已过保' : '保修中', expired };
 };
 
-/** 鸭宝查询质保状态 tag 类型 */
+/** 旧手机质保状态 tag 类型 */
 const getWarrantyTagType = (row) => {
   const info = getWarrantyInfo(row);
   if (info.expired) return 'danger';
@@ -683,8 +690,8 @@ const exportColumns = [
   { label: '旧手机IMEI2', prop: 'imei2', width: 18 },
   { label: '旧手机激活状态', prop: 'activated', formatter: (row) => (row.activated ? '已激活' : '--') },
   { label: '旧手机激活日期', prop: 'activateDate', formatter: (row) => formatDate(row.activateDate) },
-  { label: '旧手机保修到期时间', prop: 'coverage', formatter: (row) => formatDate(row.coverage) },
-  { label: '鸭宝查询质保状态', formatter: (row) => getWarrantyInfo(row).status },
+  { label: '鸭宝查询保修到期时间', prop: 'coverage', formatter: (row) => formatDate(row.coverage) },
+  { label: '旧手机质保状态', formatter: (row) => getWarrantyInfo(row).status },
   { label: '查询时系统时间', prop: 'sysTime' },
   { label: '创建者', prop: 'createBy' },
   { label: '所属门店', prop: 'storeName' },
@@ -810,7 +817,7 @@ const importTemplateHeaders = [
   '留资人姓名',
   '鸭宝激活状态',
   '旧手机激活日期',
-  '旧手机保修到期时间',
+  '鸭宝查询保修到期时间',
   '查询时系统时间',
   '图片路径',
   '签名型号',
