@@ -25,6 +25,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
@@ -62,6 +63,14 @@ public class OCRService {
 
     @Value("${ocr.parallelism:6}")
     private int ocrParallelism;
+
+    /**
+     * 增强识别阶段的总时间预算（秒）。
+     * 所有变体并行执行，总耗时不超过此值；超时的变体会被取消。
+     * 默认 120 秒，根据生产环境 Docker Tesseract 实际耗时调整。
+     */
+    @Value("${ocr.enhanced.total.timeout.seconds:120}")
+    private int enhancedTotalTimeoutSeconds;
 
     private synchronized ExecutorService getOcrExecutor() {
         if (ocrExecutor == null) {
@@ -158,11 +167,29 @@ public class OCRService {
                         }));
                     }
 
-                    // ===== 3) 按变体顺序回收结果（保留原有顺序，方便后续 controller 评分时的稳定性） =====
+                    // ===== 3) 回收结果：带超时控制和提前退出 =====
+                    long enhancedDeadline = System.currentTimeMillis() + enhancedTotalTimeoutSeconds * 1000L;
                     for (Future<VariantOcrResult> future : futures) {
+                        long remaining = enhancedDeadline - System.currentTimeMillis();
+                        if (remaining <= 0) {
+                            future.cancel(true);
+                            log.warn("增强OCR总时间预算已耗尽（{}s），跳过剩余变体", enhancedTotalTimeoutSeconds);
+                            continue;
+                        }
                         try {
-                            VariantOcrResult variantResult = future.get();
+                            VariantOcrResult variantResult = future.get(remaining, TimeUnit.MILLISECONDS);
                             addOcrResult(results, variantResult.variantName, variantResult.text);
+                            // 提前退出：已获得包含设备信号的有效结果时，取消剩余变体
+                            if (variantResult.text != null && containsDeviceSignal(variantResult.text)) {
+                                log.info("增强OCR已获得有效结果（变体={}），取消剩余变体", variantResult.variantName);
+                                for (Future<VariantOcrResult> f : futures) {
+                                    f.cancel(true);
+                                }
+                                break;
+                            }
+                        } catch (TimeoutException te) {
+                            future.cancel(true);
+                            log.warn("增强OCR变体执行超时（剩余预算={}ms），跳过", Math.max(0, remaining));
                         } catch (InterruptedException ie) {
                             Thread.currentThread().interrupt();
                             // 中断时取消剩余任务后退出
@@ -506,25 +533,39 @@ public class OCRService {
         pb.redirectErrorStream(true);
         Process process = pb.start();
 
-        String output = readProcessOutput(process);
+        // 在后台线程读取输出，避免管道缓冲区满导致进程卡死，同时不阻塞超时判断
+        StringBuilder sb = new StringBuilder();
+        Thread readerThread = new Thread(() -> {
+            try (BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                String line;
+                while ((line = br.readLine()) != null) {
+                    sb.append(line).append("\n");
+                }
+            } catch (IOException e) {
+                // 进程被销毁时可能抛出异常，忽略
+            }
+        }, "ocr-output-reader");
+        readerThread.setDaemon(true);
+        readerThread.start();
+
         boolean finished = process.waitFor(dockerTimeoutSeconds, TimeUnit.SECONDS);
         if (!finished) {
             process.destroyForcibly();
-            throw new RuntimeException("Docker OCR 执行超时");
+            readerThread.interrupt();
+            throw new RuntimeException("Docker OCR 执行超时（" + dockerTimeoutSeconds + "s）");
         }
+        // 等待读取线程结束（正常结束时很快完成）
+        try {
+            readerThread.join(5000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        String output = sb.toString();
         if (process.exitValue() != 0) {
             throw new RuntimeException("Docker OCR 执行失败, 输出: " + output);
         }
         return output;
-    }
-
-    private String readProcessOutput(Process process) throws IOException {
-        StringBuilder sb = new StringBuilder();
-        try (BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-            String line;
-            while ((line = br.readLine()) != null) sb.append(line).append("\n");
-        }
-        return sb.toString();
     }
 
     public static class OcrResult {
