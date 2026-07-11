@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.ruoyi.web.mapper.PhoneOrderContractMapper">
+
+    <resultMap id="BaseResultMap" type="com.ruoyi.web.domain.PhoneOrderContract">
+        <result column="order_id" property="orderId"/>
+        <result column="contract_id" property="contractId"/>
+        <result column="contract_path" property="contractPath"/>
+        <result column="contract_content" property="contractContent"/>
+        <result column="signature_model" property="signatureModel"/>
+        <result column="signature_imei" property="signatureImei"/>
+        <result column="signature_date" property="signatureDate"/>
+        <result column="signature_path" property="signaturePath"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        order_id, contract_id, contract_path, contract_content,
+        signature_model, signature_imei, signature_date, signature_path
+    </sql>
+
+    <select id="selectByOrderId" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM phone_order_contract
+        WHERE order_id = #{orderId}
+    </select>
+
+    <insert id="insert">
+        INSERT INTO phone_order_contract (
+            order_id, contract_id, contract_path, contract_content,
+            signature_model, signature_imei, signature_date, signature_path
+        ) VALUES (
+            #{orderId}, #{contractId}, #{contractPath}, #{contractContent},
+            #{signatureModel}, #{signatureImei}, #{signatureDate}, #{signaturePath}
+        )
+    </insert>
+
+    <update id="updateByOrderId">
+        UPDATE phone_order_contract
+        SET contract_id = #{contractId},
+            contract_path = #{contractPath},
+            contract_content = #{contractContent},
+            signature_model = #{signatureModel},
+            signature_imei = #{signatureImei},
+            signature_date = #{signatureDate},
+            signature_path = #{signaturePath}
+        WHERE order_id = #{orderId}
+    </update>
+
+</mapper>

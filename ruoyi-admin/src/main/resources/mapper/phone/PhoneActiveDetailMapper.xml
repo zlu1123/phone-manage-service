@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.ruoyi.web.mapper.PhoneActiveDetailMapper">
+
+    <resultMap id="BaseResultMap" type="com.ruoyi.web.domain.PhoneActiveDetail">
+        <result column="order_id" property="orderId"/>
+        <result column="activated" property="activated"/>
+        <result column="activate_date" property="activateDate"/>
+        <result column="coverage" property="coverage"/>
+        <result column="active_info" property="activeInfo"/>
+        <result column="sys_time" property="sysTime"/>
+        <result column="image_path" property="imagePath"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        order_id, activated, activate_date, coverage, active_info, sys_time, image_path
+    </sql>
+
+    <insert id="insert">
+        INSERT INTO phone_active_detail (
+            order_id, activated, activate_date, coverage, active_info, sys_time, image_path
+        ) VALUES (
+            #{orderId}, #{activated}, #{activateDate}, #{coverage}, #{activeInfo}, #{sysTime}, #{imagePath}
+        )
+    </insert>
+
+</mapper>

@@ -48,7 +48,7 @@ public class OCRService {
     @Value("${ocr.shared.dir:/tmp/ocr_shared}")
     private String sharedDir;
 
-    @Value("${docker.command.timeout:30}")
+    @Value("${docker.command.timeout:60}")
     private int dockerTimeoutSeconds;
 
     /**
@@ -297,7 +297,17 @@ public class OCRService {
         // 都强制触发增强识别。原因：旋转拍摄/倒置拍摄时 OCR 会产出大量乱码长串（如 SV278890601299Z3Y），
         // 这些乱码本身长度合法但语义错误，必须通过旋转变体重试才能拿到正确文本。
         boolean noDeviceSignal = signalLines == 0;
-        boolean shouldEnhance = lowConfidence || suspiciousAboutPage || noDeviceSignal;
+        // 修正：当已有长字母数字混合串（IMEI/SN等）且行数足够时，
+        // 即使没有中文设备信号关键字，也不再触发增强识别。
+        // 避免因 Tesseract 未识别出中文标签（如"序列号"）而浪费时间做旋转等变体。
+        boolean shouldEnhance;
+        if (hasLongMixedToken && usefulLines >= 2) {
+            shouldEnhance = lowConfidence || suspiciousAboutPage;
+            // lowConfidence 在 hasLongMixedToken 为 true 时必然为 false，
+            // 所以此处实际只有 suspiciousAboutPage 可能触发
+        } else {
+            shouldEnhance = lowConfidence || suspiciousAboutPage || noDeviceSignal;
+        }
         if (shouldEnhance) {
             log.info("OCR触发增强识别: usefulLines={}, signalLines={}, hasLongMixedToken={}, hasAboutPageSignal={}, hasModelLine={}, hasSnLine={}, hasSuspiciousChars={}, noDeviceSignal={}",
                     usefulLines, signalLines, hasLongMixedToken, hasAboutPageSignal, hasModelLine, hasSnLine, hasSuspiciousChars, noDeviceSignal);
