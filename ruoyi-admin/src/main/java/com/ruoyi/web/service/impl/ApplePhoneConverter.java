@@ -14,7 +14,9 @@ public class ApplePhoneConverter implements PhoneInfoConverter {
             target.setModel(obj.getModel());
             target.setCoverage(obj.getRepairExpiry());
             target.setActivated(obj.getActivated());
-            target.setActivateDate(obj.getEstPurchaseDate());
+            // 优先取 activeDate（真正的激活日期），不返回时兜底 estPurchaseDate
+            String activateDate = obj.getActiveDate() != null ? obj.getActiveDate() : obj.getEstPurchaseDate();
+            target.setActivateDate(activateDate);
         }
     }
 }

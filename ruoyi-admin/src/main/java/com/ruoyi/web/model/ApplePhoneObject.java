@@ -21,6 +21,7 @@ public class ApplePhoneObject {
     private Integer warrantyYear;
     private String warrantyStatus;
     private Boolean appleCare;
+    private String activeDate;
     private String estPurchaseDate;
     private String repairExpiry;
     private String color;

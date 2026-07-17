@@ -15,7 +15,10 @@ public class HuaWeiPhoneConverter implements PhoneInfoConverter {
             target.setModel(obj.getModel());
             target.setCoverage(obj.getCoverage());
             target.setActivated(obj.isActivated());
-            target.setActivateDate(obj.getPurchase().getDate());
+            // purchase 在未激活时可能为 null（API 文档注明"未激活不取这个值"）
+            if (obj.getPurchase() != null) {
+                target.setActivateDate(obj.getPurchase().getDate());
+            }
         }
     }
 }

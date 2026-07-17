@@ -1,12 +1,14 @@
 package com.ruoyi.web.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 @Data
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class XiaoMiPhoneObject {
 
+    @JsonProperty("imei")
     private String imei1;
     private String imei2;
     private String model;
@@ -17,6 +19,6 @@ public class XiaoMiPhoneObject {
     private String coverage;
     private String color;
     private Boolean locked;
-    private String skuId;
+    private Integer skuId;
     private String description;
 }

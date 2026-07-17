@@ -15,8 +15,14 @@ public class OppoPhoneConverter implements PhoneInfoConverter {
             target.setImei2(obj.getImei2());
             target.setModel(obj.getModel());
             target.setCoverage(obj.getCoverage());
-            target.setActivated(obj.getActivated());
-            target.setActivateDate(obj.getActivateDate());
+            // OPPO API 不返回 activated 布尔值，通过 purchase.date 判断是否激活
+            if (obj.getPurchase() != null && obj.getPurchase().getDate() != null && !obj.getPurchase().getDate().isEmpty()) {
+                target.setActivated(true);
+                target.setActivateDate(obj.getPurchase().getDate());
+            } else {
+                target.setActivated(false);
+                target.setActivateDate(null);
+            }
         }
     }
 }
