@@ -6,7 +6,7 @@
       <el-row :gutter="20" class="mb8">
         <el-col :span="12">
           <div class="info-item">
-            <label class="info-label">用户名称：</label>
+            <label class="info-label">用户账号：</label>
             <span class="info-value plaintext">{{ info.nickName }}</span>
           </div>
         </el-col>

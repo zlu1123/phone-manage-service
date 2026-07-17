@@ -545,7 +545,7 @@ const balanceTagIcon = computed(() => {
   return 'CircleCheckFilled';
 });
 
-/** 获取用户昵称 */
+/** 获取员工姓名 */
 const nickName = computed(() => {
   return userStore.nickName || userStore.name || '用户';
 });
