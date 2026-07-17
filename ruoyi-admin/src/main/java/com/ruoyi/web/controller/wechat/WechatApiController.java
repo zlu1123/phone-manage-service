@@ -70,11 +70,14 @@ public class WechatApiController extends BaseController {
 
     /**
      * 查询激活信息
-     * 查询策略：先用SN码查询，如果失败再用IMEI查询，两次都失败返回匹配失败
+     * 查询策略：
+     * - IMEI优先品牌（OPPO/真我/一加、VIVO/iQOO）：官方API要求手机必须用IMEI查询，
+     *   如果有IMEI则优先用IMEI查询，失败再用SN兜底
+     * - 其他品牌（苹果、小米、华为、荣耀、三星）：先用SN码查询，失败再用IMEI重试
      *
      * @param typeCode 手机类型编号
      * @param code     SN码
-     * @param imei     IMEI码（可选，用于SN查询失败时的重试，同时作为 imei1 返回）
+     * @param imei     IMEI码（可选，查询失败时的重试/首选，同时作为 imei1 返回）
      * @param imei2    IMEI2 码（可选，双卡设备的第二个 IMEI）
      * @return 激活信息
      */
@@ -112,17 +115,17 @@ public class WechatApiController extends BaseController {
             return R.fail("图片处理失败：" + e.getMessage());
         }
 
-        // 第一次：用SN码查询
-        log.info("第一次查询：使用SN码={}, type={}", code, type);
-        ExternalApiService.ApiResult apiResult = externalApiService.fetchDataFromExternalApi(type, code);
-
-        // 第二次：SN查询失败且有IMEI时，用IMEI重试
-        if (!apiResult.getSuccess() && imei != null && !imei.trim().isEmpty()) {
-            log.info("SN查询失败，第二次查询：使用IMEI={}, type={}", imei, type);
-            apiResult = externalApiService.fetchDataFromExternalApi(type, imei.trim());
+        // 根据品牌决定查询策略
+        ExternalApiService.ApiResult apiResult;
+        if (isImeiFirstType(typeCode)) {
+            // IMEI优先品牌（OPPO/真我/一加、VIVO/iQOO）：官方要求手机必须用IMEI查询
+            apiResult = queryImeiFirst(type, code, imei);
+        } else {
+            // 其他品牌：SN优先，失败再用IMEI兜底
+            apiResult = querySnFirst(type, code, imei);
         }
 
-        // 两次都失败，返回匹配失败
+        // 查询失败，返回匹配失败
         if (!apiResult.getSuccess()) {
             return R.fail("查询失败，请检查输入是否正确！" + apiResult.getData());
         }
@@ -145,6 +148,57 @@ public class WechatApiController extends BaseController {
             return R.fail("保存数据失败：" + e.getMessage());
         }
         return R.ok(phoneInfoDto);
+    }
+
+    /**
+     * 判断是否为 IMEI 优先查询的品牌（OPPO/真我/一加、VIVO/iQOO）
+     * 这两类品牌的 06API 文档明确要求"手机必须用IMEI查询"
+     */
+    private boolean isImeiFirstType(String typeCode) {
+        return PhoneType.OPPO.getCode().equals(typeCode) || PhoneType.VIVO.getCode().equals(typeCode);
+    }
+
+    /**
+     * IMEI 优先查询策略：有 IMEI 时优先用 IMEI，失败再用 SN 兜底；无 IMEI 时直接用 SN
+     */
+    private ExternalApiService.ApiResult queryImeiFirst(String type, String code, String imei) {
+        String effectiveImei = (imei != null && !imei.trim().isEmpty()) ? imei.trim() : null;
+        String effectiveCode = (code != null && !code.trim().isEmpty()) ? code.trim() : null;
+
+        if (effectiveImei != null) {
+            // 优先用 IMEI 查询
+            log.info("IMEI优先查询：使用IMEI={}, type={}", effectiveImei, type);
+            ExternalApiService.ApiResult apiResult = externalApiService.fetchDataFromExternalApi(type, effectiveImei);
+            if (apiResult.getSuccess()) {
+                return apiResult;
+            }
+            // IMEI 失败，用 SN 兜底
+            if (effectiveCode != null && !effectiveCode.equals(effectiveImei)) {
+                log.info("IMEI查询失败，兜底查询：使用SN={}, type={}", effectiveCode, type);
+                return externalApiService.fetchDataFromExternalApi(type, effectiveCode);
+            }
+            return apiResult;
+        } else {
+            // 无 IMEI，直接用 SN
+            log.info("IMEI优先查询（无IMEI参数）：使用SN={}, type={}", effectiveCode, type);
+            return externalApiService.fetchDataFromExternalApi(type, effectiveCode);
+        }
+    }
+
+    /**
+     * SN 优先查询策略（苹果、小米、华为、荣耀、三星等）：先用 SN，失败再用 IMEI 兜底
+     */
+    private ExternalApiService.ApiResult querySnFirst(String type, String code, String imei) {
+        // 第一次：用SN码查询
+        log.info("SN优先查询：使用SN码={}, type={}", code, type);
+        ExternalApiService.ApiResult apiResult = externalApiService.fetchDataFromExternalApi(type, code);
+
+        // 第二次：SN查询失败且有IMEI时，用IMEI重试
+        if (!apiResult.getSuccess() && imei != null && !imei.trim().isEmpty()) {
+            log.info("SN查询失败，兜底查询：使用IMEI={}, type={}", imei, type);
+            apiResult = externalApiService.fetchDataFromExternalApi(type, imei.trim());
+        }
+        return apiResult;
     }
 
     /**
