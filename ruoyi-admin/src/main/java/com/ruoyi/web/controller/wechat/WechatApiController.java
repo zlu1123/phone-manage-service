@@ -341,7 +341,46 @@ public class WechatApiController extends BaseController {
             // 未找到对应策略，可记录日志或抛出异常
             log.warn("No converter found for type: {}", type);
         }
+
+        // 3. 统一日期格式为 yyyy-MM-dd（各品牌API返回格式不一致）
+        dto.setActivateDate(normalizeDate(dto.getActivateDate()));
+        dto.setCoverage(normalizeDate(dto.getCoverage()));
+
         return dto;
+    }
+
+    /**
+     * 将各品牌API返回的激活日期统一为 yyyy-MM-dd 格式
+     * 支持格式：
+     * - "2025年10月17日"（vivo中文格式）
+     * - "2021-07-01"（已标准，直接返回）
+     * - "2025/10/17"（斜杠分隔）
+     */
+    private String normalizeDate(String dateStr) {
+        if (dateStr == null || dateStr.trim().isEmpty()) {
+            return null;
+        }
+        String s = dateStr.trim();
+        // 中文格式：2025年10月17日 → 2025-10-17
+        java.util.regex.Matcher cnMatcher = java.util.regex.Pattern.compile(
+                "(\\d{4})\\s*年\\s*(\\d{1,2})\\s*月\\s*(\\d{1,2})\\s*日").matcher(s);
+        if (cnMatcher.find()) {
+            return String.format("%04d-%02d-%02d",
+                    Integer.parseInt(cnMatcher.group(1)),
+                    Integer.parseInt(cnMatcher.group(2)),
+                    Integer.parseInt(cnMatcher.group(3)));
+        }
+        // 斜杠格式：2025/10/17 → 2025-10-17
+        java.util.regex.Matcher slashMatcher = java.util.regex.Pattern.compile(
+                "(\\d{4})\\s*/\\s*(\\d{1,2})\\s*/\\s*(\\d{1,2})").matcher(s);
+        if (slashMatcher.find()) {
+            return String.format("%04d-%02d-%02d",
+                    Integer.parseInt(slashMatcher.group(1)),
+                    Integer.parseInt(slashMatcher.group(2)),
+                    Integer.parseInt(slashMatcher.group(3)));
+        }
+        // 已经是标准格式或无法识别，直接返回
+        return s;
     }
 
     /**
