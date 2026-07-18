@@ -356,12 +356,16 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
 
     @Override
     public List<PhoneActiveInfo> queryActiveList(PhoneActiveInfo info) {
-        return fillImageUrls(phoneActiveInfoMapper.selectListByExample(info));
+        List<PhoneActiveInfo> list = phoneActiveInfoMapper.selectListByExample(info);
+        list.forEach(this::normalizeDates);
+        return fillImageUrls(list);
     }
 
     @Override
     public List<PhoneActiveInfo> queryExportList(PhoneActiveInfo info) {
-        return fillImageUrls(phoneActiveInfoMapper.selectExportList(info));
+        List<PhoneActiveInfo> list = phoneActiveInfoMapper.selectExportList(info);
+        list.forEach(this::normalizeDates);
+        return fillImageUrls(list);
     }
 
     @Override
@@ -371,6 +375,7 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
         }
         PhoneActiveInfo detail = phoneActiveInfoMapper.selectDetailById(id);
         if (detail != null) {
+            normalizeDates(detail);
             fillImageUrl(detail);
         }
         return detail;
@@ -581,7 +586,9 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
 
     @Override
     public List<PhoneActiveInfo> getRecentOrders(String createBy, int limit) {
-        return fillImageUrls(phoneActiveInfoMapper.selectRecentOrders(createBy, limit));
+        List<PhoneActiveInfo> list = phoneActiveInfoMapper.selectRecentOrders(createBy, limit);
+        list.forEach(this::normalizeDates);
+        return fillImageUrls(list);
     }
 
     private List<PhoneActiveInfo> fillImageUrls(List<PhoneActiveInfo> list) {
@@ -601,6 +608,43 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
         String normalizedImagePath = normalizeImagePath(info.getImagePath());
         info.setImagePath(normalizedImagePath);
         info.setImageUrl(buildImageUrl(normalizedImagePath));
+    }
+
+    /**
+     * 统一日期格式为 yyyy-MM-dd，避免各品牌API返回的中文日期（如"2025年10月17日"）导致编码乱码
+     */
+    private void normalizeDates(PhoneActiveInfo info) {
+        if (info == null) {
+            return;
+        }
+        info.setActivateDate(normalizeDateStr(info.getActivateDate()));
+        info.setCoverage(normalizeDateStr(info.getCoverage()));
+    }
+
+    private String normalizeDateStr(String dateStr) {
+        if (dateStr == null || dateStr.trim().isEmpty()) {
+            return dateStr;
+        }
+        String s = dateStr.trim();
+        // 中文格式：2025年10月17日 → 2025-10-17
+        java.util.regex.Matcher cnMatcher = java.util.regex.Pattern.compile(
+                "(\\d{4})\\s*年\\s*(\\d{1,2})\\s*月\\s*(\\d{1,2})\\s*日").matcher(s);
+        if (cnMatcher.find()) {
+            return String.format("%04d-%02d-%02d",
+                    Integer.parseInt(cnMatcher.group(1)),
+                    Integer.parseInt(cnMatcher.group(2)),
+                    Integer.parseInt(cnMatcher.group(3)));
+        }
+        // 斜杠格式：2025/10/17 → 2025-10-17
+        java.util.regex.Matcher slashMatcher = java.util.regex.Pattern.compile(
+                "(\\d{4})\\s*/\\s*(\\d{1,2})\\s*/\\s*(\\d{1,2})").matcher(s);
+        if (slashMatcher.find()) {
+            return String.format("%04d-%02d-%02d",
+                    Integer.parseInt(slashMatcher.group(1)),
+                    Integer.parseInt(slashMatcher.group(2)),
+                    Integer.parseInt(slashMatcher.group(3)));
+        }
+        return s;
     }
 
     private String normalizeImagePath(String imagePath) {
