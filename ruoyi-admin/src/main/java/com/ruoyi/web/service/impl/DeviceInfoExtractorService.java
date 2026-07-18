@@ -75,6 +75,15 @@ public class DeviceInfoExtractorService {
     private static final Pattern IMEI_LOOSE = Pattern.compile("(?<![\\d])(\\d{15,17})(?![\\d])");
 
     /**
+     * 带分隔符的IMEI匹配：处理OCR将IMEI数字断开的情况
+     * 如 "8685 7307. 4291227"、"60097307429 1936"
+     * 匹配15~17位数字，数字之间允许单个空格/点/横杠/冒号/斜杠
+     */
+    private static final Pattern IMEI_SEPARATED = Pattern.compile(
+            "(?<![\\d])(\\d[\\s.\\-/:：]?){14,16}\\d(?![\\d])"
+    );
+
+    /**
      * IMEI数字修正映射：OCR常见的字符误识别
      * O→0, o→0, l→1, I→1, S→5, B→8, G→6, Z→2
      */
@@ -363,6 +372,24 @@ public class DeviceInfoExtractorService {
                 String num = normalizeImei(m.group(1));
                 if (num != null) {
                     addImeiCandidate(num, 0, strongCandidates, weakCandidates);
+                }
+            }
+
+            // 策略3.5：匹配带分隔符的IMEI（空格/点/横杠/冒号断开）
+            // 用于处理 vivo 等品牌 OCR 将 IMEI 数字断开的情况（如 "8685 7307. 4291227"）
+            if (strongCandidates.isEmpty() && weakCandidates.isEmpty()) {
+                for (String line : lines) {
+                    Matcher m2 = IMEI_SEPARATED.matcher(line);
+                    while (m2.find()) {
+                        String raw = m2.group();
+                        // 去掉可能的IMEI序号标签（如 "2:" "1:"），避免序号数字混入IMEI
+                        // 例如 ": 2: 60097307429 1936" 中 "2:" 是标签不是IMEI的一部分
+                        String cleaned = raw.replaceFirst("^[\\s.:：]*[12]\\s*[:：]\\s*", "");
+                        String num = normalizeImei(cleaned);
+                        if (num != null) {
+                            addImeiCandidate(num, 0, strongCandidates, weakCandidates);
+                        }
+                    }
                 }
             }
         }

@@ -25,8 +25,19 @@ public class ExternalApiService {
     private Boolean testFlag;
 
     public ApiResult fetchDataFromExternalApi(String type, String code) {
-        // 拼接请求地址：url + type + code（code可以是SN或IMEI）
-        String reqUrl = url + "key=" + key + "&type=" + type + "&sn=" + code;
+        return fetchDataFromExternalApi(type, code, false);
+    }
+
+    /**
+     * 查询06API
+     * @param type  手机品牌类型
+     * @param code  SN或IMEI
+     * @param isImei true=用IMEI参数名查询，false=用SN参数名查询
+     */
+    public ApiResult fetchDataFromExternalApi(String type, String code, boolean isImei) {
+        // 拼接请求地址：IMEI优先品牌（vivo/oppo）需要用 &imei= 参数
+        String paramName = isImei ? "&imei=" : "&sn=";
+        String reqUrl = url + "key=" + key + "&type=" + type + paramName + code;
         log.info("reqUrl: {}", reqUrl);
         String jsonString;
         if (testFlag) {
