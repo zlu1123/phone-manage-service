@@ -51,6 +51,8 @@ public interface PhoneActiveInfoMapper {
 
     List<Map<String, Object>> selectDeviceModelDistribution();
 
+    List<Map<String, Object>> selectSignatureModelDistribution();
+
     Map<String, Object> selectWarrantyStatus(@Param("currentDate") String currentDate);
 
     List<PhoneActiveInfo> selectRecentOrders(@Param("createBy") String createBy, @Param("limit") int limit);

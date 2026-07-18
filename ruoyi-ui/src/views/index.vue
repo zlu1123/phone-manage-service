@@ -18,10 +18,10 @@
               </div>
             </div>
             <div class="balance-right">
-              <el-tag :type="balanceTagType" size="medium" effect="plain">
+              <span class="balance-status-tag" :class="balanceTagType">
                 <el-icon :size="14"><component :is="balanceTagIcon" /></el-icon>
-                {{ balanceStatusText }}
-              </el-tag>
+                <span>{{ balanceStatusText }}</span>
+              </span>
             </div>
           </div>
         </el-card>
@@ -120,7 +120,7 @@
 
       <!-- 图表区域 - 第一行 -->
       <el-row :gutter="16" class="chart-row">
-        <el-col :xs="24" :sm="24" :md="16" :lg="16">
+        <el-col :xs="24" :sm="24" :md="12" :lg="12">
           <el-card class="chart-card" shadow="hover">
             <template #header>
               <div class="chart-header">
@@ -140,14 +140,24 @@
             <div ref="orderTrendChartRef" class="chart-container" style="height: 320px"></div>
           </el-card>
         </el-col>
-        <el-col :xs="24" :sm="24" :md="8" :lg="8">
+        <el-col :xs="24" :sm="24" :md="6" :lg="6">
           <el-card class="chart-card" shadow="hover">
             <template #header>
               <div class="chart-header">
-                <span class="chart-title">设备型号分布</span>
+                <span class="chart-title">旧设备型号分布</span>
               </div>
             </template>
             <div ref="deviceModelChartRef" class="chart-container" style="height: 320px"></div>
+          </el-card>
+        </el-col>
+        <el-col :xs="24" :sm="24" :md="6" :lg="6">
+          <el-card class="chart-card" shadow="hover">
+            <template #header>
+              <div class="chart-header">
+                <span class="chart-title">已签约手机型号分布</span>
+              </div>
+            </template>
+            <div ref="signatureModelChartRef" class="chart-container" style="height: 320px"></div>
           </el-card>
         </el-col>
       </el-row>
@@ -158,7 +168,7 @@
           <el-card class="chart-card" shadow="hover">
             <template #header>
               <div class="chart-header">
-                <span class="chart-title">保修状态统计</span>
+                <span class="chart-title">旧手机保修状态</span>
               </div>
             </template>
             <div ref="warrantyChartRef" class="chart-container" style="height: 300px"></div>
@@ -183,7 +193,7 @@
             <template #header>
               <div class="chart-header">
                 <span class="chart-title">最近订单</span>
-                <el-button size="mini" type="text" :icon="DArrowRight" @click="router.push('/order/list')"
+                <el-button size="mini" type="text" :icon="DArrowRight" @click="router.push('/info/list')"
                   >查看更多</el-button
                 >
               </div>
@@ -194,22 +204,24 @@
               size="medium"
               :header-cell-style="{ background: '#fafafa' }"
             >
-              <el-table-column prop="sn" label="序列号" min-width="140" />
-              <el-table-column prop="model" label="设备型号" min-width="140" />
-              <el-table-column prop="activated" label="激活状态" min-width="100" align="center">
+              <el-table-column prop="signatureModel" label="签约型号" min-width="140" />
+              <el-table-column prop="signatureImei" label="签约IMEI" min-width="160" />
+              <el-table-column prop="createBy" label="创建人" min-width="90" align="center" />
+              <el-table-column label="签约日期" min-width="120" align="center">
                 <template #default="scope">
-                  <el-tag :type="scope.row.activated ? 'success' : 'info'" size="small">
-                    {{ scope.row.activated ? '已激活' : '未激活' }}
-                  </el-tag>
+                  {{ scope.row.signatureDate || '-' }}
                 </template>
               </el-table-column>
-              <el-table-column prop="createBy" label="创建人" min-width="100" align="center" />
-              <el-table-column label="业务日期" min-width="120" align="center">
+              <el-table-column label="剩余保修" min-width="130" align="center">
                 <template #default="scope">
-                  {{ formatBusinessDate(scope.row) }}
+                  <template v-if="scope.row.signatureDate">
+                    <el-tag :type="getWarrantyTagType(scope.row)" size="small">
+                      {{ getRemainingWarranty(scope.row) }}
+                    </el-tag>
+                  </template>
+                  <span v-else style="color: #909399">-</span>
                 </template>
               </el-table-column>
-              <el-table-column prop="createTime" label="创建时间" min-width="160" align="center" />
             </el-table>
           </el-card>
         </el-col>
@@ -343,7 +355,7 @@
               </div>
             </template>
             <div class="shortcut-grid">
-              <div class="shortcut-item" @click="router.push('/order/list')">
+              <div class="shortcut-item" @click="router.push('/info/list')">
                 <div class="shortcut-icon" style="background: linear-gradient(135deg, #409eff, #66b1ff)">
                   <el-icon :size="22" color="#fff"><Tickets /></el-icon>
                 </div>
@@ -373,7 +385,7 @@
             <template #header>
               <div class="chart-header">
                 <span class="chart-title">我的最近订单</span>
-                <el-button size="mini" type="text" :icon="DArrowRight" @click="router.push('/order/list')"
+                <el-button size="mini" type="text" :icon="DArrowRight" @click="router.push('/info/list')"
                   >查看更多</el-button
                 >
               </div>
@@ -384,21 +396,23 @@
               size="medium"
               :header-cell-style="{ background: '#fafafa' }"
             >
-              <el-table-column prop="sn" label="序列号" min-width="140" />
-              <el-table-column prop="model" label="设备型号" min-width="140" />
-              <el-table-column prop="activated" label="激活状态" min-width="100" align="center">
+              <el-table-column prop="signatureModel" label="签约型号" min-width="140" />
+              <el-table-column prop="signatureImei" label="签约IMEI" min-width="160" />
+              <el-table-column label="签约日期" min-width="120" align="center">
                 <template #default="scope">
-                  <el-tag :type="scope.row.activated ? 'success' : 'info'" size="small">
-                    {{ scope.row.activated ? '已激活' : '未激活' }}
-                  </el-tag>
+                  {{ scope.row.signatureDate || '-' }}
                 </template>
               </el-table-column>
-              <el-table-column label="业务日期" min-width="120" align="center">
+              <el-table-column label="剩余保修" min-width="130" align="center">
                 <template #default="scope">
-                  {{ formatBusinessDate(scope.row) }}
+                  <template v-if="scope.row.signatureDate">
+                    <el-tag :type="getWarrantyTagType(scope.row)" size="small">
+                      {{ getRemainingWarranty(scope.row) }}
+                    </el-tag>
+                  </template>
+                  <span v-else style="color: #909399">-</span>
                 </template>
               </el-table-column>
-              <el-table-column prop="createTime" label="创建时间" min-width="160" align="center" />
             </el-table>
           </el-card>
         </el-col>
@@ -431,6 +445,7 @@ import {
   getStatistics,
   getOrderTrend,
   getDeviceModelDistribution,
+  getSignatureModelDistribution,
   getMonthlyOrderStats,
   getWarrantyStatus,
   getRecentOrders,
@@ -473,12 +488,14 @@ const recentOrders = ref([]);
 // 管理员图表实例
 const orderTrendChart = ref(null);
 const deviceModelChart = ref(null);
+const signatureModelChart = ref(null);
 const warrantyChart = ref(null);
 const monthlyChart = ref(null);
 
 // 管理员图表 ref 引用
 const orderTrendChartRef = ref(null);
 const deviceModelChartRef = ref(null);
+const signatureModelChartRef = ref(null);
 const warrantyChartRef = ref(null);
 const monthlyChartRef = ref(null);
 
@@ -617,6 +634,7 @@ async function initAdminData() {
   nextTick(() => {
     initOrderTrendChart();
     initDeviceModelChart();
+    initSignatureModelChart();
     initWarrantyChart();
     initMonthlyChart();
   });
@@ -780,6 +798,55 @@ async function initDeviceModelChart() {
     });
   } catch (e) {
     console.error('初始化设备型号图失败：', e);
+  }
+}
+
+/** 初始化已签约手机型号分布饼图 */
+async function initSignatureModelChart() {
+  try {
+    const res = await getSignatureModelDistribution();
+    signatureModelChart.value = echarts.init(signatureModelChartRef.value, 'macarons');
+    signatureModelChart.value.setOption({
+      tooltip: {
+        trigger: 'item',
+        formatter: '{a} <br/>{b} : {c} ({d}%)',
+      },
+      legend: {
+        orient: 'horizontal',
+        bottom: 10,
+        data: res.data.map((item) => item.name),
+      },
+      series: [
+        {
+          name: '签约型号',
+          type: 'pie',
+          radius: ['35%', '60%'],
+          center: ['50%', '42%'],
+          avoidLabelOverlap: true,
+          itemStyle: {
+            borderRadius: 6,
+            borderColor: '#fff',
+            borderWidth: 2,
+          },
+          label: {
+            show: true,
+            formatter: '{b}\n{d}%',
+          },
+          emphasis: {
+            label: {
+              show: true,
+              fontSize: 14,
+              fontWeight: 'bold',
+            },
+          },
+          data: res.data,
+          animationEasing: 'cubicInOut',
+          animationDuration: 2000,
+        },
+      ],
+    });
+  } catch (e) {
+    console.error('初始化已签约手机型号分布图失败：', e);
   }
 }
 
@@ -1029,6 +1096,53 @@ function formatBusinessDate(row) {
   return '-';
 }
 
+/** 保修期（年） */
+const WARRANTY_YEARS = 2;
+
+/** 计算剩余保修天数（从签约日期起保2年） */
+function getRemainingWarranty(row) {
+  if (!row || !row.signatureDate) return '-';
+  const signDate = new Date(row.signatureDate);
+  if (isNaN(signDate.getTime())) return '-';
+  const expireDate = new Date(signDate);
+  expireDate.setFullYear(expireDate.getFullYear() + WARRANTY_YEARS);
+  const now = new Date();
+  const diffMs = expireDate.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  if (diffDays <= 0) {
+    return '已过期' + Math.abs(diffDays) + '天';
+  }
+  if (diffDays <= 30) {
+    return '仅剩' + diffDays + '天';
+  }
+  const diffMonths = Math.floor(diffDays / 30);
+  if (diffMonths < 12) {
+    return '约' + diffMonths + '个月';
+  }
+  const years = Math.floor(diffMonths / 12);
+  const remainMonths = diffMonths % 12;
+  if (remainMonths > 0) {
+    return '约' + years + '年' + remainMonths + '个月';
+  }
+  return '约' + years + '年';
+}
+
+/** 根据剩余保修天数返回标签类型 */
+function getWarrantyTagType(row) {
+  if (!row || !row.signatureDate) return 'info';
+  const signDate = new Date(row.signatureDate);
+  if (isNaN(signDate.getTime())) return 'info';
+  const expireDate = new Date(signDate);
+  expireDate.setFullYear(expireDate.getFullYear() + WARRANTY_YEARS);
+  const now = new Date();
+  const diffMs = expireDate.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  if (diffDays <= 0) return 'danger';
+  if (diffDays <= 30) return 'warning';
+  if (diffDays <= 180) return '';
+  return 'success';
+}
+
 /** 监听窗口 resize */
 function initListener() {
   $_resizeHandler = debounce(() => {
@@ -1061,6 +1175,7 @@ function handleSidebarResize(e) {
 function resizeAllCharts() {
   orderTrendChart.value?.resize();
   deviceModelChart.value?.resize();
+  signatureModelChart.value?.resize();
   warrantyChart.value?.resize();
   monthlyChart.value?.resize();
   userOrderTrendChart.value?.resize();
@@ -1071,6 +1186,7 @@ function disposeAllCharts() {
   const charts = [
     orderTrendChart.value,
     deviceModelChart.value,
+    signatureModelChart.value,
     warrantyChart.value,
     monthlyChart.value,
     userOrderTrendChart.value,
@@ -1080,6 +1196,7 @@ function disposeAllCharts() {
   });
   orderTrendChart.value = null;
   deviceModelChart.value = null;
+  signatureModelChart.value = null;
   warrantyChart.value = null;
   monthlyChart.value = null;
   userOrderTrendChart.value = null;
@@ -1245,6 +1362,41 @@ function disposeAllCharts() {
   .balance-right {
     flex-shrink: 0;
     margin-left: 16px;
+  }
+
+  .balance-status-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    border: 1px solid;
+
+    &.success {
+      color: #67c23a;
+      background: #f0f9eb;
+      border-color: #c2e7b0;
+    }
+
+    &.warning {
+      color: #e6a23c;
+      background: #fdf6ec;
+      border-color: #f5dab1;
+    }
+
+    &.danger {
+      color: #f56c6c;
+      background: #fef0f0;
+      border-color: #fbc4c4;
+    }
+
+    &.info {
+      color: #909399;
+      background: #f4f4f5;
+      border-color: #d3d4d6;
+    }
   }
 
   /* 统计卡片 */

@@ -305,6 +305,21 @@
         LIMIT 10
     </select>
 
+    <!-- 已签约手机型号分布：统计签约表 signature_model -->
+    <select id="selectSignatureModelDistribution" resultType="java.util.HashMap">
+        SELECT
+            CASE
+                WHEN poc.signature_model IS NULL OR TRIM(poc.signature_model) = '' THEN '未知型号'
+                ELSE poc.signature_model
+            END AS name,
+            COUNT(*) AS value
+        FROM phone_order_contract poc
+        WHERE poc.signature_date IS NOT NULL AND poc.signature_date != ''
+        GROUP BY name
+        ORDER BY value DESC, name ASC
+        LIMIT 10
+    </select>
+
     <!-- 保修状态统计：需 JOIN 详情表 -->
     <select id="selectWarrantyStatus" resultType="java.util.HashMap">
         SELECT
@@ -357,11 +372,12 @@
         LEFT JOIN phone_active_detail pad ON pai.id = pad.order_id
         LEFT JOIN phone_order_contract poc ON pai.id = poc.order_id
         <where>
+            poc.signature_date IS NOT NULL AND poc.signature_date != ''
             <if test="createBy != null and createBy != ''">
                 AND pai.create_by = #{createBy}
             </if>
         </where>
-        ORDER BY pai.create_time DESC
+        ORDER BY poc.signature_date ASC
         LIMIT #{limit}
     </select>
 

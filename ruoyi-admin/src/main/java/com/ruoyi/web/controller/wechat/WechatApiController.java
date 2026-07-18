@@ -290,6 +290,11 @@ public class WechatApiController extends BaseController {
         log.info("开始签约，orderId={}, contractId={}, signatureModel={}, signatureImei={}, signatureDate={}",
                 id, contractId, signatureModel, signatureImei, signatureDate);
 
+        // 签约日期为必填项
+        if (signatureDate == null || signatureDate.trim().isEmpty()) {
+            return R.fail("签约日期不能为空");
+        }
+
         // 处理手写签名图片
         String resolvedSignaturePath = null;
         try {

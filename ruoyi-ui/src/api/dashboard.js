@@ -30,6 +30,14 @@ export function getDeviceModelDistribution() {
   })
 }
 
+// 获取已签约手机型号分布数据
+export function getSignatureModelDistribution() {
+  return request({
+    url: '/system/order/dashboard/signatureModelDistribution',
+    method: 'get'
+  })
+}
+
 // 获取月度订单统计数据（近6个月）
 export function getMonthlyOrderStats() {
   return request({

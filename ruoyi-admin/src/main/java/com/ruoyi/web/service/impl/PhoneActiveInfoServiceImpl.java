@@ -146,6 +146,15 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
                         info.setId(exist.getId());
                         info.setUpdateBy(operName);
                         phoneActiveInfoMapper.updateById(info);
+
+                        // 同步更新签约表
+                        PhoneOrderContract contract = new PhoneOrderContract();
+                        contract.setOrderId(exist.getId());
+                        contract.setSignatureModel(info.getSignatureModel());
+                        contract.setSignatureImei(info.getSignatureImei());
+                        contract.setSignatureDate(info.getSignatureDate());
+                        saveOrUpdateContract(contract);
+
                         updateCount++;
                     } else {
                         failCount++;
@@ -285,6 +294,11 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
             if (info.getOldPhoneStatus() != 0 && info.getOldPhoneStatus() != 1) {
                 return prefix + "旧手机状态值无效，必须为 0 或 1";
             }
+        }
+
+        // 签约日期必填
+        if (info.getSignatureDate() == null || info.getSignatureDate().trim().isEmpty()) {
+            return prefix + "签约日期不能为空";
         }
 
         return null;
@@ -509,6 +523,12 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
     @Override
     public List<Map<String, Object>> getDeviceModelDistribution() {
         List<Map<String, Object>> result = phoneActiveInfoMapper.selectDeviceModelDistribution();
+        return result == null ? Collections.emptyList() : result;
+    }
+
+    @Override
+    public List<Map<String, Object>> getSignatureModelDistribution() {
+        List<Map<String, Object>> result = phoneActiveInfoMapper.selectSignatureModelDistribution();
         return result == null ? Collections.emptyList() : result;
     }
 

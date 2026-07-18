@@ -49,6 +49,8 @@ public interface IPhoneActiveInfoService {
 
     List<Map<String, Object>> getDeviceModelDistribution();
 
+    List<Map<String, Object>> getSignatureModelDistribution();
+
     Map<String, Object> getMonthlyOrderStats(String currentDate);
 
     List<Map<String, Object>> getWarrantyStatus(String currentDate);

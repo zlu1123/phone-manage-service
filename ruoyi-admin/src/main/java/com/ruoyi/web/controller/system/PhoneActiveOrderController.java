@@ -79,6 +79,12 @@ public class PhoneActiveOrderController extends BaseController {
         return R.ok(phoneActiveInfoService.getDeviceModelDistribution());
     }
 
+    @ApiOperation("首页已签约手机型号分布-管理员")
+    @GetMapping("/dashboard/signatureModelDistribution")
+    public R getSignatureModelDistribution() {
+        return R.ok(phoneActiveInfoService.getSignatureModelDistribution());
+    }
+
     @ApiOperation("首页月度订单统计-管理员")
     @GetMapping("/dashboard/monthlyOrderStats")
     public R getMonthlyOrderStats() {

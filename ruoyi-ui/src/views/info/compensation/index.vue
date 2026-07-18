@@ -29,6 +29,7 @@
       <template #action="{ row }">
         <el-button
           v-if="Number(row.status) === 0"
+          v-hasRole="['admin', 'user']"
           size="small"
           type="primary"
           link
@@ -38,6 +39,7 @@
         >
         <el-button
           v-if="Number(row.status) === 1 && Number(row.amount) === 0"
+          v-hasRole="['admin', 'user']"
           size="small"
           type="warning"
           link
@@ -45,7 +47,7 @@
           @click="handleEditAmount(row)"
           >修改金额</el-button
         >
-        <el-button size="small" type="danger" link :icon="Delete" @click="handleDelete(row)">删除</el-button>
+        <el-button v-hasRole="['admin', 'user']" size="small" type="danger" link :icon="Delete" @click="handleDelete(row)">删除</el-button>
       </template>
     </pro-table>
 
@@ -58,11 +60,33 @@
       :close-on-click-modal="false"
     >
       <el-form ref="addFormRef" :model="addForm" :rules="addRules" label-width="100px" size="small">
-        <el-form-item label="订单ID" prop="orderId">
-          <el-input v-model.number="addForm.orderId" placeholder="请输入订单ID" clearable />
+        <el-form-item label="订单" prop="orderId">
+          <el-select
+            v-model="addForm.orderId"
+            filterable
+            remote
+            reserve-keyword
+            clearable
+            placeholder="请输入签约IMEI搜索订单"
+            :remote-method="searchOrders"
+            :loading="orderLoading"
+            style="width: 100%"
+            @visible-change="onOrderVisibleChange"
+            @change="onOrderSelect"
+          >
+            <el-option
+              v-for="item in orderOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
         </el-form-item>
-        <el-form-item label="留资人ID" prop="infoId">
-          <el-input v-model.number="addForm.infoId" placeholder="请输入留资人ID" clearable />
+        <el-form-item label="留资人">
+          <span v-if="addFormLeaveInfo" style="color: #303133">
+            {{ addFormLeaveInfo }}
+          </span>
+          <span v-else style="color: #909399">选择订单后自动填充</span>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -162,6 +186,8 @@ import { ref, reactive, nextTick } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Plus, Edit, Delete } from '@element-plus/icons-vue';
 import { getCompensationList, addCompensation, updateCompensation, deleteCompensation } from '@/api/order/compensation';
+import { queryOrderList } from '@/api/order/list';
+import { getLeaveInfoList } from '@/api/order/user';
 import { parseTime } from '@/utils/ruoyi';
 
 // 列表请求 API
@@ -182,12 +208,7 @@ const addForm = reactive({
 });
 const addRules = {
   orderId: [
-    { required: true, message: '请输入订单ID', trigger: 'blur' },
-    { type: 'number', message: '订单ID必须为数字', trigger: 'blur' },
-  ],
-  infoId: [
-    { required: true, message: '请输入留资人ID', trigger: 'blur' },
-    { type: 'number', message: '留资人ID必须为数字', trigger: 'blur' },
+    { required: true, message: '请选择订单', trigger: 'change' },
   ],
 };
 
@@ -286,10 +307,103 @@ const getStatusTagType = (status) => {
   return map[Number(status)] || 'info';
 };
 
+// 订单下拉选项
+const orderOptions = ref([]);
+const orderLoading = ref(false);
+
+// 留资人下拉选项（保留用于远程搜索，后续可移除）
+const leaveInfoOptions = ref([]);
+const leaveInfoLoading = ref(false);
+
+// 选中订单后自动填充的留资人显示文本
+const addFormLeaveInfo = ref('');
+
+/** 下拉展开时加载默认列表 */
+const onOrderVisibleChange = (visible) => {
+  if (visible && orderOptions.value.length === 0) {
+    searchOrders('');
+  }
+};
+
+/** 远程搜索订单列表 */
+const searchOrders = (query) => {
+  if (orderLoading.value) return;
+  orderLoading.value = true;
+  const params = { pageNum: 1, pageSize: 20 };
+  if (query) {
+    params.signatureImei = query;
+  }
+  queryOrderList(params)
+    .then((res) => {
+      const rows = res.data?.rows || res.rows || [];
+      orderOptions.value = rows.map((item) => ({
+        value: item.id,
+        label: `${item.signatureModel || '-'} / ${item.signatureImei || '-'}`,
+        infoId: item.infoId,
+      }));
+    })
+    .finally(() => {
+      orderLoading.value = false;
+    });
+};
+
+/** 选择订单后自动回填留资人 */
+const onOrderSelect = (orderId) => {
+  if (!orderId) {
+    addForm.infoId = undefined;
+    addFormLeaveInfo.value = '';
+    return;
+  }
+  const selected = orderOptions.value.find((item) => item.value === orderId);
+  if (selected && selected.infoId) {
+    addForm.infoId = selected.infoId;
+    // 通过留资人ID精确查询
+    getLeaveInfoList({ id: selected.infoId, pageNum: 1, pageSize: 1 })
+      .then((res) => {
+        const rows = res.data?.rows || res.rows || [];
+        if (rows.length > 0) {
+          const match = rows[0];
+          addFormLeaveInfo.value = `${match.name || '-'} / ${match.phoneNum || '-'}`;
+        } else {
+          addFormLeaveInfo.value = `ID: ${selected.infoId}`;
+        }
+      })
+      .catch(() => {
+        addFormLeaveInfo.value = `ID: ${selected.infoId}`;
+      });
+  } else {
+    addForm.infoId = undefined;
+    addFormLeaveInfo.value = '未关联留资人';
+  }
+};
+
+/** 远程搜索留资人列表 */
+const searchLeaveInfo = (query) => {
+  if (leaveInfoLoading.value) return;
+  leaveInfoLoading.value = true;
+  const params = { pageNum: 1, pageSize: 20 };
+  if (query) {
+    params.name = query;
+  }
+  getLeaveInfoList(params)
+    .then((res) => {
+      const rows = res.data?.rows || res.rows || [];
+      leaveInfoOptions.value = rows.map((item) => ({
+        value: item.id,
+        label: `${item.name || '-'} / ${item.phoneNum || '-'}`,
+      }));
+    })
+    .finally(() => {
+      leaveInfoLoading.value = false;
+    });
+};
+
 /** 重置新增表单 */
 const resetAddForm = () => {
   addForm.orderId = undefined;
   addForm.infoId = undefined;
+  addFormLeaveInfo.value = '';
+  orderOptions.value = [];
   nextTick(() => {
     addFormRef.value?.clearValidate();
   });
