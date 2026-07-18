@@ -325,6 +325,15 @@ const onOrderVisibleChange = (visible) => {
   }
 };
 
+/** 构建订单下拉选项标签：优先签约信息，为空则展示旧手机信息 */
+const buildOrderLabel = (item) => {
+  const hasSignInfo = item.signatureModel || item.signatureImei;
+  if (hasSignInfo) {
+    return `[签] ${item.signatureModel || '-'} / ${item.signatureImei || '-'}`;
+  }
+  return `[旧] ${item.sn || '-'} / ${item.model || '-'}`;
+};
+
 /** 远程搜索订单列表 */
 const searchOrders = (query) => {
   if (orderLoading.value) return;
@@ -338,7 +347,7 @@ const searchOrders = (query) => {
       const rows = res.data?.rows || res.rows || [];
       orderOptions.value = rows.map((item) => ({
         value: item.id,
-        label: `${item.signatureModel || '-'} / ${item.signatureImei || '-'}`,
+        label: buildOrderLabel(item),
         infoId: item.infoId,
       }));
     })

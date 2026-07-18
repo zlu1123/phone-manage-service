@@ -168,7 +168,7 @@ public class WechatApiController extends BaseController {
         if (effectiveImei != null) {
             // 优先用 IMEI 查询
             log.info("IMEI优先查询：使用IMEI={}, type={}", effectiveImei, type);
-            ExternalApiService.ApiResult apiResult = externalApiService.fetchDataFromExternalApi(type, effectiveImei, true);
+            ExternalApiService.ApiResult apiResult = externalApiService.fetchDataFromExternalApi(type, effectiveImei);
             if (apiResult.getSuccess()) {
                 return apiResult;
             }
@@ -196,7 +196,7 @@ public class WechatApiController extends BaseController {
         // 第二次：SN查询失败且有IMEI时，用IMEI重试
         if (!apiResult.getSuccess() && imei != null && !imei.trim().isEmpty()) {
             log.info("SN查询失败，兜底查询：使用IMEI={}, type={}", imei, type);
-            apiResult = externalApiService.fetchDataFromExternalApi(type, imei.trim(), true);
+            apiResult = externalApiService.fetchDataFromExternalApi(type, imei.trim());
         }
         return apiResult;
     }
