@@ -64,10 +64,10 @@
         <el-tag v-else type="success" size="small">旧手机识别</el-tag>
       </template>
 
-      <!-- 自定义列：渠道 -->
+      <!-- 自定义列：渠道（小于24个月为亚丁，大于等于24个月为自有） -->
       <template #channel="{ row }">
-        <el-tag :type="row.skipApiCall === 1 ? '' : 'warning'" size="small">
-          {{ row.skipApiCall === 1 ? '自有' : '亚丁' }}
+        <el-tag :type="(row.skipApiCall === 1 && row.oldPhoneUsageMonths === 24) ? '' : 'warning'" size="small">
+          {{ (row.skipApiCall === 1 && row.oldPhoneUsageMonths === 24) ? '自有' : '亚丁' }}
         </el-tag>
       </template>
 
@@ -669,7 +669,7 @@ const exportColumns = [
   },
   {
     label: '渠道',
-    formatter: (row) => (row.skipApiCall === 1 ? '自有' : '亚丁'),
+    formatter: (row) => (row.skipApiCall === 1 && row.oldPhoneUsageMonths === 24 ? '自有' : '亚丁'),
     width: 8,
   },
   {
