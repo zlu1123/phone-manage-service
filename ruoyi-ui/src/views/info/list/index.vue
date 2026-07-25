@@ -380,9 +380,26 @@ const mapOrderSource = (params) => {
   return mapped;
 };
 
-/** 列表查询：映射 orderSource 后调 queryOrderList */
+/** 列表查询：映射 orderSource 后调 queryOrderList，并为 skipApiCall=1 的行预加载详情以获取 oldPhoneUsageMonths */
 const fetchOrderList = (params) => {
-  return queryOrderList(mapOrderSource(params));
+  return queryOrderList(mapOrderSource(params)).then((res) => {
+    const rows = res.rows || [];
+    // 为自有渠道（skipApiCall=1）的行预加载详情，获取 oldPhoneUsageMonths 用于渠道列判断
+    const detailPromises = rows
+      .filter((row) => row.skipApiCall === 1)
+      .map((row) =>
+        getOrderDetail(row.id)
+          .then((detailRes) => {
+            const detail = (detailRes && detailRes.data) || detailRes || {};
+            Object.assign(row, detail);
+            detailLoadedMap[row.id] = true; // 标记已加载，避免展开时重复请求
+          })
+          .catch((err) => {
+            console.error('预加载订单详情失败：', err);
+          })
+      );
+    return Promise.all(detailPromises).then(() => res);
+  });
 };
 
 // 表格列配置
