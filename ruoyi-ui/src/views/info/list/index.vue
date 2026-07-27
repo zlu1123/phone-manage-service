@@ -64,10 +64,10 @@
         <el-tag v-else type="success" size="small">旧手机识别</el-tag>
       </template>
 
-      <!-- 自定义列：渠道（小于24个月为亚丁，大于等于24个月为自有） -->
+      <!-- 自定义列：渠道（参考小程序：在保→亚丁，过保→自有；无旧手机→自有；≤24月→亚丁，>24月→自有） -->
       <template #channel="{ row }">
-        <el-tag :type="(row.skipApiCall === 1 && row.oldPhoneUsageMonths === 24) ? '' : 'warning'" size="small">
-          {{ (row.skipApiCall === 1 && row.oldPhoneUsageMonths === 24) ? '自有' : '亚丁' }}
+        <el-tag :type="getChannel(row) === '自有' ? '' : 'warning'" size="small">
+          {{ getChannel(row) }}
         </el-tag>
       </template>
 
@@ -380,26 +380,29 @@ const mapOrderSource = (params) => {
   return mapped;
 };
 
-/** 列表查询：映射 orderSource 后调 queryOrderList，并为 skipApiCall=1 的行预加载详情以获取 oldPhoneUsageMonths */
+/**
+ * 判断渠道：参考 phone-little-app 小程序逻辑
+ *   skipApiCall=0（OCR识别）：coverage > sysTime（在保）→ 亚丁，否则 → 自有
+ *   skipApiCall=1 + oldPhoneStatus=0（无旧手机）→ 自有
+ *   skipApiCall=1 + oldPhoneStatus=1（丢失/损坏）：
+ *     oldPhoneUsageMonths=0（≤24个月）→ 亚丁，否则 → 自有
+ */
+const getChannel = (row) => {
+  if (row.skipApiCall === 0) {
+    // OCR 路径：根据保修到期时间 vs 查询时系统时间判断
+    const coverage = (row.coverage || '').substring(0, 10);
+    const sysTime = (row.sysTime || '').substring(0, 10);
+    if (!coverage || !sysTime) return '自有'; // 无保期数据视为已过保
+    return coverage > sysTime ? '亚丁' : '自有';
+  }
+  // skipApiCall === 1
+  if (row.oldPhoneStatus === 0) return '自有';       // 无旧手机
+  return row.oldPhoneUsageMonths === 0 ? '亚丁' : '自有'; // 丢失/损坏：≤24月 → 亚丁
+};
+
+/** 列表查询：映射 orderSource 后调 queryOrderList，渠道字段已由后端列表 SQL 直接返回 */
 const fetchOrderList = (params) => {
-  return queryOrderList(mapOrderSource(params)).then((res) => {
-    const rows = res.rows || [];
-    // 为自有渠道（skipApiCall=1）的行预加载详情，获取 oldPhoneUsageMonths 用于渠道列判断
-    const detailPromises = rows
-      .filter((row) => row.skipApiCall === 1)
-      .map((row) =>
-        getOrderDetail(row.id)
-          .then((detailRes) => {
-            const detail = (detailRes && detailRes.data) || detailRes || {};
-            Object.assign(row, detail);
-            detailLoadedMap[row.id] = true; // 标记已加载，避免展开时重复请求
-          })
-          .catch((err) => {
-            console.error('预加载订单详情失败：', err);
-          })
-      );
-    return Promise.all(detailPromises).then(() => res);
-  });
+  return queryOrderList(mapOrderSource(params));
 };
 
 // 表格列配置
@@ -686,7 +689,7 @@ const exportColumns = [
   },
   {
     label: '渠道',
-    formatter: (row) => (row.skipApiCall === 1 && row.oldPhoneUsageMonths === 24 ? '自有' : '亚丁'),
+    formatter: (row) => getChannel(row),
     width: 8,
   },
   {

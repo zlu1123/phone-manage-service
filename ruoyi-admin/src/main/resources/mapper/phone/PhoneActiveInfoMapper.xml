@@ -115,12 +115,13 @@
         DELETE FROM phone_active_info WHERE sn = #{sn}
     </delete>
 
-    <!-- 列表查询（轻量）：JOIN 留资 + 部门 + 签约表（不含大字段），不 JOIN 详情表，不返回旧手机信息 -->
+    <!-- 列表查询：JOIN 留资 + 部门 + 签约 + 详情表（含渠道判断所需字段） -->
     <select id="selectListByExample" resultMap="BaseResultMap" parameterType="com.ruoyi.web.domain.PhoneActiveInfo">
         SELECT
             pai.id, pai.info_id, pai.store_id,
-            pai.skip_api_call, pai.old_phone_status,
+            pai.skip_api_call, pai.old_phone_status, pai.old_phone_usage_months,
             pai.create_time, pai.create_by, pai.nick_name, pai.update_time, pai.update_by,
+            pad.coverage, pad.sys_time,
             poc.contract_id, poc.signature_model, poc.signature_imei,
             poc.signature_date, poc.signature_path,
             CASE WHEN poc.signature_imei IS NOT NULL THEN 1 ELSE 0 END AS is_signature,
@@ -128,6 +129,7 @@
         FROM phone_active_info pai
         LEFT JOIN leave_information li ON pai.info_id = li.id
         LEFT JOIN sys_dept sd ON pai.store_id = sd.dept_id
+        LEFT JOIN phone_active_detail pad ON pai.id = pad.order_id
         LEFT JOIN phone_order_contract poc ON pai.id = poc.order_id
         <where>
             <if test="id != null"> AND pai.id = #{id}</if>
