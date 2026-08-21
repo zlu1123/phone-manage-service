@@ -103,4 +103,12 @@ public interface LeaveInformationMapper {
      * @return 存在数量
      */
     int checkPhoneNumExists(@Param("phoneNum") String phoneNum);
+
+    /**
+     * 根据电话号码精确查询留资信息
+     *
+     * @param phoneNum 电话号码
+     * @return 留资信息
+     */
+    LeaveInformation selectByPhoneNum(@Param("phoneNum") String phoneNum);
 }

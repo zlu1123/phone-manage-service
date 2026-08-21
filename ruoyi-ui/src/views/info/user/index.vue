@@ -14,6 +14,28 @@
             >新增</el-button
           >
         </el-col>
+        <el-col :span="1.5">
+          <el-button
+            type="info"
+            plain
+            :icon="Upload"
+            size="small"
+            @click="handleImport"
+            v-hasRole="['admin', 'user']"
+            >导入</el-button
+          >
+        </el-col>
+        <el-col :span="1.5">
+          <el-button
+            type="warning"
+            plain
+            :icon="Download"
+            size="small"
+            @click="handleExport"
+            v-hasRole="['admin', 'user']"
+            >导出</el-button
+          >
+        </el-col>
       </template>
 
       <!-- 创建时间列 -->
@@ -61,19 +83,34 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 留资用户导入对话框 -->
+    <excel-import-dialog
+      ref="importUserRef"
+      title="留资用户导入"
+      action="/system/leaveInfo/importData"
+      template-action="/system/leaveInfo/importTemplate"
+      template-file-name="leave_user_template"
+      update-support-label="是否更新已经存在的留资用户"
+      @success="handleImportSuccess"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, nextTick } from 'vue';
+import { ref, reactive, nextTick, getCurrentInstance } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Plus, Edit, Delete } from '@element-plus/icons-vue';
+import { Plus, Edit, Delete, Upload, Download } from '@element-plus/icons-vue';
+import ExcelImportDialog from '@/components/ExcelImportDialog';
 import { getLeaveInfoList, addLeaveInfo, updateLeaveInfo, deleteLeaveInfo } from '@/api/order/user';
+
+const { proxy } = getCurrentInstance();
 
 // 对话框相关
 const dialogVisible = ref(false);
 const dialogTitle = ref('');
 const submitLoading = ref(false);
+const importUserRef = ref(null);
 
 // 表单数据
 const form = reactive({
@@ -188,5 +225,26 @@ const handleDelete = (row) => {
       proTableRef.value.refresh();
     })
     .catch(() => {});
+};
+
+/** 导入按钮操作 */
+const handleImport = () => {
+  importUserRef.value?.open();
+};
+
+/** 导入成功后刷新列表 */
+const handleImportSuccess = () => {
+  proTableRef.value.refresh();
+};
+
+/** 导出按钮操作 */
+const handleExport = () => {
+  proxy.download(
+    'system/leaveInfo/export',
+    {
+      ...proTableRef.value?.getQueryParams(),
+    },
+    `leave_user_${new Date().getTime()}.xlsx`,
+  );
 };
 </script>

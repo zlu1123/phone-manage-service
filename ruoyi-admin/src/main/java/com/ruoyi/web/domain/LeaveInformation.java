@@ -1,5 +1,6 @@
 package com.ruoyi.web.domain;
 
+import com.ruoyi.common.annotation.Excel;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -22,16 +23,19 @@ public class LeaveInformation {
     /**
      * 姓名
      */
+    @Excel(name = "姓名", required = true)
     private String name;
 
     /**
      * 电话号码
      */
+    @Excel(name = "电话", required = true)
     private String phoneNum;
 
     /**
-     * 创建时间
+     * 创建时间（仅导出，导入时由后端生成，不允许从Excel填写）
      */
+    @Excel(name = "创建时间", type = Excel.Type.EXPORT, width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
     private Date createTime;
 
     /**

@@ -388,7 +388,8 @@ public class ExcelUtil<T>
                 if (StringUtils.isNotNull(cell))
                 {
                     String value = this.getCellValue(heard, i).toString();
-                    cellMap.put(value, i);
+                    // 模板中必填列表头带有（必填）后缀，该后缀仅用于展示，匹配字段时需去掉
+                    cellMap.put(StringUtils.removeEnd(value, "（必填）"), i);
                 }
             }
             // 有数据时才处理 得到类的所有field.
@@ -402,6 +403,11 @@ public class ExcelUtil<T>
                 {
                     fieldsMap.put(column, objects);
                 }
+            }
+            // 表头与模板完全匹配不上时直接报错，避免每行都以空数据导入
+            if (fieldsMap.isEmpty())
+            {
+                throw new UtilException("Excel表头与导入模板不一致，请使用系统下载的模板填写");
             }
             for (int i = titleNum + 1; i <= rows; i++)
             {

@@ -30,6 +30,37 @@
 
     <!-- ==================== 管理员视图 ==================== -->
     <template v-if="isAdmin">
+      <!-- 筛选行：门店维度 + 趋势周期，作用于下方所有统计 -->
+      <el-card class="filter-card" shadow="never">
+        <div class="filter-row">
+          <span class="filter-label">
+            <el-icon style="vertical-align: -2px"><Shop /></el-icon>
+            所属门店
+          </span>
+          <el-select
+            v-model="selectedStoreId"
+            placeholder="全部门店"
+            clearable
+            size="small"
+            style="width: 220px"
+            @change="handleStoreChange"
+          >
+            <el-option v-for="store in storeList" :key="store.deptId" :label="store.storeName" :value="store.deptId" />
+          </el-select>
+          <span class="filter-divider"></span>
+          <span class="filter-label">趋势周期</span>
+          <el-button-group>
+            <el-button size="small" :type="trendType === 'week' ? 'primary' : ''" @click="trendType = 'week'"
+              >近7天</el-button
+            >
+            <el-button size="small" :type="trendType === 'month' ? 'primary' : ''" @click="trendType = 'month'"
+              >近30天</el-button
+            >
+          </el-button-group>
+          <span class="filter-count">共 {{ storeComparison.length }} 家门店</span>
+        </div>
+      </el-card>
+
       <!-- 顶部统计卡片 -->
       <el-row :gutter="16" class="stat-cards">
         <el-col :xs="12" :sm="12" :md="6" :lg="6">
@@ -41,13 +72,13 @@
                 <div class="stat-desc">
                   <span :class="['stat-trend', statistics.totalOrdersTrend]"
                     ><el-icon style="vertical-align: middle; font-size: 12px"
-                      ><component :is="statistics.totalOrdersTrend === 'down' ? 'ArrowDown' : 'ArrowUp'"
+                      ><component :is="statistics.totalOrdersTrend === 'down' ? ArrowDown : ArrowUp"
                     /></el-icon>
                     {{ statistics.totalOrdersGrowthLabel }}</span
                   >
                 </div>
               </div>
-              <div class="stat-icon" style="background: linear-gradient(135deg, #409eff, #66b1ff)">
+              <div class="stat-icon" style="background: linear-gradient(135deg, #2a78d6, #66b1ff)">
                 <el-icon :size="28" color="#fff"><Tickets /></el-icon>
               </div>
             </div>
@@ -62,35 +93,14 @@
                 <div class="stat-desc">
                   <span :class="['stat-trend', statistics.todayOrdersTrend]"
                     ><el-icon style="vertical-align: middle; font-size: 12px"
-                      ><component :is="statistics.todayOrdersTrend === 'down' ? 'ArrowDown' : 'ArrowUp'"
+                      ><component :is="statistics.todayOrdersTrend === 'down' ? ArrowDown : ArrowUp"
                     /></el-icon>
                     {{ statistics.todayOrdersGrowthLabel }}</span
                   >
                 </div>
               </div>
-              <div class="stat-icon" style="background: linear-gradient(135deg, #67c23a, #85ce61)">
+              <div class="stat-icon" style="background: linear-gradient(135deg, #008300, #52b32a)">
                 <el-icon :size="28" color="#fff"><DocumentAdd /></el-icon>
-              </div>
-            </div>
-          </el-card>
-        </el-col>
-        <el-col :xs="12" :sm="12" :md="6" :lg="6">
-          <el-card class="stat-card" shadow="hover">
-            <div class="stat-card-body">
-              <div class="stat-info">
-                <div class="stat-label">已激活设备</div>
-                <div class="stat-value">{{ statistics.activatedDevices }}</div>
-                <div class="stat-desc">
-                  <span :class="['stat-trend', statistics.activationRateTrend]"
-                    ><el-icon style="vertical-align: middle; font-size: 12px"
-                      ><component :is="statistics.activationRateTrend === 'down' ? 'ArrowDown' : 'ArrowUp'"
-                    /></el-icon>
-                    {{ statistics.activationRateLabel }}</span
-                  >
-                </div>
-              </div>
-              <div class="stat-icon" style="background: linear-gradient(135deg, #e6a23c, #ebb563)">
-                <el-icon :size="28" color="#fff"><Cellphone /></el-icon>
               </div>
             </div>
           </el-card>
@@ -104,81 +114,88 @@
                 <div class="stat-desc">
                   <span :class="['stat-trend', statistics.signedRateTrend]"
                     ><el-icon style="vertical-align: middle; font-size: 12px"
-                      ><component :is="statistics.signedRateTrend === 'down' ? 'ArrowDown' : 'ArrowUp'"
+                      ><component :is="statistics.signedRateTrend === 'down' ? ArrowDown : ArrowUp"
                     /></el-icon>
                     {{ statistics.signedRateLabel }}</span
                   >
                 </div>
               </div>
-              <div class="stat-icon" style="background: linear-gradient(135deg, #f56c6c, #f78989)">
+              <div class="stat-icon" style="background: linear-gradient(135deg, #e34948, #f78989)">
                 <el-icon :size="28" color="#fff"><EditPen /></el-icon>
+              </div>
+            </div>
+          </el-card>
+        </el-col>
+        <el-col :xs="12" :sm="12" :md="6" :lg="6">
+          <el-card class="stat-card" shadow="hover">
+            <div class="stat-card-body">
+              <div class="stat-info">
+                <div class="stat-label">已激活设备</div>
+                <div class="stat-value">{{ statistics.activatedDevices }}</div>
+                <div class="stat-desc">
+                  <span :class="['stat-trend', statistics.activationRateTrend]"
+                    ><el-icon style="vertical-align: middle; font-size: 12px"
+                      ><component :is="statistics.activationRateTrend === 'down' ? ArrowDown : ArrowUp"
+                    /></el-icon>
+                    {{ statistics.activationRateLabel }}</span
+                  >
+                </div>
+              </div>
+              <div class="stat-icon" style="background: linear-gradient(135deg, #e6a23c, #ebb563)">
+                <el-icon :size="28" color="#fff"><Cellphone /></el-icon>
               </div>
             </div>
           </el-card>
         </el-col>
       </el-row>
 
-      <!-- 图表区域 - 第一行 -->
+      <!-- 图表区域 - 第一行：订单趋势 + 门店订单对比 -->
       <el-row :gutter="16" class="chart-row">
-        <el-col :xs="24" :sm="24" :md="12" :lg="12">
+        <el-col :xs="24" :sm="24" :md="14" :lg="14">
           <el-card class="chart-card" shadow="hover">
             <template #header>
               <div class="chart-header">
                 <span class="chart-title">
                   {{ trendType === 'week' ? '订单趋势（近7天）' : '订单趋势（近30天）' }}
+                  <span v-if="selectedStoreName" class="chart-scope">· {{ selectedStoreName }}</span>
                 </span>
-                <el-button-group>
-                  <el-button size="mini" :type="trendType === 'week' ? 'primary' : ''" @click="trendType = 'week'"
-                    >近7天</el-button
-                  >
-                  <el-button size="mini" :type="trendType === 'month' ? 'primary' : ''" @click="trendType = 'month'"
-                    >近30天</el-button
-                  >
-                </el-button-group>
               </div>
             </template>
-            <div ref="orderTrendChartRef" class="chart-container" style="height: 320px"></div>
+            <div ref="orderTrendChartRef" class="chart-container" style="height: 300px"></div>
           </el-card>
         </el-col>
-        <el-col :xs="24" :sm="24" :md="6" :lg="6">
+        <el-col :xs="24" :sm="24" :md="10" :lg="10">
           <el-card class="chart-card" shadow="hover">
             <template #header>
               <div class="chart-header">
-                <span class="chart-title">旧设备型号分布</span>
+                <span class="chart-title">门店订单对比（TOP10）</span>
               </div>
             </template>
-            <div ref="deviceModelChartRef" class="chart-container" style="height: 320px"></div>
-          </el-card>
-        </el-col>
-        <el-col :xs="24" :sm="24" :md="6" :lg="6">
-          <el-card class="chart-card" shadow="hover">
-            <template #header>
-              <div class="chart-header">
-                <span class="chart-title">已签约手机型号分布</span>
-              </div>
-            </template>
-            <div ref="signatureModelChartRef" class="chart-container" style="height: 320px"></div>
+            <div ref="storeCompareChartRef" class="chart-container" style="height: 300px"></div>
           </el-card>
         </el-col>
       </el-row>
 
-      <!-- 图表区域 - 第二行 -->
+      <!-- 图表区域 - 第二行：门店签约构成 + 月度订单统计 -->
       <el-row :gutter="16" class="chart-row">
-        <el-col :xs="24" :sm="24" :md="8" :lg="8">
+        <el-col :xs="24" :sm="24" :md="10" :lg="10">
           <el-card class="chart-card" shadow="hover">
             <template #header>
               <div class="chart-header">
-                <span class="chart-title">旧手机保修状态</span>
+                <span class="chart-title">门店签约构成（TOP8）</span>
               </div>
             </template>
-            <div ref="warrantyChartRef" class="chart-container" style="height: 300px"></div>
+            <div ref="storeSignedChartRef" class="chart-container" style="height: 300px"></div>
           </el-card>
         </el-col>
-        <el-col :xs="24" :sm="24" :md="16" :lg="16">
+        <el-col :xs="24" :sm="24" :md="14" :lg="14">
           <el-card class="chart-card" shadow="hover">
             <template #header>
               <div class="chart-header">
-                <span class="chart-title">月度订单统计（近6个月）</span>
+                <span class="chart-title">
+                  月度订单统计（近6个月）
+                  <span v-if="selectedStoreName" class="chart-scope">· {{ selectedStoreName }}</span>
+                </span>
               </div>
             </template>
             <div ref="monthlyChartRef" class="chart-container" style="height: 300px"></div>
@@ -186,13 +203,58 @@
         </el-col>
       </el-row>
 
-      <!-- 最近订单列表 -->
+      <!-- 门店数据总览 + 最近订单 -->
       <el-row :gutter="16" class="chart-row">
-        <el-col :span="24">
+        <el-col :xs="24" :sm="24" :md="14" :lg="14">
           <el-card class="chart-card" shadow="hover">
             <template #header>
               <div class="chart-header">
-                <span class="chart-title">最近订单</span>
+                <span class="chart-title">门店数据总览</span>
+                <span class="table-hint">点击行可按门店筛选</span>
+              </div>
+            </template>
+            <el-table
+              :data="storeComparison"
+              style="width: 100%"
+              size="small"
+              :header-cell-style="{ background: '#fafafa' }"
+              :row-style="storeRowStyle"
+              class="store-table"
+              @row-click="handleStoreRowClick"
+            >
+              <el-table-column prop="storeName" label="门店" min-width="140" />
+              <el-table-column prop="totalOrders" label="订单数" min-width="80" align="center" sortable />
+              <el-table-column prop="activatedCount" label="已激活" min-width="80" align="center" sortable />
+              <el-table-column prop="signedCount" label="已签约" min-width="80" align="center" sortable />
+              <el-table-column
+                label="签约率"
+                min-width="90"
+                align="center"
+                sortable
+                :sort-by="(row) => signedRateOf(row)"
+              >
+                <template #default="scope">{{ formatRate(signedRateOf(scope.row)) }}</template>
+              </el-table-column>
+              <el-table-column
+                label="激活率"
+                min-width="90"
+                align="center"
+                sortable
+                :sort-by="(row) => activationRateOf(row)"
+              >
+                <template #default="scope">{{ formatRate(activationRateOf(scope.row)) }}</template>
+              </el-table-column>
+            </el-table>
+          </el-card>
+        </el-col>
+        <el-col :xs="24" :sm="24" :md="10" :lg="10">
+          <el-card class="chart-card" shadow="hover">
+            <template #header>
+              <div class="chart-header">
+                <span class="chart-title">
+                  最近订单
+                  <span v-if="selectedStoreName" class="chart-scope">· {{ selectedStoreName }}</span>
+                </span>
                 <el-button size="mini" type="text" :icon="DArrowRight" @click="router.push('/info/list')"
                   >查看更多</el-button
                 >
@@ -201,18 +263,18 @@
             <el-table
               :data="recentOrders"
               style="width: 100%"
-              size="medium"
+              size="small"
               :header-cell-style="{ background: '#fafafa' }"
             >
-              <el-table-column prop="signatureModel" label="签约型号" min-width="140" />
-              <el-table-column prop="signatureImei" label="签约IMEI" min-width="160" />
-              <el-table-column prop="createBy" label="创建人" min-width="90" align="center" />
-              <el-table-column label="签约日期" min-width="120" align="center">
+              <el-table-column prop="signatureModel" label="签约型号" min-width="110" />
+              <el-table-column prop="signatureImei" label="签约IMEI" min-width="140" />
+              <el-table-column prop="createBy" label="创建人" min-width="80" align="center" />
+              <el-table-column label="签约日期" min-width="100" align="center">
                 <template #default="scope">
                   {{ scope.row.signatureDate || '-' }}
                 </template>
               </el-table-column>
-              <el-table-column label="剩余保修" min-width="130" align="center">
+              <el-table-column label="剩余保修" min-width="110" align="center">
                 <template #default="scope">
                   <template v-if="scope.row.signatureDate">
                     <el-tag :type="getWarrantyTagType(scope.row)" size="small">
@@ -254,13 +316,13 @@
                 <div class="stat-desc">
                   <span :class="['stat-trend', userStatistics.myTotalOrdersTrend]"
                     ><el-icon style="vertical-align: middle; font-size: 12px"
-                      ><component :is="userStatistics.myTotalOrdersTrend === 'down' ? 'ArrowDown' : 'ArrowUp'"
+                      ><component :is="userStatistics.myTotalOrdersTrend === 'down' ? ArrowDown : ArrowUp"
                     /></el-icon>
                     {{ userStatistics.myTotalOrdersGrowthLabel }}</span
                   >
                 </div>
               </div>
-              <div class="stat-icon" style="background: linear-gradient(135deg, #409eff, #66b1ff)">
+              <div class="stat-icon" style="background: linear-gradient(135deg, #2a78d6, #66b1ff)">
                 <el-icon :size="28" color="#fff"><Tickets /></el-icon>
               </div>
             </div>
@@ -275,13 +337,13 @@
                 <div class="stat-desc">
                   <span :class="['stat-trend', userStatistics.myTodayOrdersTrend]"
                     ><el-icon style="vertical-align: middle; font-size: 12px"
-                      ><component :is="userStatistics.myTodayOrdersTrend === 'down' ? 'ArrowDown' : 'ArrowUp'"
+                      ><component :is="userStatistics.myTodayOrdersTrend === 'down' ? ArrowDown : ArrowUp"
                     /></el-icon>
                     {{ userStatistics.myTodayOrdersGrowthLabel }}</span
                   >
                 </div>
               </div>
-              <div class="stat-icon" style="background: linear-gradient(135deg, #67c23a, #85ce61)">
+              <div class="stat-icon" style="background: linear-gradient(135deg, #008300, #52b32a)">
                 <el-icon :size="28" color="#fff"><DocumentAdd /></el-icon>
               </div>
             </div>
@@ -298,7 +360,7 @@
                 <div class="stat-desc">
                   <span :class="['stat-trend', userStatistics.myActivationRateTrend]"
                     ><el-icon style="vertical-align: middle; font-size: 12px"
-                      ><component :is="userStatistics.myActivationRateTrend === 'down' ? 'ArrowDown' : 'ArrowUp'"
+                      ><component :is="userStatistics.myActivationRateTrend === 'down' ? ArrowDown : ArrowUp"
                     /></el-icon>
                     {{ userStatistics.myActivationRateLabel }}</span
                   >
@@ -321,13 +383,13 @@
                 <div class="stat-desc">
                   <span :class="['stat-trend', userStatistics.mySignedRateTrend]"
                     ><el-icon style="vertical-align: middle; font-size: 12px"
-                      ><component :is="userStatistics.mySignedRateTrend === 'down' ? 'ArrowDown' : 'ArrowUp'"
+                      ><component :is="userStatistics.mySignedRateTrend === 'down' ? ArrowDown : ArrowUp"
                     /></el-icon>
                     {{ userStatistics.mySignedRateLabel }}</span
                   >
                 </div>
               </div>
-              <div class="stat-icon" style="background: linear-gradient(135deg, #f56c6c, #f78989)">
+              <div class="stat-icon" style="background: linear-gradient(135deg, #e34948, #f78989)">
                 <el-icon :size="28" color="#fff"><EditPen /></el-icon>
               </div>
             </div>
@@ -356,13 +418,13 @@
             </template>
             <div class="shortcut-grid">
               <div class="shortcut-item" @click="router.push('/info/list')">
-                <div class="shortcut-icon" style="background: linear-gradient(135deg, #409eff, #66b1ff)">
+                <div class="shortcut-icon" style="background: linear-gradient(135deg, #2a78d6, #66b1ff)">
                   <el-icon :size="22" color="#fff"><Tickets /></el-icon>
                 </div>
                 <span class="shortcut-text">订单列表</span>
               </div>
               <div class="shortcut-item" @click="router.push('/user/profile')">
-                <div class="shortcut-icon" style="background: linear-gradient(135deg, #67c23a, #85ce61)">
+                <div class="shortcut-icon" style="background: linear-gradient(135deg, #008300, #52b32a)">
                   <el-icon :size="22" color="#fff"><User /></el-icon>
                 </div>
                 <span class="shortcut-text">个人中心</span>
@@ -425,7 +487,6 @@
 import { ref, computed, watch, onMounted, onActivated, onBeforeUnmount, onDeactivated, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import * as echarts from 'echarts';
-import 'echarts/theme/macarons';
 import { ElMessageBox } from 'element-plus';
 import { debounce } from '@/utils';
 import {
@@ -439,16 +500,20 @@ import {
   DArrowRight,
   User,
   Search,
+  Shop,
+  Loading,
+  WarningFilled,
+  InfoFilled,
+  CircleCheckFilled,
 } from '@element-plus/icons-vue';
 import useUserStore from '@/store/modules/user';
 import {
   getStatistics,
   getOrderTrend,
-  getDeviceModelDistribution,
-  getSignatureModelDistribution,
   getMonthlyOrderStats,
-  getWarrantyStatus,
   getRecentOrders,
+  getStoreList,
+  getStoreComparison,
   getUserStatistics,
   getUserOrderTrend,
   getUserRecentOrders,
@@ -458,10 +523,25 @@ import {
 const router = useRouter();
 const userStore = useUserStore();
 
+// ==================== 图表配色 ====================
+// 系列色（蓝/绿/红，已通过色盲安全校验，需配合点形状等二级编码）
+const COLOR_BLUE = '#2a78d6';
+const COLOR_GREEN = '#008300';
+const COLOR_RED = '#e34948';
+const COLOR_GRAY = '#dcdfe6';
+// 文本墨水色（轴/标签，不与系列色混用）
+const INK_MUTED = '#909399';
+const INK_SECONDARY = '#606266';
+
 // ==================== 响应式数据 ====================
 
 // 公共数据
 const apiBalance = ref('--');
+
+// 门店筛选
+const storeList = ref([]);
+const selectedStoreId = ref(null);
+const storeComparison = ref([]);
 
 // 管理员数据
 const statistics = ref({
@@ -487,16 +567,14 @@ const recentOrders = ref([]);
 
 // 管理员图表实例
 const orderTrendChart = ref(null);
-const deviceModelChart = ref(null);
-const signatureModelChart = ref(null);
-const warrantyChart = ref(null);
+const storeCompareChart = ref(null);
+const storeSignedChart = ref(null);
 const monthlyChart = ref(null);
 
 // 管理员图表 ref 引用
 const orderTrendChartRef = ref(null);
-const deviceModelChartRef = ref(null);
-const signatureModelChartRef = ref(null);
-const warrantyChartRef = ref(null);
+const storeCompareChartRef = ref(null);
+const storeSignedChartRef = ref(null);
 const monthlyChartRef = ref(null);
 
 // 普通用户数据
@@ -535,6 +613,13 @@ const isAdmin = computed(() => {
   return adminRoles.some((role) => roles.includes(role));
 });
 
+/** 当前选中门店名称（未选返回空） */
+const selectedStoreName = computed(() => {
+  if (!selectedStoreId.value) return '';
+  const store = storeList.value.find((item) => item.deptId === selectedStoreId.value);
+  return store ? store.storeName : '';
+});
+
 /** 余额状态标签类型 */
 const balanceTagType = computed(() => {
   const val = parseFloat(apiBalance.value);
@@ -556,10 +641,10 @@ const balanceStatusText = computed(() => {
 /** 余额状态图标 */
 const balanceTagIcon = computed(() => {
   const val = parseFloat(apiBalance.value);
-  if (isNaN(val)) return 'Loading';
-  if (val <= 1) return 'WarningFilled';
-  if (val <= 5) return 'InfoFilled';
-  return 'CircleCheckFilled';
+  if (isNaN(val)) return Loading;
+  if (val <= 1) return WarningFilled;
+  if (val <= 5) return InfoFilled;
+  return CircleCheckFilled;
 });
 
 /** 获取员工姓名 */
@@ -630,20 +715,78 @@ async function initData() {
 
 /** 初始化管理员数据 */
 async function initAdminData() {
+  await Promise.all([fetchStoreList(), fetchStoreComparison(), fetchStatistics(), fetchRecentOrders()]);
+  nextTick(() => {
+    initOrderTrendChart();
+    initStoreCompareChart();
+    initStoreSignedChart();
+    initMonthlyChart();
+  });
+}
+
+/** 门店筛选变更：重新拉取门店维度下的所有统计 */
+async function handleStoreChange() {
   await Promise.all([fetchStatistics(), fetchRecentOrders()]);
   nextTick(() => {
     initOrderTrendChart();
-    initDeviceModelChart();
-    initSignatureModelChart();
-    initWarrantyChart();
     initMonthlyChart();
+    initStoreCompareChart();
   });
+}
+
+/** 门店总览表行点击：切换门店筛选 */
+function handleStoreRowClick(row) {
+  selectedStoreId.value = selectedStoreId.value === row.deptId ? null : row.deptId;
+  handleStoreChange();
+}
+
+/** 门店总览表选中行高亮 */
+function storeRowStyle({ row }) {
+  if (row.deptId === selectedStoreId.value) {
+    return { background: '#ecf5ff', cursor: 'pointer' };
+  }
+  return { cursor: 'pointer' };
+}
+
+/** 签约率（百分比数值） */
+function signedRateOf(row) {
+  return row.totalOrders > 0 ? (row.signedCount / row.totalOrders) * 100 : 0;
+}
+
+/** 激活率（百分比数值） */
+function activationRateOf(row) {
+  return row.totalOrders > 0 ? (row.activatedCount / row.totalOrders) * 100 : 0;
+}
+
+/** 百分比格式化 */
+function formatRate(rate) {
+  return rate.toFixed(1) + '%';
+}
+
+/** 获取门店列表 */
+async function fetchStoreList() {
+  try {
+    const res = await getStoreList();
+    storeList.value = res.data || [];
+  } catch (e) {
+    console.error('获取门店列表失败：', e);
+  }
+}
+
+/** 获取门店对比统计 */
+async function fetchStoreComparison() {
+  try {
+    const res = await getStoreComparison();
+    storeComparison.value = res.data || [];
+  } catch (e) {
+    console.error('获取门店对比统计失败：', e);
+  }
 }
 
 /** 获取统计卡片数据 */
 async function fetchStatistics() {
   try {
-    const res = await getStatistics();
+    const res = await getStatistics(selectedStoreId.value);
     statistics.value = res.data;
   } catch (e) {
     console.error('获取统计数据失败：', e);
@@ -653,7 +796,7 @@ async function fetchStatistics() {
 /** 获取最近订单 */
 async function fetchRecentOrders() {
   try {
-    const res = await getRecentOrders();
+    const res = await getRecentOrders(selectedStoreId.value);
     recentOrders.value = res.data;
   } catch (e) {
     console.error('获取最近订单失败：', e);
@@ -663,10 +806,10 @@ async function fetchRecentOrders() {
 /** 初始化订单趋势折线图 */
 async function initOrderTrendChart() {
   try {
-    const res = await getOrderTrend(trendType.value);
+    const res = await getOrderTrend(trendType.value, selectedStoreId.value);
     const { dates, newOrders, completedOrders, signedOrders } = res.data;
     if (!orderTrendChart.value) {
-      orderTrendChart.value = echarts.init(orderTrendChartRef.value, 'macarons');
+      orderTrendChart.value = echarts.init(orderTrendChartRef.value);
     }
     orderTrendChart.value.setOption({
       tooltip: {
@@ -675,23 +818,32 @@ async function initOrderTrendChart() {
         padding: [5, 10],
       },
       legend: {
-        data: ['新增订单', '完成订单', '签约订单'],
+        data: ['新增订单', '激活订单', '签约订单'],
         right: 10,
+        top: 0,
       },
       grid: {
         left: 10,
         right: 20,
         bottom: 20,
-        top: 40,
+        top: 36,
         containLabel: true,
       },
       xAxis: {
+        type: 'category',
         data: dates,
         boundaryGap: false,
         axisTick: { show: false },
+        axisLine: { lineStyle: { color: '#c3c2b7' } },
+        axisLabel: { color: INK_MUTED },
       },
       yAxis: {
+        type: 'value',
+        minInterval: 1,
         axisTick: { show: false },
+        axisLine: { show: false },
+        axisLabel: { color: INK_MUTED },
+        splitLine: { lineStyle: { color: '#f0f0f0', type: 'solid' } },
       },
       series: [
         {
@@ -700,50 +852,38 @@ async function initOrderTrendChart() {
           smooth: true,
           symbol: 'circle',
           symbolSize: 8,
-          itemStyle: { color: '#409EFF' },
+          lineStyle: { width: 2, color: COLOR_BLUE },
+          itemStyle: { color: COLOR_BLUE, borderColor: '#fff', borderWidth: 2 },
           areaStyle: {
             color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: 'rgba(64,158,255,0.3)' },
-              { offset: 1, color: 'rgba(64,158,255,0.05)' },
+              { offset: 0, color: 'rgba(42,120,214,0.15)' },
+              { offset: 1, color: 'rgba(42,120,214,0.02)' },
             ]),
           },
           data: newOrders,
-          animationDuration: 2000,
-          animationEasing: 'cubicInOut',
+          animationDuration: 1000,
         },
         {
-          name: '完成订单',
+          name: '激活订单',
           type: 'line',
           smooth: true,
-          symbol: 'circle',
-          symbolSize: 8,
-          itemStyle: { color: '#67C23A' },
-          areaStyle: {
-            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: 'rgba(103,194,58,0.3)' },
-              { offset: 1, color: 'rgba(103,194,58,0.05)' },
-            ]),
-          },
+          symbol: 'triangle',
+          symbolSize: 9,
+          lineStyle: { width: 2, color: COLOR_GREEN },
+          itemStyle: { color: COLOR_GREEN, borderColor: '#fff', borderWidth: 2 },
           data: completedOrders,
-          animationDuration: 2000,
-          animationEasing: 'cubicInOut',
+          animationDuration: 1000,
         },
         {
           name: '签约订单',
           type: 'line',
           smooth: true,
-          symbol: 'circle',
-          symbolSize: 8,
-          itemStyle: { color: '#F56C6C' },
-          areaStyle: {
-            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: 'rgba(245,108,108,0.3)' },
-              { offset: 1, color: 'rgba(245,108,108,0.05)' },
-            ]),
-          },
+          symbol: 'diamond',
+          symbolSize: 9,
+          lineStyle: { width: 2, color: COLOR_RED },
+          itemStyle: { color: COLOR_RED, borderColor: '#fff', borderWidth: 2 },
           data: signedOrders,
-          animationDuration: 2000,
-          animationEasing: 'cubicInOut',
+          animationDuration: 1000,
         },
       ],
     });
@@ -752,149 +892,144 @@ async function initOrderTrendChart() {
   }
 }
 
-/** 初始化设备型号饼图 */
-async function initDeviceModelChart() {
+/** 初始化门店订单对比横向柱状图（TOP10，选中门店高亮，其余置灰） */
+function initStoreCompareChart() {
   try {
-    const res = await getDeviceModelDistribution();
-    deviceModelChart.value = echarts.init(deviceModelChartRef.value, 'macarons');
-    deviceModelChart.value.setOption({
+    // 按订单数降序取前10，横向柱状图反转后最大值在顶部
+    const top = [...storeComparison.value].sort((a, b) => b.totalOrders - a.totalOrders).slice(0, 10).reverse();
+    const hasSelection = !!selectedStoreId.value;
+    if (!storeCompareChart.value) {
+      storeCompareChart.value = echarts.init(storeCompareChartRef.value);
+    }
+    storeCompareChart.value.setOption({
       tooltip: {
-        trigger: 'item',
-        formatter: '{a} <br/>{b} : {c} ({d}%)',
+        trigger: 'axis',
+        axisPointer: { type: 'shadow' },
       },
-      legend: {
-        orient: 'horizontal',
-        bottom: 10,
-        data: res.data.map((item) => item.name),
+      grid: {
+        left: 10,
+        right: 36,
+        bottom: 4,
+        top: 4,
+        containLabel: true,
+      },
+      xAxis: {
+        type: 'value',
+        minInterval: 1,
+        axisTick: { show: false },
+        axisLine: { show: false },
+        axisLabel: { color: INK_MUTED },
+        splitLine: { lineStyle: { color: '#f0f0f0', type: 'solid' } },
+      },
+      yAxis: {
+        type: 'category',
+        data: top.map((item) => item.storeName),
+        axisTick: { show: false },
+        axisLine: { lineStyle: { color: '#c3c2b7' } },
+        axisLabel: { color: INK_SECONDARY },
       },
       series: [
         {
-          name: '设备型号',
-          type: 'pie',
-          radius: ['35%', '60%'],
-          center: ['50%', '42%'],
-          avoidLabelOverlap: true,
-          itemStyle: {
-            borderRadius: 6,
-            borderColor: '#fff',
-            borderWidth: 2,
-          },
+          name: '订单数',
+          type: 'bar',
+          barWidth: 16,
+          data: top.map((item) => ({
+            value: item.totalOrders,
+            itemStyle: {
+              color:
+                !hasSelection || item.deptId === selectedStoreId.value ? COLOR_BLUE : COLOR_GRAY,
+              borderRadius: [0, 4, 4, 0],
+            },
+          })),
           label: {
             show: true,
-            formatter: '{b}\n{d}%',
+            position: 'right',
+            color: INK_MUTED,
+            formatter: (params) => (params.value > 0 ? params.value : ''),
           },
-          emphasis: {
-            label: {
-              show: true,
-              fontSize: 14,
-              fontWeight: 'bold',
-            },
-          },
-          data: res.data,
-          animationEasing: 'cubicInOut',
-          animationDuration: 2000,
+          animationDuration: 800,
         },
       ],
     });
   } catch (e) {
-    console.error('初始化设备型号图失败：', e);
+    console.error('初始化门店订单对比图失败：', e);
   }
 }
 
-/** 初始化已签约手机型号分布饼图 */
-async function initSignatureModelChart() {
+/** 初始化门店签约构成横向堆叠柱状图（TOP8） */
+function initStoreSignedChart() {
   try {
-    const res = await getSignatureModelDistribution();
-    signatureModelChart.value = echarts.init(signatureModelChartRef.value, 'macarons');
-    signatureModelChart.value.setOption({
+    const top = [...storeComparison.value].sort((a, b) => b.totalOrders - a.totalOrders).slice(0, 8).reverse();
+    const signed = top.map((item) => item.signedCount);
+    const unsigned = top.map((item) => Math.max(item.totalOrders - item.signedCount, 0));
+    if (!storeSignedChart.value) {
+      storeSignedChart.value = echarts.init(storeSignedChartRef.value);
+    }
+    storeSignedChart.value.setOption({
       tooltip: {
-        trigger: 'item',
-        formatter: '{a} <br/>{b} : {c} ({d}%)',
+        trigger: 'axis',
+        axisPointer: { type: 'shadow' },
       },
       legend: {
-        orient: 'horizontal',
-        bottom: 10,
-        data: res.data.map((item) => item.name),
+        data: ['已签约', '未签约'],
+        right: 10,
+        top: 0,
+      },
+      grid: {
+        left: 10,
+        right: 36,
+        bottom: 4,
+        top: 36,
+        containLabel: true,
+      },
+      xAxis: {
+        type: 'value',
+        minInterval: 1,
+        axisTick: { show: false },
+        axisLine: { show: false },
+        axisLabel: { color: INK_MUTED },
+        splitLine: { lineStyle: { color: '#f0f0f0', type: 'solid' } },
+      },
+      yAxis: {
+        type: 'category',
+        data: top.map((item) => item.storeName),
+        axisTick: { show: false },
+        axisLine: { lineStyle: { color: '#c3c2b7' } },
+        axisLabel: { color: INK_SECONDARY },
       },
       series: [
         {
-          name: '签约型号',
-          type: 'pie',
-          radius: ['35%', '60%'],
-          center: ['50%', '42%'],
-          avoidLabelOverlap: true,
-          itemStyle: {
-            borderRadius: 6,
-            borderColor: '#fff',
-            borderWidth: 2,
-          },
-          label: {
-            show: true,
-            formatter: '{b}\n{d}%',
-          },
-          emphasis: {
-            label: {
-              show: true,
-              fontSize: 14,
-              fontWeight: 'bold',
-            },
-          },
-          data: res.data,
-          animationEasing: 'cubicInOut',
-          animationDuration: 2000,
+          name: '已签约',
+          type: 'bar',
+          stack: 'total',
+          barWidth: 16,
+          itemStyle: { color: COLOR_BLUE },
+          data: signed,
+          animationDuration: 800,
+        },
+        {
+          name: '未签约',
+          type: 'bar',
+          stack: 'total',
+          itemStyle: { color: COLOR_GRAY, borderRadius: [0, 4, 4, 0] },
+          data: unsigned,
+          animationDuration: 800,
         },
       ],
     });
   } catch (e) {
-    console.error('初始化已签约手机型号分布图失败：', e);
-  }
-}
-
-/** 初始化保修状态饼图 */
-async function initWarrantyChart() {
-  try {
-    const res = await getWarrantyStatus();
-    warrantyChart.value = echarts.init(warrantyChartRef.value, 'macarons');
-    warrantyChart.value.setOption({
-      tooltip: {
-        trigger: 'item',
-        formatter: '{a} <br/>{b} : {c} ({d}%)',
-      },
-      legend: {
-        orient: 'horizontal',
-        bottom: 10,
-        data: res.data.map((item) => item.name),
-      },
-      color: ['#67C23A', '#E6A23C', '#F56C6C'],
-      series: [
-        {
-          name: '保修状态',
-          type: 'pie',
-          roseType: 'radius',
-          radius: [20, 100],
-          center: ['50%', '42%'],
-          data: res.data,
-          itemStyle: {
-            borderRadius: 5,
-            borderColor: '#fff',
-            borderWidth: 2,
-          },
-          animationEasing: 'cubicInOut',
-          animationDuration: 2000,
-        },
-      ],
-    });
-  } catch (e) {
-    console.error('初始化保修状态图失败：', e);
+    console.error('初始化门店签约构成图失败：', e);
   }
 }
 
 /** 初始化月度订单柱状图 */
 async function initMonthlyChart() {
   try {
-    const res = await getMonthlyOrderStats();
+    const res = await getMonthlyOrderStats(selectedStoreId.value);
     const { months, orderCounts, activatedCounts, signedCounts } = res.data;
-    monthlyChart.value = echarts.init(monthlyChartRef.value, 'macarons');
+    if (!monthlyChart.value) {
+      monthlyChart.value = echarts.init(monthlyChartRef.value);
+    }
     monthlyChart.value.setOption({
       tooltip: {
         trigger: 'axis',
@@ -903,65 +1038,72 @@ async function initMonthlyChart() {
       legend: {
         data: ['订单数量', '激活数量', '签约数量'],
         right: 10,
+        top: 0,
       },
       grid: {
         left: 10,
         right: 20,
         bottom: 20,
-        top: 40,
+        top: 36,
         containLabel: true,
       },
       xAxis: {
         type: 'category',
         data: months,
         axisTick: { alignWithLabel: true },
+        axisLine: { lineStyle: { color: '#c3c2b7' } },
+        axisLabel: { color: INK_MUTED },
       },
       yAxis: {
         type: 'value',
+        minInterval: 1,
         axisTick: { show: false },
+        axisLine: { show: false },
+        axisLabel: { color: INK_MUTED },
+        splitLine: { lineStyle: { color: '#f0f0f0', type: 'solid' } },
       },
       series: [
         {
           name: '订单数量',
           type: 'bar',
-          barWidth: '22%',
+          barWidth: 14,
           itemStyle: {
             color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: '#409EFF' },
+              { offset: 0, color: COLOR_BLUE },
               { offset: 1, color: '#66b1ff' },
             ]),
             borderRadius: [4, 4, 0, 0],
           },
           data: orderCounts,
-          animationDuration: 2000,
+          animationDuration: 1000,
         },
         {
           name: '激活数量',
           type: 'bar',
-          barWidth: '22%',
+          barWidth: 14,
           itemStyle: {
             color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: '#67C23A' },
-              { offset: 1, color: '#85ce61' },
+              { offset: 0, color: COLOR_GREEN },
+              { offset: 1, color: '#4db82e' },
             ]),
             borderRadius: [4, 4, 0, 0],
           },
           data: activatedCounts,
-          animationDuration: 2000,
+          animationDuration: 1000,
         },
         {
           name: '签约数量',
           type: 'bar',
-          barWidth: '22%',
+          barWidth: 14,
           itemStyle: {
             color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: '#F56C6C' },
+              { offset: 0, color: COLOR_RED },
               { offset: 1, color: '#f78989' },
             ]),
             borderRadius: [4, 4, 0, 0],
           },
           data: signedCounts,
-          animationDuration: 2000,
+          animationDuration: 1000,
         },
       ],
     });
@@ -1005,7 +1147,7 @@ async function initUserOrderTrendChart() {
   try {
     const res = await getUserOrderTrend();
     const { dates, myOrders } = res.data;
-    userOrderTrendChart.value = echarts.init(userOrderTrendChartRef.value, 'macarons');
+    userOrderTrendChart.value = echarts.init(userOrderTrendChartRef.value);
     userOrderTrendChart.value.setOption({
       tooltip: {
         trigger: 'axis',
@@ -1020,13 +1162,20 @@ async function initUserOrderTrendChart() {
         containLabel: true,
       },
       xAxis: {
+        type: 'category',
         data: dates,
         boundaryGap: false,
         axisTick: { show: false },
+        axisLine: { lineStyle: { color: '#c3c2b7' } },
+        axisLabel: { color: INK_MUTED },
       },
       yAxis: {
-        axisTick: { show: false },
+        type: 'value',
         minInterval: 1,
+        axisTick: { show: false },
+        axisLine: { show: false },
+        axisLabel: { color: INK_MUTED },
+        splitLine: { lineStyle: { color: '#f0f0f0', type: 'solid' } },
       },
       series: [
         {
@@ -1035,16 +1184,16 @@ async function initUserOrderTrendChart() {
           smooth: true,
           symbol: 'circle',
           symbolSize: 8,
-          itemStyle: { color: '#409EFF' },
+          lineStyle: { width: 2, color: COLOR_BLUE },
+          itemStyle: { color: COLOR_BLUE, borderColor: '#fff', borderWidth: 2 },
           areaStyle: {
             color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: 'rgba(64,158,255,0.35)' },
-              { offset: 1, color: 'rgba(64,158,255,0.05)' },
+              { offset: 0, color: 'rgba(42,120,214,0.15)' },
+              { offset: 1, color: 'rgba(42,120,214,0.02)' },
             ]),
           },
           data: myOrders,
-          animationDuration: 2000,
-          animationEasing: 'cubicInOut',
+          animationDuration: 1000,
         },
       ],
     });
@@ -1080,20 +1229,6 @@ async function fetchApiBalance() {
     console.error('获取API余额失败：', e);
     apiBalance.value = '--';
   }
-}
-
-/** 格式化业务日期 */
-function formatBusinessDate(row) {
-  if (!row) {
-    return '-';
-  }
-  if (row.sysTime) {
-    return row.sysTime;
-  }
-  if (row.createTime) {
-    return String(row.createTime).slice(0, 10);
-  }
-  return '-';
 }
 
 /** 保修期（年） */
@@ -1174,9 +1309,8 @@ function handleSidebarResize(e) {
 /** 所有图表 resize */
 function resizeAllCharts() {
   orderTrendChart.value?.resize();
-  deviceModelChart.value?.resize();
-  signatureModelChart.value?.resize();
-  warrantyChart.value?.resize();
+  storeCompareChart.value?.resize();
+  storeSignedChart.value?.resize();
   monthlyChart.value?.resize();
   userOrderTrendChart.value?.resize();
 }
@@ -1185,9 +1319,8 @@ function resizeAllCharts() {
 function disposeAllCharts() {
   const charts = [
     orderTrendChart.value,
-    deviceModelChart.value,
-    signatureModelChart.value,
-    warrantyChart.value,
+    storeCompareChart.value,
+    storeSignedChart.value,
     monthlyChart.value,
     userOrderTrendChart.value,
   ];
@@ -1195,9 +1328,8 @@ function disposeAllCharts() {
     chart?.dispose();
   });
   orderTrendChart.value = null;
-  deviceModelChart.value = null;
-  signatureModelChart.value = null;
-  warrantyChart.value = null;
+  storeCompareChart.value = null;
+  storeSignedChart.value = null;
   monthlyChart.value = null;
   userOrderTrendChart.value = null;
 }
@@ -1206,6 +1338,58 @@ function disposeAllCharts() {
 <style scoped lang="scss">
 .dashboard {
   padding: 12px;
+
+  /* 门店筛选行 */
+  .filter-card {
+    margin-bottom: 16px;
+
+    :deep(.el-card__body) {
+      padding: 12px 20px;
+    }
+  }
+
+  .filter-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .filter-label {
+    font-size: 13px;
+    color: #606266;
+    font-weight: 500;
+    margin-right: 8px;
+  }
+
+  .filter-divider {
+    width: 1px;
+    height: 16px;
+    background: #dcdfe6;
+    margin: 0 16px;
+  }
+
+  .filter-count {
+    margin-left: auto;
+    font-size: 12px;
+    color: #909399;
+  }
+
+  /* 图表标题后的门店范围提示 */
+  .chart-scope {
+    font-size: 12px;
+    font-weight: 400;
+    color: #909399;
+  }
+
+  /* 门店总览表提示 */
+  .table-hint {
+    font-size: 12px;
+    color: #909399;
+  }
+
+  .store-table {
+    cursor: pointer;
+  }
 
   /* 欢迎卡片（普通用户） */
   .welcome-card {

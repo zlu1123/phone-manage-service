@@ -240,6 +240,9 @@
         FROM phone_active_info pai
         LEFT JOIN phone_active_detail pad ON pai.id = pad.order_id
         LEFT JOIN phone_order_contract poc ON pai.id = poc.order_id
+        <where>
+            <if test="storeId != null">pai.store_id = #{storeId}</if>
+        </where>
     </select>
 
     <select id="selectUserStatistics" resultType="java.util.HashMap">
@@ -274,6 +277,9 @@
         <if test="createBy != null and createBy != ''">
             AND pai.create_by = #{createBy}
         </if>
+        <if test="storeId != null">
+            AND pai.store_id = #{storeId}
+        </if>
         GROUP BY DATE_FORMAT(pai.create_time, '%Y-%m-%d')
         ORDER BY day ASC
     </select>
@@ -289,6 +295,9 @@
         LEFT JOIN phone_order_contract poc ON pai.id = poc.order_id
         WHERE DATE_FORMAT(pai.create_time, '%Y-%m') &gt;= #{startMonth}
           AND DATE_FORMAT(pai.create_time, '%Y-%m') &lt;= #{endMonth}
+        <if test="storeId != null">
+            AND pai.store_id = #{storeId}
+        </if>
         GROUP BY DATE_FORMAT(pai.create_time, '%Y-%m')
         ORDER BY month ASC
     </select>
@@ -378,9 +387,41 @@
             <if test="createBy != null and createBy != ''">
                 AND pai.create_by = #{createBy}
             </if>
+            <if test="storeId != null">
+                AND pai.store_id = #{storeId}
+            </if>
         </where>
         ORDER BY poc.signature_date ASC
         LIMIT #{limit}
+    </select>
+
+    <!-- 门店列表：通信源手机部门的直接子部门（启用且未删除） -->
+    <select id="selectStoreList" resultType="java.util.HashMap">
+        SELECT dept_id AS deptId, dept_name AS storeName
+        FROM sys_dept
+        WHERE parent_id = #{storeParentDeptId}
+          AND status = '0'
+          AND del_flag = '0'
+        ORDER BY order_num ASC
+    </select>
+
+    <!-- 门店对比统计：LEFT JOIN 门店维度，无订单的门店也返回（数量为0） -->
+    <select id="selectStoreComparison" resultType="java.util.HashMap">
+        SELECT
+            sd.dept_id AS deptId,
+            sd.dept_name AS storeName,
+            COUNT(DISTINCT pai.id) AS totalOrders,
+            COALESCE(SUM(CASE WHEN pad.activated = 1 THEN 1 ELSE 0 END), 0) AS activatedCount,
+            COALESCE(SUM(CASE WHEN poc.signature_date IS NOT NULL AND poc.signature_date != '' THEN 1 ELSE 0 END), 0) AS signedCount
+        FROM sys_dept sd
+        LEFT JOIN phone_active_info pai ON pai.store_id = sd.dept_id
+        LEFT JOIN phone_active_detail pad ON pai.id = pad.order_id
+        LEFT JOIN phone_order_contract poc ON pai.id = poc.order_id
+        WHERE sd.parent_id = #{storeParentDeptId}
+          AND sd.status = '0'
+          AND sd.del_flag = '0'
+        GROUP BY sd.dept_id, sd.dept_name
+        ORDER BY totalOrders DESC, sd.order_num ASC
     </select>
 
     <!-- 协议内容从签约表查询 -->

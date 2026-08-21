@@ -1,63 +1,57 @@
 /**
- * 首页仪表盘 Mock 数据接口
- * 后续可替换为真实接口
+ * 首页仪表盘数据接口
  */
 
 import request from '@/utils/request'
 
-// 获取统计卡片数据
-export function getStatistics() {
+// 获取统计卡片数据（可选门店维度，storeId 为空表示全部门店）
+export function getStatistics(storeId) {
   return request({
     url: '/system/order/dashboard/statistics',
-    method: 'get'
+    method: 'get',
+    params: storeId ? { storeId } : {}
   })
 }
 
-// 获取订单趋势数据
-export function getOrderTrend(period = 'week') {
+// 获取订单趋势数据（可选门店维度）
+export function getOrderTrend(period = 'week', storeId) {
   return request({
     url: '/system/order/dashboard/trend',
     method: 'get',
-    params: { period }
+    params: { period, ...(storeId ? { storeId } : {}) }
   })
 }
 
-// 获取设备型号分布数据
-export function getDeviceModelDistribution() {
-  return request({
-    url: '/system/order/dashboard/deviceModelDistribution',
-    method: 'get'
-  })
-}
-
-// 获取已签约手机型号分布数据
-export function getSignatureModelDistribution() {
-  return request({
-    url: '/system/order/dashboard/signatureModelDistribution',
-    method: 'get'
-  })
-}
-
-// 获取月度订单统计数据（近6个月）
-export function getMonthlyOrderStats() {
+// 获取月度订单统计数据（近6个月，可选门店维度）
+export function getMonthlyOrderStats(storeId) {
   return request({
     url: '/system/order/dashboard/monthlyOrderStats',
-    method: 'get'
+    method: 'get',
+    params: storeId ? { storeId } : {}
   })
 }
 
-// 获取保修状态统计
-export function getWarrantyStatus() {
-  return request({
-    url: '/system/order/dashboard/warrantyStatus',
-    method: 'get'
-  })
-}
-
-// 获取最近订单列表
-export function getRecentOrders() {
+// 获取最近订单列表（可选门店维度）
+export function getRecentOrders(storeId) {
   return request({
     url: '/system/order/dashboard/recentOrders',
+    method: 'get',
+    params: storeId ? { storeId } : {}
+  })
+}
+
+// 获取门店列表（门店筛选下拉数据源）
+export function getStoreList() {
+  return request({
+    url: '/system/order/dashboard/storeList',
+    method: 'get'
+  })
+}
+
+// 获取各门店订单对比统计（门店图表与总览表共用）
+export function getStoreComparison() {
+  return request({
+    url: '/system/order/dashboard/storeComparison',
     method: 'get'
   })
 }

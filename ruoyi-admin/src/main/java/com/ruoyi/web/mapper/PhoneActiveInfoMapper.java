@@ -33,7 +33,8 @@ public interface PhoneActiveInfoMapper {
     Map<String, Object> selectDashboardStatistics(@Param("currentDate") String currentDate,
                                                   @Param("previousDate") String previousDate,
                                                   @Param("currentMonth") String currentMonth,
-                                                  @Param("previousMonth") String previousMonth);
+                                                  @Param("previousMonth") String previousMonth,
+                                                  @Param("storeId") Long storeId);
 
     Map<String, Object> selectUserStatistics(@Param("createBy") String createBy,
                                              @Param("currentDate") String currentDate,
@@ -44,10 +45,12 @@ public interface PhoneActiveInfoMapper {
 
     List<Map<String, Object>> selectOrderTrend(@Param("startDate") String startDate,
                                                @Param("endDate") String endDate,
-                                               @Param("createBy") String createBy);
+                                               @Param("createBy") String createBy,
+                                               @Param("storeId") Long storeId);
 
     List<Map<String, Object>> selectMonthlyOrderStats(@Param("startMonth") String startMonth,
-                                                      @Param("endMonth") String endMonth);
+                                                      @Param("endMonth") String endMonth,
+                                                      @Param("storeId") Long storeId);
 
     List<Map<String, Object>> selectDeviceModelDistribution();
 
@@ -55,7 +58,24 @@ public interface PhoneActiveInfoMapper {
 
     Map<String, Object> selectWarrantyStatus(@Param("currentDate") String currentDate);
 
-    List<PhoneActiveInfo> selectRecentOrders(@Param("createBy") String createBy, @Param("limit") int limit);
+    List<PhoneActiveInfo> selectRecentOrders(@Param("createBy") String createBy, @Param("limit") int limit,
+                                             @Param("storeId") Long storeId);
+
+    /**
+     * 查询门店列表（通信源手机部门的直接子部门）
+     *
+     * @param storeParentDeptId 门店父部门ID
+     * @return 门店列表 {deptId, storeName}
+     */
+    List<Map<String, Object>> selectStoreList(@Param("storeParentDeptId") Long storeParentDeptId);
+
+    /**
+     * 各门店订单对比统计（含无订单门店）
+     *
+     * @param storeParentDeptId 门店父部门ID
+     * @return 门店统计列表 {deptId, storeName, totalOrders, activatedCount, signedCount}
+     */
+    List<Map<String, Object>> selectStoreComparison(@Param("storeParentDeptId") Long storeParentDeptId);
 
     /**
      * 根据订单ID查询签约时的协议内容快照

@@ -139,4 +139,12 @@
         SELECT COUNT(*) FROM leave_information WHERE phone_num = #{phoneNum}
     </select>
 
+    <!-- 根据电话号码精确查询留资信息 -->
+    <select id="selectByPhoneNum" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM leave_information
+        WHERE phone_num = #{phoneNum}
+        LIMIT 1
+    </select>
+
 </mapper>

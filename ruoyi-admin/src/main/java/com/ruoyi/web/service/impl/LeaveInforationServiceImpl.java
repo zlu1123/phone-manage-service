@@ -10,7 +10,9 @@ import org.springframework.util.StringUtils;
 
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 留资信息管理 Service 实现类
@@ -142,6 +144,103 @@ public class LeaveInforationServiceImpl implements LeaveInformationService {
     @Override
     public List<LeaveInformation> queryInfoByNameOrNum(String text) {
         return leaveInformationMapper.selectByNameOrNum(text);
+    }
+
+    /**
+     * 导入留资信息
+     * <p>
+     * 以电话号码作为唯一匹配键：
+     * <ul>
+     *     <li>updateSupport=true 且电话已存在：更新对应记录的姓名</li>
+     *     <li>updateSupport=false 且电话已存在：跳过并记为失败</li>
+     *     <li>电话不存在：新增</li>
+     * </ul>
+     *
+     * @param list          导入数据
+     * @param updateSupport 是否更新已存在的数据
+     * @param operName      操作人
+     * @return 导入结果消息
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public String importLeaveInfo(List<LeaveInformation> list, boolean updateSupport, String operName) {
+        if (list == null || list.isEmpty()) {
+            return "导入数据为空";
+        }
+
+        int successCount = 0;
+        int updateCount = 0;
+        int failCount = 0;
+        StringBuilder failMsg = new StringBuilder();
+        Set<String> processedPhones = new HashSet<>();
+
+        for (int i = 0; i < list.size(); i++) {
+            LeaveInformation info = list.get(i);
+            int rowNum = i + 1;
+            try {
+                // 防御：解析结果不应为null，出现时给出明确提示而不是抛空指针
+                if (info == null) {
+                    failCount++;
+                    failMsg.append("<br/>第").append(rowNum).append("条：未解析到有效数据");
+                    continue;
+                }
+                String name = info.getName() == null ? null : info.getName().trim();
+                String phoneNum = info.getPhoneNum() == null ? null : info.getPhoneNum().trim();
+
+                // 1. 字段逻辑校验：姓名、电话必填
+                if (!StringUtils.hasText(name) || !StringUtils.hasText(phoneNum)) {
+                    failCount++;
+                    failMsg.append("<br/>第").append(rowNum).append("条：姓名和电话不能为空");
+                    continue;
+                }
+                // 2. 文件内电话去重
+                if (processedPhones.contains(phoneNum)) {
+                    failCount++;
+                    failMsg.append("<br/>第").append(rowNum).append("条：电话号码【").append(phoneNum).append("】与文件内其他行重复");
+                    continue;
+                }
+                processedPhones.add(phoneNum);
+                info.setName(name);
+                info.setPhoneNum(phoneNum);
+
+                // 3. 按电话号码精确匹配已有记录
+                LeaveInformation exist = leaveInformationMapper.selectByPhoneNum(phoneNum);
+                if (exist != null) {
+                    if (updateSupport) {
+                        info.setId(exist.getId());
+                        info.setUpdateBy(operName);
+                        info.setUpdateTime(new Date());
+                        leaveInformationMapper.updateSelective(info);
+                        updateCount++;
+                    } else {
+                        failCount++;
+                        failMsg.append("<br/>第").append(rowNum).append("条：电话号码【").append(phoneNum).append("】已存在");
+                    }
+                } else {
+                    info.setCreateBy(operName);
+                    info.setUpdateBy(operName);
+                    info.setCreateTime(new Date());
+                    info.setUpdateTime(new Date());
+                    leaveInformationMapper.insert(info);
+                    successCount++;
+                }
+            } catch (Exception e) {
+                failCount++;
+                failMsg.append("<br/>第").append(rowNum).append("条导入失败：")
+                        .append(StringUtils.hasText(e.getMessage()) ? e.getMessage() : e.getClass().getSimpleName());
+            }
+        }
+
+        StringBuilder resultMsg = new StringBuilder();
+        resultMsg.append("共 ").append(list.size()).append(" 条数据，成功导入 ").append(successCount).append(" 条");
+        if (updateCount > 0) {
+            resultMsg.append("，更新 ").append(updateCount).append(" 条");
+        }
+        if (failCount > 0) {
+            resultMsg.append("，失败 ").append(failCount).append(" 条");
+            resultMsg.append(failMsg);
+        }
+        return resultMsg.toString();
     }
 
 }

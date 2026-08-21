@@ -1,12 +1,12 @@
 <template>
-  <el-dialog :title="title" v-model="visible" :width="width" append-to-body @close="handleClose">
+  <el-dialog :title="title" v-model="visible" :width="width" append-to-body :before-close="handleBeforeClose" @close="handleClose">
     <el-upload ref="uploadRef" :limit="1" accept=".xlsx, .xls" :headers="headers" :action="uploadUrl" :disabled="isUploading" :on-progress="handleProgress" :on-change="handleFileChange" :on-remove="handleFileRemove" :on-success="handleSuccess" :auto-upload="false" drag>
       <el-icon class="el-icon--upload"><upload-filled /></el-icon>
       <div class="el-upload__text">将文件拖到此处，或<em>点击上传</em></div>
       <template #tip>
         <div class="el-upload__tip text-center">
           <div class="el-upload__tip">
-            <el-checkbox v-model="updateSupport"> {{ updateSupportLabel }} </el-checkbox>
+            <el-checkbox v-model="updateSupport" @change="handleUpdateSupportChange"> {{ updateSupportLabel }} </el-checkbox>
           </div>
           <span>仅允许导入xls、xlsx格式文件。</span>
           <el-link v-if="templateUrl" type="primary" underline="never" style="font-size: 12px; vertical-align: baseline" @click="handleDownloadTemplate">下载模板</el-link>
@@ -15,8 +15,8 @@
     </el-upload>
     <template #footer>
       <div class="dialog-footer">
-        <el-button type="primary" @click="handleSubmit">确 定</el-button>
-        <el-button @click="visible = false">取 消</el-button>
+        <el-button type="primary" :loading="isUploading" @click="handleSubmit">确 定</el-button>
+        <el-button :disabled="isUploading" @click="visible = false">取 消</el-button>
       </div>
     </template>
   </el-dialog>
@@ -75,6 +75,16 @@ const uploadUrl = computed(() => {
 
 const templateUrl = computed(() => !!props.templateAction)
 
+// 勾选"更新已存在数据"时二次确认，取消则恢复为不勾选
+function handleUpdateSupportChange(checked) {
+  if (!checked) return
+  proxy.$modal.confirm('更新已存在的留资用户将覆盖原有数据，请务必谨慎操作！确定要勾选吗？')
+    .then(() => {})
+    .catch(() => {
+      updateSupport.value = false
+    })
+}
+
 // 打开对话框（供父组件通过 ref 调用）
 function open() {
   updateSupport.value = false
@@ -84,6 +94,15 @@ function open() {
     selectedFile.value = null
     uploadRef.value?.clearFiles()
   })
+}
+
+// 导入过程中禁止关闭弹窗（X 按钮、ESC、遮罩点击）
+function handleBeforeClose(done) {
+  if (isUploading.value) {
+    proxy.$modal.msgError('数据导入中，请稍候…')
+    return
+  }
+  done()
 }
 
 // 关闭时清理

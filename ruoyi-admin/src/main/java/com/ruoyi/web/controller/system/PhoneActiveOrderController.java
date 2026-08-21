@@ -63,14 +63,15 @@ public class PhoneActiveOrderController extends BaseController {
 
     @ApiOperation("首页统计卡片-管理员")
     @GetMapping("/dashboard/statistics")
-    public R getStatistics() {
-        return R.ok(phoneActiveInfoService.getDashboardStatistics(resolveCurrentDate()));
+    public R getStatistics(@RequestParam(value = "storeId", required = false) Long storeId) {
+        return R.ok(phoneActiveInfoService.getDashboardStatistics(resolveCurrentDate(), storeId));
     }
 
     @ApiOperation("首页订单趋势-管理员")
     @GetMapping("/dashboard/trend")
-    public R getOrderTrend(@RequestParam(value = "period", defaultValue = "week") String period) {
-        return R.ok(phoneActiveInfoService.getOrderTrend(period, null, resolveCurrentDate()));
+    public R getOrderTrend(@RequestParam(value = "period", defaultValue = "week") String period,
+                           @RequestParam(value = "storeId", required = false) Long storeId) {
+        return R.ok(phoneActiveInfoService.getOrderTrend(period, null, resolveCurrentDate(), storeId));
     }
 
     @ApiOperation("首页设备型号分布-管理员")
@@ -87,8 +88,8 @@ public class PhoneActiveOrderController extends BaseController {
 
     @ApiOperation("首页月度订单统计-管理员")
     @GetMapping("/dashboard/monthlyOrderStats")
-    public R getMonthlyOrderStats() {
-        return R.ok(phoneActiveInfoService.getMonthlyOrderStats(resolveCurrentDate()));
+    public R getMonthlyOrderStats(@RequestParam(value = "storeId", required = false) Long storeId) {
+        return R.ok(phoneActiveInfoService.getMonthlyOrderStats(resolveCurrentDate(), storeId));
     }
 
     @ApiOperation("首页保修状态统计-管理员")
@@ -99,8 +100,20 @@ public class PhoneActiveOrderController extends BaseController {
 
     @ApiOperation("首页最近订单-管理员")
     @GetMapping("/dashboard/recentOrders")
-    public R getRecentOrders() {
-        return R.ok(phoneActiveInfoService.getRecentOrders(null, DASHBOARD_RECENT_LIMIT));
+    public R getRecentOrders(@RequestParam(value = "storeId", required = false) Long storeId) {
+        return R.ok(phoneActiveInfoService.getRecentOrders(null, DASHBOARD_RECENT_LIMIT, storeId));
+    }
+
+    @ApiOperation("首页门店列表")
+    @GetMapping("/dashboard/storeList")
+    public R getStoreList() {
+        return R.ok(phoneActiveInfoService.getStoreList());
+    }
+
+    @ApiOperation("首页门店对比统计")
+    @GetMapping("/dashboard/storeComparison")
+    public R getStoreComparison() {
+        return R.ok(phoneActiveInfoService.getStoreComparison());
     }
 
     @ApiOperation("首页个人统计卡片")
@@ -112,13 +125,13 @@ public class PhoneActiveOrderController extends BaseController {
     @ApiOperation("首页个人订单趋势")
     @GetMapping("/dashboard/userTrend")
     public R getUserOrderTrend() {
-        return R.ok(phoneActiveInfoService.getOrderTrend("week", getUsername(), resolveCurrentDate()));
+        return R.ok(phoneActiveInfoService.getOrderTrend("week", getUsername(), resolveCurrentDate(), null));
     }
 
     @ApiOperation("首页个人最近订单")
     @GetMapping("/dashboard/userRecentOrders")
     public R getUserRecentOrders() {
-        return R.ok(phoneActiveInfoService.getRecentOrders(getUsername(), DASHBOARD_RECENT_LIMIT));
+        return R.ok(phoneActiveInfoService.getRecentOrders(getUsername(), DASHBOARD_RECENT_LIMIT, null));
     }
 
     private String resolveCurrentDate() {

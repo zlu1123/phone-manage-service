@@ -41,21 +41,45 @@ public interface IPhoneActiveInfoService {
      */
     String importActiveInfo(List<PhoneActiveInfo> list, boolean updateSupport, String operName);
 
-    Map<String, Object> getDashboardStatistics(String currentDate);
+    /**
+     * 首页统计卡片（管理员，可选门店维度）
+     *
+     * @param currentDate 当前业务日期
+     * @param storeId     门店ID，null表示全部门店
+     */
+    Map<String, Object> getDashboardStatistics(String currentDate, Long storeId);
 
     Map<String, Object> getUserDashboardStatistics(String createBy, String currentDate);
 
-    Map<String, Object> getOrderTrend(String period, String createBy, String currentDate);
+    /**
+     * 订单趋势（可选门店维度）
+     *
+     * @param period      week / month
+     * @param createBy    创建人，null表示全部
+     * @param currentDate 当前业务日期
+     * @param storeId     门店ID，null表示全部门店
+     */
+    Map<String, Object> getOrderTrend(String period, String createBy, String currentDate, Long storeId);
 
     List<Map<String, Object>> getDeviceModelDistribution();
 
     List<Map<String, Object>> getSignatureModelDistribution();
 
-    Map<String, Object> getMonthlyOrderStats(String currentDate);
+    Map<String, Object> getMonthlyOrderStats(String currentDate, Long storeId);
 
     List<Map<String, Object>> getWarrantyStatus(String currentDate);
 
-    List<PhoneActiveInfo> getRecentOrders(String createBy, int limit);
+    List<PhoneActiveInfo> getRecentOrders(String createBy, int limit, Long storeId);
+
+    /**
+     * 门店列表（通信源手机部门的直接子部门）
+     */
+    List<Map<String, Object>> getStoreList();
+
+    /**
+     * 各门店订单对比统计（含无订单门店）
+     */
+    List<Map<String, Object>> getStoreComparison();
 
     /**
      * 根据订单ID查询签约时的协议内容（历史快照，不受协议模板表变更影响）

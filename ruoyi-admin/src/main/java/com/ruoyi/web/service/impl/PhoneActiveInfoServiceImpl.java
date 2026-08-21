@@ -382,14 +382,14 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
     }
 
     @Override
-    public Map<String, Object> getDashboardStatistics(String currentDate) {
+    public Map<String, Object> getDashboardStatistics(String currentDate, Long storeId) {
         LocalDate businessDate = parseDate(currentDate);
         String previousDate = businessDate.minusDays(1).format(DAY_FORMATTER);
         String currentMonth = businessDate.format(MONTH_FORMATTER);
         String previousMonth = businessDate.minusMonths(1).format(MONTH_FORMATTER);
 
         Map<String, Object> result = phoneActiveInfoMapper.selectDashboardStatistics(
-                businessDate.format(DAY_FORMATTER), previousDate, currentMonth, previousMonth);
+                businessDate.format(DAY_FORMATTER), previousDate, currentMonth, previousMonth, storeId);
         long totalOrders = getLongValue(result, "totalOrders");
         long todayOrders = getLongValue(result, "todayOrders");
         long activatedDevices = getLongValue(result, "activatedDevices");
@@ -481,14 +481,15 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
     }
 
     @Override
-    public Map<String, Object> getOrderTrend(String period, String createBy, String currentDate) {
+    public Map<String, Object> getOrderTrend(String period, String createBy, String currentDate, Long storeId) {
         int days = "month".equalsIgnoreCase(period) ? 30 : 7;
         LocalDate endDate = parseDate(currentDate);
         LocalDate startDate = endDate.minusDays(days - 1L);
         List<Map<String, Object>> rows = phoneActiveInfoMapper.selectOrderTrend(
                 startDate.format(DAY_FORMATTER),
                 endDate.format(DAY_FORMATTER),
-                createBy);
+                createBy,
+                storeId);
 
         Map<String, Map<String, Object>> rowMap = new HashMap<>();
         for (Map<String, Object> row : rows) {
@@ -538,13 +539,14 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
     }
 
     @Override
-    public Map<String, Object> getMonthlyOrderStats(String currentDate) {
+    public Map<String, Object> getMonthlyOrderStats(String currentDate, Long storeId) {
         LocalDate businessDate = parseDate(currentDate);
         YearMonth currentMonth = YearMonth.from(businessDate);
         YearMonth startMonth = currentMonth.minusMonths(5);
         List<Map<String, Object>> rows = phoneActiveInfoMapper.selectMonthlyOrderStats(
                 startMonth.format(MONTH_FORMATTER),
-                currentMonth.format(MONTH_FORMATTER));
+                currentMonth.format(MONTH_FORMATTER),
+                storeId);
 
         Map<String, Map<String, Object>> rowMap = new HashMap<>();
         for (Map<String, Object> row : rows) {
@@ -585,10 +587,22 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
     }
 
     @Override
-    public List<PhoneActiveInfo> getRecentOrders(String createBy, int limit) {
-        List<PhoneActiveInfo> list = phoneActiveInfoMapper.selectRecentOrders(createBy, limit);
+    public List<PhoneActiveInfo> getRecentOrders(String createBy, int limit, Long storeId) {
+        List<PhoneActiveInfo> list = phoneActiveInfoMapper.selectRecentOrders(createBy, limit, storeId);
         list.forEach(this::normalizeDates);
         return fillImageUrls(list);
+    }
+
+    @Override
+    public List<Map<String, Object>> getStoreList() {
+        List<Map<String, Object>> list = phoneActiveInfoMapper.selectStoreList(STORE_PARENT_DEPT_ID);
+        return list == null ? Collections.emptyList() : list;
+    }
+
+    @Override
+    public List<Map<String, Object>> getStoreComparison() {
+        List<Map<String, Object>> list = phoneActiveInfoMapper.selectStoreComparison(STORE_PARENT_DEPT_ID);
+        return list == null ? Collections.emptyList() : list;
     }
 
     private List<PhoneActiveInfo> fillImageUrls(List<PhoneActiveInfo> list) {
