@@ -263,6 +263,7 @@ import { ref, reactive, computed, onMounted, getCurrentInstance } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Download, Upload, Picture, View, Printer, UploadFilled } from '@element-plus/icons-vue';
 import { queryOrderList, queryPhoneTypeList, getOrderContractContent, getOrderDetail, exportOrderList } from '@/api/order/list';
+import { getStoreList } from '@/api/dashboard';
 import { getToken } from '@/utils/auth';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
@@ -342,8 +343,11 @@ const proTableRef = ref(null);
 const uploadRef = ref(null);
 const selectedFile = ref(null);
 
+// 门店列表（所属门店下拉数据源）
+const storeOptions = ref([]);
+
 // 搜索字段配置
-const searchFields = [
+const searchFields = computed(() => [
   {
     prop: 'orderSource',
     label: '订单来源',
@@ -357,10 +361,29 @@ const searchFields = [
   },
   { prop: 'createBy', label: '创建者', type: 'input' },
   { prop: 'nickName', label: '昵称', type: 'input' },
-  { prop: 'storeId', label: '所属门店', type: 'input' },
+  {
+    prop: 'storeId',
+    label: '所属门店',
+    type: 'select',
+    options: [{ label: '全部', value: null }, ...storeOptions.value],
+  },
   { prop: 'name', label: '留资人姓名', type: 'input' },
   { prop: 'phoneNum', label: '留资人电话', type: 'input' },
-];
+]);
+
+/** 获取门店列表（所属门店下拉数据源） */
+const fetchStoreList = () => {
+  getStoreList()
+    .then((res) => {
+      storeOptions.value = (res.data || []).map((store) => ({
+        label: store.storeName,
+        value: store.deptId,
+      }));
+    })
+    .catch((err) => {
+      console.error('获取门店列表失败：', err);
+    });
+};
 
 /** 将前端「订单来源」映射为后端 skipApiCall + oldPhoneStatus 参数 */
 const mapOrderSource = (params) => {
@@ -1049,6 +1072,7 @@ const submitFileForm = () => {
 
 onMounted(() => {
   getPhoneTypeList();
+  fetchStoreList();
 });
 </script>
 
