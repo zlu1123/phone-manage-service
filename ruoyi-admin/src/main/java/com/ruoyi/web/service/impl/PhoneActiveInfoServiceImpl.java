@@ -1,6 +1,5 @@
 package com.ruoyi.web.service.impl;
 
-import com.ruoyi.common.annotation.Excel;
 import com.ruoyi.common.core.domain.entity.SysDept;
 import com.ruoyi.common.core.domain.entity.SysUser;
 import com.ruoyi.common.utils.StringUtils;
@@ -9,19 +8,20 @@ import com.ruoyi.system.mapper.SysDeptMapper;
 import com.ruoyi.system.mapper.SysUserMapper;
 import com.ruoyi.web.domain.PhoneActiveDetail;
 import com.ruoyi.web.domain.PhoneActiveInfo;
+import com.ruoyi.web.domain.PhoneActiveInfoImport;
 import com.ruoyi.web.domain.PhoneOrderContract;
 import com.ruoyi.web.domain.LeaveInformation;
+import com.ruoyi.web.mapper.LeaveInformationMapper;
 import com.ruoyi.web.mapper.PhoneActiveDetailMapper;
 import com.ruoyi.web.mapper.PhoneActiveInfoMapper;
 import com.ruoyi.web.mapper.PhoneOrderContractMapper;
 import com.ruoyi.web.service.IPhoneActiveInfoService;
-import com.ruoyi.web.service.LeaveInformationService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
@@ -29,9 +29,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
@@ -55,7 +57,7 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
     private SysDeptMapper sysDeptMapper;
 
     @Autowired
-    private LeaveInformationService leaveInformationService;
+    private LeaveInformationMapper leaveInformationMapper;
 
     @Autowired
     private ServerConfig serverConfig;
@@ -112,246 +114,399 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
 
     @Override
     @Transactional
-    public String importActiveInfo(List<PhoneActiveInfo> list, boolean updateSupport, String operName) {
+    public Map<String, Object> importActiveInfo(List<PhoneActiveInfoImport> list, boolean updateSupport, String operName) {
+        Map<String, Object> result = new HashMap<>(8);
+        result.put("total", list == null ? 0 : list.size());
+        List<String> errors = new ArrayList<>();
+        List<String> warns = new ArrayList<>();
+        result.put("errors", errors);
+        result.put("warns", warns);
+
         if (list == null || list.isEmpty()) {
-            return "导入数据为空";
+            result.put("successCount", 0);
+            result.put("updateCount", 0);
+            result.put("failCount", 0);
+            result.put("message", "导入数据为空");
+            return result;
         }
 
-        int successCount = 0;
-        int failCount = 0;
-        int updateCount = 0;
-        StringBuilder failMsg = new StringBuilder();
-
+        // 第一阶段：对全部行做字段校验（含门店匹配、文件内序列号去重），
+        // 任何一行校验不通过则整个文件不导入，不会写入任何数据。
+        List<ParsedImportRow> parsedRows = new ArrayList<>();
+        Set<String> processedSns = new HashSet<>();
         for (int i = 0; i < list.size(); i++) {
-            PhoneActiveInfo info = list.get(i);
+            PhoneActiveInfoImport row = list.get(i);
+            int rowNum = i + 1;
             try {
-                // 1. 字段逻辑校验
-                String validateError = validateImportRow(info, i + 1);
-                if (validateError != null) {
-                    failCount++;
-                    failMsg.append("<br/>").append(validateError);
+                if (row == null) {
+                    errors.add("第" + rowNum + "行：未解析到有效数据");
                     continue;
                 }
+                String validateError = validateImportRow(row, rowNum);
+                if (validateError != null) {
+                    errors.add(validateError);
+                    continue;
+                }
+                PhoneActiveInfo info = buildActiveInfo(row, operName);
                 String sn = info.getSn();
                 if (sn != null) {
-                    info.setSn(sn.trim());
+                    if (processedSns.contains(sn)) {
+                        errors.add("第" + rowNum + "行：序列号「" + sn + "」与文件内其他行重复");
+                        continue;
+                    }
+                    processedSns.add(sn);
                 }
-
-                // 根据留资人电话匹配 infoId
-                resolveLeaveInfoId(info, i + 1, failMsg);
-
-                PhoneActiveInfo exist = info.getSn() != null ? phoneActiveInfoMapper.selectBySn(info.getSn()) : null;
-                if (exist != null) {
-                    if (updateSupport) {
-                        info.setId(exist.getId());
-                        info.setUpdateBy(operName);
-                        phoneActiveInfoMapper.updateById(info);
-
-                        // 同步更新签约表
-                        PhoneOrderContract contract = new PhoneOrderContract();
-                        contract.setOrderId(exist.getId());
-                        contract.setSignatureModel(info.getSignatureModel());
-                        contract.setSignatureImei(info.getSignatureImei());
-                        contract.setSignatureDate(info.getSignatureDate());
-                        saveOrUpdateContract(contract);
-
-                        updateCount++;
-                    } else {
-                        failCount++;
-                        failMsg.append("<br/>序列号 ").append(info.getSn()).append(" 已存在（第").append(i + 1).append("行）");
-                    }
-                } else {
-                    info.setCreateBy(operName);
-                    info.setUpdateBy(operName);
-                    if (info.getStoreId() == null) {
-                        info.setStoreId(resolveStoreIdByUsername(operName));
-                    }
-                    info.setCreateTime(new Date());
-                    info.setUpdateTime(new Date());
-                    phoneActiveInfoMapper.insert(info);
-                    Long orderId = info.getId();
-
-                    // 插入详情表
-                    PhoneActiveDetail detail = new PhoneActiveDetail();
-                    detail.setOrderId(orderId);
-                    detail.setActivated(info.getActivated());
-                    detail.setActivateDate(info.getActivateDate());
-                    detail.setCoverage(info.getCoverage());
-                    detail.setActiveInfo(info.getActiveInfo());
-                    detail.setSysTime(info.getSysTime());
-                    detail.setImagePath(info.getImagePath());
-                    phoneActiveDetailMapper.insert(detail);
-
-                    // 插入签约表（签名信息存在时）
-                    if (hasContractData(info)) {
-                        PhoneOrderContract contract = new PhoneOrderContract();
-                        contract.setOrderId(orderId);
-                        contract.setSignatureModel(info.getSignatureModel());
-                        contract.setSignatureImei(info.getSignatureImei());
-                        contract.setSignatureDate(info.getSignatureDate());
-                        phoneOrderContractMapper.insert(contract);
-                    }
-
-                    successCount++;
-                }
-            } catch (Exception e) {
-                failCount++;
-                failMsg.append("<br/>第").append(i + 1).append("行导入失败：").append(e.getMessage());
+                parsedRows.add(new ParsedImportRow(rowNum, row, info));
+            } catch (IllegalArgumentException e) {
+                // 门店匹配失败等校验类异常：该行不通过，整体取消导入
+                errors.add("第" + rowNum + "行：" + e.getMessage());
             }
         }
 
-        StringBuilder resultMsg = new StringBuilder();
-        resultMsg.append("共 ").append(list.size()).append(" 条数据，成功导入 ").append(successCount).append(" 条");
-        if (updateCount > 0) {
-            resultMsg.append("，更新 ").append(updateCount).append(" 条");
+        if (!errors.isEmpty()) {
+            result.put("successCount", 0);
+            result.put("updateCount", 0);
+            result.put("failCount", errors.size());
+            result.put("message", buildImportResultMessage(list.size(), 0, 0, errors.size(), errors, warns)
+                    + "<br/>文件校验未通过，已取消导入，未写入任何数据");
+            return result;
         }
-        if (failCount > 0) {
-            resultMsg.append("，失败 ").append(failCount).append(" 条");
-            resultMsg.append(failMsg);
+
+        // 第二阶段：全部校验通过后逐行入库，运行期冲突（如序列号已存在）仅影响对应行。
+        int successCount = 0;
+        int updateCount = 0;
+        int failCount = 0;
+        for (ParsedImportRow parsed : parsedRows) {
+            int rowNum = parsed.rowNum;
+            PhoneActiveInfoImport row = parsed.row;
+            PhoneActiveInfo info = parsed.info;
+            try {
+                // 根据留资人电话匹配留资记录，匹配不到时自动创建（入库阶段执行，避免校验不通过时产生脏数据）
+                resolveLeaveInfo(info, row, operName, rowNum, warns);
+                // 根据 sn 判断新增或更新
+                PhoneActiveInfo exist = info.getSn() != null ? phoneActiveInfoMapper.selectBySn(info.getSn()) : null;
+                if (exist != null) {
+                    if (!updateSupport) {
+                        errors.add("第" + rowNum + "行：序列号「" + info.getSn() + "」已存在");
+                        failCount++;
+                    } else {
+                        updateExistingOrder(info, row, exist, operName);
+                        updateCount++;
+                    }
+                } else {
+                    insertNewOrder(info, row, operName);
+                    successCount++;
+                }
+            } catch (DuplicateKeyException e) {
+                errors.add("第" + rowNum + "行：序列号已存在或数据冲突，导入失败");
+                failCount++;
+            } catch (Exception e) {
+                errors.add("第" + rowNum + "行导入失败："
+                        + (StringUtils.hasText(e.getMessage()) ? e.getMessage() : e.getClass().getSimpleName()));
+                failCount++;
+            }
         }
-        return resultMsg.toString();
+
+        result.put("successCount", successCount);
+        result.put("updateCount", updateCount);
+        result.put("failCount", failCount);
+        result.put("message", buildImportResultMessage(list.size(), successCount, updateCount, failCount, errors, warns));
+        return result;
     }
 
-    /** 判断是否存在签约数据 */
-    private boolean hasContractData(PhoneActiveInfo info) {
-        return (info.getSignatureModel() != null && !info.getSignatureModel().trim().isEmpty())
-                || (info.getSignatureImei() != null && !info.getSignatureImei().trim().isEmpty())
-                || (info.getSignatureDate() != null && !info.getSignatureDate().trim().isEmpty());
-    }
+    /** 校验通过后待入库的行数据 */
+    private static class ParsedImportRow {
+        final int rowNum;
+        final PhoneActiveInfoImport row;
+        final PhoneActiveInfo info;
 
-    /**
-     * 根据留资人电话匹配 leave_information 的 id
-     * <p>
-     * 手机号在留资表中唯一，通过精确匹配查找。
-     * 如果匹配到多条（历史脏数据），取最新一条。
-     * 如果匹配不到，不阻断导入，infoId 保持 null。
-     */
-    private void resolveLeaveInfoId(PhoneActiveInfo info, int rowNum, StringBuilder failMsg) {
-        String phoneNum = info.getPhoneNum();
-        if (phoneNum == null || phoneNum.trim().isEmpty()) {
-            return;
-        }
-        phoneNum = phoneNum.trim();
-        LeaveInformation query = new LeaveInformation();
-        query.setPhoneNum(phoneNum);
-        List<LeaveInformation> results = leaveInformationService.queryLeaveInformationByCondition(query);
-
-        if (results == null || results.isEmpty()) {
-            failMsg.append("<br/>第").append(rowNum).append("行提示：留资人电话「")
-                    .append(phoneNum).append("」未在留资库中找到，请先导入留资人数据");
-            return;
-        }
-
-        // 手机号唯一，取第一条；若历史存在多条脏数据取最新
-        LeaveInformation match = results.get(results.size() - 1);
-        info.setInfoId(match.getId());
-
-        // 如果 Excel 未填留资人姓名，用匹配到的姓名回填
-        if (info.getName() == null || info.getName().trim().isEmpty()) {
-            info.setName(match.getName());
-        }
-
-        if (results.size() > 1) {
-            failMsg.append("<br/>第").append(rowNum).append("行提示：留资人电话「")
-                    .append(phoneNum).append("」匹配到多条记录，已取最新一条（id=")
-                    .append(match.getId()).append("）");
+        ParsedImportRow(int rowNum, PhoneActiveInfoImport row, PhoneActiveInfo info) {
+            this.rowNum = rowNum;
+            this.row = row;
+            this.info = info;
         }
     }
 
     /**
      * 导入行级字段逻辑校验
+     * <p>
+     * 导入模型统一用 String 接收数值/枚举列，此处负责值域校验，
+     * 保证后续解析（{@link #buildActiveInfo}）不会因格式问题抛异常。
      *
      * @return 错误信息，null 表示通过
      */
-    private String validateImportRow(PhoneActiveInfo info, int rowNum) {
+    private String validateImportRow(PhoneActiveInfoImport row, int rowNum) {
         String prefix = "第" + rowNum + "行：";
 
         // 创建时间必填
-        if (info.getCreateTime() == null) {
+        if (row.getCreateTime() == null) {
             return prefix + "创建时间不能为空";
         }
 
-        // 跳过API 必填
-        if (info.getSkipApiCall() == null) {
+        // 跳过API 必填 + 值域
+        String skipApiCall = trimToNull(row.getSkipApiCall());
+        if (skipApiCall == null) {
             return prefix + "跳过API不能为空（0=旧手机识别, 1=自有渠道）";
         }
-        if (info.getSkipApiCall() != 0 && info.getSkipApiCall() != 1) {
+        if (!"0".equals(skipApiCall) && !"1".equals(skipApiCall)) {
             return prefix + "跳过API值无效，必须为 0 或 1";
         }
 
-        // 旧手机识别模式：sn 必填
-        if (info.getSkipApiCall() == 0) {
-            if (info.getSn() == null || info.getSn().trim().isEmpty()) {
-                return prefix + "跳过API=0（旧手机识别）时，旧手机序列号不能为空";
-            }
+        // 旧手机识别模式：序列号必填
+        String sn = trimToNull(row.getSn());
+        if ("0".equals(skipApiCall) && sn == null) {
+            return prefix + "跳过API=0（旧手机识别）时，旧手机序列号不能为空";
         }
 
-        // 自有渠道模式：旧手机状态必填
-        if (info.getSkipApiCall() == 1) {
-            if (info.getOldPhoneStatus() == null) {
+        // 自有渠道模式：旧手机状态必填 + 值域
+        String oldPhoneStatus = trimToNull(row.getOldPhoneStatus());
+        if ("1".equals(skipApiCall)) {
+            if (oldPhoneStatus == null) {
                 return prefix + "跳过API=1（自有渠道）时，旧手机状态不能为空（0=无旧手机, 1=丢失/损坏）";
             }
-            if (info.getOldPhoneStatus() != 0 && info.getOldPhoneStatus() != 1) {
+            if (!"0".equals(oldPhoneStatus) && !"1".equals(oldPhoneStatus)) {
                 return prefix + "旧手机状态值无效，必须为 0 或 1";
             }
         }
 
+        // 旧手机使用月数：选填，填了必须为正整数
+        String usageMonths = trimToNull(row.getOldPhoneUsageMonths());
+        if (usageMonths != null && !usageMonths.matches("\\d+(\\.0+)?")) {
+            return prefix + "旧手机使用月数无效，必须为正整数";
+        }
+
+        // 鸭宝激活状态：选填，填了必须在枚举范围内
+        String activated = trimToNull(row.getActivated());
+        if (activated != null && parseActivated(activated) == null) {
+            return prefix + "鸭宝激活状态值无效，可填写：已激活/未激活（或 true/false、1/0、是/否）";
+        }
+
         // 签约日期必填
-        if (info.getSignatureDate() == null || info.getSignatureDate().trim().isEmpty()) {
+        if (trimToNull(row.getSignatureDate()) == null) {
             return prefix + "签约日期不能为空";
         }
 
         return null;
     }
 
+    /** 将导入模型解析为订单对象（含门店归属解析，留资匹配另行处理） */
+    private PhoneActiveInfo buildActiveInfo(PhoneActiveInfoImport row, String operName) {
+        PhoneActiveInfo info = new PhoneActiveInfo();
+        info.setSn(trimToNull(row.getSn()));
+        info.setPhoneType(trimToNull(row.getPhoneType()));
+        info.setModel(trimToNull(row.getModel()));
+        info.setImei1(trimToNull(row.getImei1()));
+        info.setImei2(trimToNull(row.getImei2()));
+        info.setNickName(trimToNull(row.getNickName()));
+        info.setSkipApiCall(Integer.valueOf(trimToNull(row.getSkipApiCall())));
+        info.setOldPhoneStatus(parseIntOrNull(row.getOldPhoneStatus()));
+        info.setOldPhoneUsageMonths(parseUsageMonthsOrNull(row.getOldPhoneUsageMonths()));
+        info.setCreateTime(row.getCreateTime());
+        info.setStoreId(resolveImportStoreId(row.getStore(), operName));
+        info.setSignatureModel(trimToNull(row.getSignatureModel()));
+        info.setSignatureImei(trimToNull(row.getSignatureImei()));
+        info.setSignatureDate(trimToNull(row.getSignatureDate()));
+        return info;
+    }
+
     /**
-     * 基于 @Excel(required=true) 注解校验必填字段
-     *
-     * @param info 待校验的订单对象
-     * @return 错误消息，校验通过返回 null
+     * 解析导入的所属门店列：可填门店名称（系统自动匹配）或门店ID，留空则归属当前操作人所属门店
+     * <p>
+     * 填写了但匹配不到时抛出异常（该行导入失败），避免订单被静默归属到错误门店。
      */
-    private String validateRequiredFields(PhoneActiveInfo info) {
-        Field[] fields = PhoneActiveInfo.class.getDeclaredFields();
-        for (Field field : fields) {
-            Excel excel = field.getAnnotation(Excel.class);
-            if (excel == null || !excel.required()) {
-                continue;
+    private Long resolveImportStoreId(String store, String operName) {
+        String value = trimToNull(store);
+        if (value == null) {
+            return resolveStoreIdByUsername(operName);
+        }
+        Long storeId = value.matches("\\d+")
+                ? resolveStoreIdById(Long.valueOf(value))
+                : phoneActiveInfoMapper.selectStoreIdByName(value, STORE_PARENT_DEPT_ID);
+        if (storeId == null) {
+            throw new IllegalArgumentException("所属门店「" + value + "」未匹配到，请填写正确的门店名称或门店ID");
+        }
+        return storeId;
+    }
+
+    /** 校验数字门店ID是否为通信源手机下的有效门店（启用且未删除） */
+    private Long resolveStoreIdById(Long storeId) {
+        if (storeId == null) {
+            return null;
+        }
+        SysDept dept = sysDeptMapper.selectDeptById(storeId);
+        if (dept == null || !"0".equals(dept.getStatus()) || !"0".equals(dept.getDelFlag())) {
+            return null;
+        }
+        return dept.getParentId() != null && dept.getParentId().equals(STORE_PARENT_DEPT_ID) ? storeId : null;
+    }
+
+    /**
+     * 根据留资人电话匹配留资记录，匹配不到时自动创建留资记录（需要留资人姓名）
+     */
+    private void resolveLeaveInfo(PhoneActiveInfo info, PhoneActiveInfoImport row, String operName,
+                                  int rowNum, List<String> warns) {
+        String phoneNum = trimToNull(row.getPhoneNum());
+        if (phoneNum == null) {
+            return;
+        }
+        LeaveInformation exist = leaveInformationMapper.selectByPhoneNum(phoneNum);
+        if (exist != null) {
+            info.setInfoId(exist.getId());
+            return;
+        }
+        // 匹配不到且缺留资人姓名时无法自动创建，仅提示不阻断导入
+        String name = trimToNull(row.getName());
+        if (name == null) {
+            warns.add("第" + rowNum + "行提示：留资人电话「" + phoneNum + "」未在留资库中匹配到，且未填写留资人姓名，未自动创建留资记录");
+            return;
+        }
+        LeaveInformation created = new LeaveInformation();
+        created.setName(name);
+        created.setPhoneNum(phoneNum);
+        created.setCreateBy(operName);
+        created.setUpdateBy(operName);
+        created.setCreateTime(new Date());
+        created.setUpdateTime(new Date());
+        leaveInformationMapper.insert(created);
+        info.setInfoId(created.getId());
+        warns.add("第" + rowNum + "行提示：留资人电话「" + phoneNum + "」未在留资库中匹配到，已自动创建留资记录（" + name + "）");
+    }
+
+    /** 更新已存在的订单：主表/详情/签约均只更新非空字段，避免覆盖未填写的列 */
+    private void updateExistingOrder(PhoneActiveInfo info, PhoneActiveInfoImport row,
+                                     PhoneActiveInfo exist, String operName) {
+        info.setId(exist.getId());
+        info.setUpdateBy(operName);
+        // 门店未填写时不覆盖原门店快照
+        if (trimToNull(row.getStore()) == null) {
+            info.setStoreId(null);
+        }
+        phoneActiveInfoMapper.updateById(info);
+
+        PhoneActiveDetail detail = buildDetail(exist.getId(), row);
+        if (hasDetailData(detail)) {
+            phoneActiveDetailMapper.updateByOrderIdSelective(detail);
+        }
+        if (hasContractData(row)) {
+            PhoneOrderContract contract = buildContract(exist.getId(), row);
+            if (phoneOrderContractMapper.selectByOrderId(exist.getId()) != null) {
+                phoneOrderContractMapper.updateByOrderIdSelective(contract);
+            } else {
+                phoneOrderContractMapper.insert(contract);
             }
-            try {
-                // 使用getter方法获取值
-                Method getter = findGetter(field);
-                if (getter == null) {
-                    continue;
-                }
-                Object value = getter.invoke(info);
-                if (isNullOrEmpty(value)) {
-                    return excel.name() + "不能为空";
-                }
-            } catch (Exception e) {
-                return excel.name() + "校验失败：" + e.getMessage();
-            }
+        }
+    }
+
+    /** 新增订单：主表/详情/签约三表落库 */
+    private void insertNewOrder(PhoneActiveInfo info, PhoneActiveInfoImport row, String operName) {
+        info.setCreateBy(operName);
+        info.setUpdateBy(operName);
+        if (info.getCreateTime() == null) {
+            info.setCreateTime(new Date());
+        }
+        info.setUpdateTime(new Date());
+        phoneActiveInfoMapper.insert(info);
+        Long orderId = info.getId();
+
+        phoneActiveDetailMapper.insert(buildDetail(orderId, row));
+        if (hasContractData(row)) {
+            phoneOrderContractMapper.insert(buildContract(orderId, row));
+        }
+    }
+
+    /** 由导入行构建详情表数据 */
+    private PhoneActiveDetail buildDetail(Long orderId, PhoneActiveInfoImport row) {
+        PhoneActiveDetail detail = new PhoneActiveDetail();
+        detail.setOrderId(orderId);
+        detail.setActivated(parseActivated(trimToNull(row.getActivated())));
+        detail.setActivateDate(trimToNull(row.getActivateDate()));
+        detail.setCoverage(trimToNull(row.getCoverage()));
+        detail.setSysTime(trimToNull(row.getSysTime()));
+        return detail;
+    }
+
+    /** 详情表是否存在非空字段（为空时跳过 selective 更新，避免生成空 SET 语句） */
+    private boolean hasDetailData(PhoneActiveDetail detail) {
+        return detail.getActivated() != null
+                || detail.getActivateDate() != null
+                || detail.getCoverage() != null
+                || detail.getSysTime() != null;
+    }
+
+    /** 由导入行构建签约表数据 */
+    private PhoneOrderContract buildContract(Long orderId, PhoneActiveInfoImport row) {
+        PhoneOrderContract contract = new PhoneOrderContract();
+        contract.setOrderId(orderId);
+        contract.setSignatureModel(trimToNull(row.getSignatureModel()));
+        contract.setSignatureImei(trimToNull(row.getSignatureImei()));
+        contract.setSignatureDate(trimToNull(row.getSignatureDate()));
+        return contract;
+    }
+
+    /** 判断导入行是否存在签约数据 */
+    private boolean hasContractData(PhoneActiveInfoImport row) {
+        return trimToNull(row.getSignatureModel()) != null
+                || trimToNull(row.getSignatureImei()) != null
+                || trimToNull(row.getSignatureDate()) != null;
+    }
+
+    /**
+     * 解析鸭宝激活状态：已激活/未激活、true/false、1/0、是/否，无法识别返回 null
+     */
+    private Boolean parseActivated(String value) {
+        String v = trimToNull(value);
+        if (v == null) {
+            return null;
+        }
+        if ("已激活".equals(v) || "是".equals(v) || "1".equals(v) || "true".equalsIgnoreCase(v)) {
+            return Boolean.TRUE;
+        }
+        if ("未激活".equals(v) || "否".equals(v) || "0".equals(v) || "false".equalsIgnoreCase(v)) {
+            return Boolean.FALSE;
         }
         return null;
     }
 
-    private boolean isNullOrEmpty(Object value) {
-        if (value == null) {
-            return true;
-        }
-        if (value instanceof String) {
-            return ((String) value).trim().isEmpty();
-        }
-        return false;
+    private Integer parseIntOrNull(String value) {
+        String v = trimToNull(value);
+        return v == null ? null : Integer.valueOf(v);
     }
 
-    private Method findGetter(Field field) {
-        String name = field.getName();
-        String getterName = "get" + Character.toUpperCase(name.charAt(0)) + name.substring(1);
-        try {
-            return PhoneActiveInfo.class.getMethod(getterName);
-        } catch (NoSuchMethodException e) {
+    /** 旧手机使用月数：兼容 Excel 数值列产生的 "24.0" 形式 */
+    private Integer parseUsageMonthsOrNull(String value) {
+        String v = trimToNull(value);
+        if (v == null) {
             return null;
         }
+        return new BigDecimal(v).intValue();
+    }
+
+    /** 组装导入结果摘要（展示给用户，包含错误与提示明细） */
+    private String buildImportResultMessage(int total, int successCount, int updateCount, int failCount,
+                                            List<String> errors, List<String> warns) {
+        StringBuilder message = new StringBuilder();
+        message.append("共 ").append(total).append(" 条数据，成功导入 ").append(successCount).append(" 条");
+        if (updateCount > 0) {
+            message.append("，更新 ").append(updateCount).append(" 条");
+        }
+        if (failCount > 0) {
+            message.append("，失败 ").append(failCount).append(" 条");
+        }
+        if (!warns.isEmpty()) {
+            message.append("<br/>").append(String.join("<br/>", warns));
+        }
+        if (!errors.isEmpty()) {
+            message.append("<br/>").append(String.join("<br/>", errors));
+        }
+        return message.toString();
+    }
+
+    private String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     @Override

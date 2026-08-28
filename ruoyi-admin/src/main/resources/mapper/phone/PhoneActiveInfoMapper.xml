@@ -105,6 +105,7 @@
             <if test="skipApiCall != null">skip_api_call = #{skipApiCall},</if>
             <if test="oldPhoneStatus != null">old_phone_status = #{oldPhoneStatus},</if>
             <if test="oldPhoneUsageMonths != null">old_phone_usage_months = #{oldPhoneUsageMonths},</if>
+            <if test="nickName != null">nick_name = #{nickName},</if>
             update_time = now()
             <if test="updateBy != null">, update_by = #{updateBy}</if>
         </set>
@@ -378,10 +379,12 @@
         SELECT
             <include refid="Base_Column_List_Q"/>,
             <include refid="Detail_Column_List"/>,
-            <include refid="Contract_Column_List"/>
+            <include refid="Contract_Column_List"/>,
+            sd.dept_name AS store_name
         FROM phone_active_info pai
         LEFT JOIN phone_active_detail pad ON pai.id = pad.order_id
         LEFT JOIN phone_order_contract poc ON pai.id = poc.order_id
+        LEFT JOIN sys_dept sd ON pai.store_id = sd.dept_id
         <where>
             poc.signature_date IS NOT NULL AND poc.signature_date != ''
             <if test="createBy != null and createBy != ''">
@@ -403,6 +406,18 @@
           AND status = '0'
           AND del_flag = '0'
         ORDER BY order_num ASC
+    </select>
+
+    <!-- 按门店名称精确匹配门店ID（用于订单导入，名称重复时取排序靠前的门店） -->
+    <select id="selectStoreIdByName" resultType="java.lang.Long">
+        SELECT dept_id
+        FROM sys_dept
+        WHERE parent_id = #{storeParentDeptId}
+          AND dept_name = #{storeName}
+          AND status = '0'
+          AND del_flag = '0'
+        ORDER BY order_num ASC
+        LIMIT 1
     </select>
 
     <!-- 门店对比统计：LEFT JOIN 门店维度，无订单的门店也返回（数量为0） -->

@@ -4,6 +4,7 @@ import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.R;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.web.domain.PhoneActiveInfo;
+import com.ruoyi.web.domain.PhoneActiveInfoImport;
 import com.ruoyi.web.mapper.PhoneActiveInfoMapper;
 import com.ruoyi.web.service.IPhoneActiveInfoService;
 import io.swagger.annotations.Api;
@@ -16,7 +17,9 @@ import org.springframework.web.multipart.MultipartFile;
 import javax.servlet.http.HttpServletResponse;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import static com.ruoyi.common.utils.PageUtils.startPage;
 import static com.ruoyi.common.utils.SecurityUtils.getUsername;
@@ -134,6 +137,16 @@ public class PhoneActiveOrderController extends BaseController {
         return R.ok(phoneActiveInfoService.getRecentOrders(getUsername(), DASHBOARD_RECENT_LIMIT, null));
     }
 
+    @ApiOperation("首页门店最近订单（当前用户所属门店全部人员）")
+    @GetMapping("/dashboard/storeRecentOrders")
+    public R getStoreRecentOrders() {
+        Long storeId = phoneActiveInfoService.resolveStoreIdByUsername(getUsername());
+        if (storeId == null) {
+            return R.ok(Collections.emptyList());
+        }
+        return R.ok(phoneActiveInfoService.getRecentOrders(null, DASHBOARD_RECENT_LIMIT, storeId));
+    }
+
     private String resolveCurrentDate() {
         // 仪表盘首页始终使用服务器真实日期，不受 sys.time 业务配置影响
         // sys.time 配置仅用于手机设备系统时间的同步，不应影响后台管理界面的数据查询
@@ -175,7 +188,7 @@ public class PhoneActiveOrderController extends BaseController {
     @ApiOperation("下载订单导入模板")
     @PostMapping("/importTemplate")
     public void importTemplate(HttpServletResponse response) {
-        ExcelUtil<PhoneActiveInfo> util = new ExcelUtil<>(PhoneActiveInfo.class);
+        ExcelUtil<PhoneActiveInfoImport> util = new ExcelUtil<>(PhoneActiveInfoImport.class);
         util.importTemplateExcel(response, "订单数据");
     }
 
@@ -188,10 +201,10 @@ public class PhoneActiveOrderController extends BaseController {
     @ApiOperation("导入订单数据")
     @PostMapping("/importData")
     public R importData(MultipartFile file, @RequestParam(defaultValue = "false") boolean updateSupport) throws Exception {
-        ExcelUtil<PhoneActiveInfo> util = new ExcelUtil<>(PhoneActiveInfo.class);
-        List<PhoneActiveInfo> list = util.importExcel(file.getInputStream());
-        String message = phoneActiveInfoService.importActiveInfo(list, updateSupport, getUsername());
-        return R.ok(message);
+        ExcelUtil<PhoneActiveInfoImport> util = new ExcelUtil<>(PhoneActiveInfoImport.class);
+        List<PhoneActiveInfoImport> list = util.importExcel(file.getInputStream());
+        Map<String, Object> result = phoneActiveInfoService.importActiveInfo(list, updateSupport, getUsername());
+        return R.ok(result);
     }
 
     /**

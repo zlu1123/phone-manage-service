@@ -70,6 +70,16 @@ public interface PhoneActiveInfoMapper {
     List<Map<String, Object>> selectStoreList(@Param("storeParentDeptId") Long storeParentDeptId);
 
     /**
+     * 按门店名称精确匹配门店ID（仅限门店层级，用于订单导入）
+     *
+     * @param storeName         门店名称
+     * @param storeParentDeptId 门店父部门ID
+     * @return 门店ID（sys_dept.dept_id），匹配不到返回 null
+     */
+    Long selectStoreIdByName(@Param("storeName") String storeName,
+                             @Param("storeParentDeptId") Long storeParentDeptId);
+
+    /**
      * 各门店订单对比统计（含无订单门店）
      *
      * @param storeParentDeptId 门店父部门ID

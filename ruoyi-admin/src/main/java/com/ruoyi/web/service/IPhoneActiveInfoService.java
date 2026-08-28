@@ -1,6 +1,7 @@
 package com.ruoyi.web.service;
 
 import com.ruoyi.web.domain.PhoneActiveInfo;
+import com.ruoyi.web.domain.PhoneActiveInfoImport;
 import com.ruoyi.web.domain.PhoneOrderContract;
 
 import java.util.List;
@@ -33,13 +34,28 @@ public interface IPhoneActiveInfoService {
 
     /**
      * 批量导入订单数据
+     * <p>
+     * 两阶段处理：
+     * <ol>
+     *     <li>先对全部行做字段校验（含门店匹配、文件内序列号去重），
+     *         任何一行校验不通过则整个文件不导入，不会写入任何数据；</li>
+     *     <li>全部校验通过后逐行入库，运行期冲突（如序列号已存在）仅影响对应行。</li>
+     * </ol>
+     * 返回结构化结果：
+     * <ul>
+     *     <li>total：总条数</li>
+     *     <li>successCount / updateCount / failCount：成功、更新、失败条数</li>
+     *     <li>errors：失败明细列表</li>
+     *     <li>warns：提示信息列表（如自动创建留资记录）</li>
+     *     <li>message：结果摘要（展示给用户）</li>
+     * </ul>
      *
      * @param list 导入的数据列表
      * @param updateSupport 是否更新已存在的数据（根据sn判断）
      * @param operName 操作人
-     * @return 导入结果消息
+     * @return 结构化导入结果
      */
-    String importActiveInfo(List<PhoneActiveInfo> list, boolean updateSupport, String operName);
+    Map<String, Object> importActiveInfo(List<PhoneActiveInfoImport> list, boolean updateSupport, String operName);
 
     /**
      * 首页统计卡片（管理员，可选门店维度）

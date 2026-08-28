@@ -440,26 +440,39 @@
         </el-col>
       </el-row>
 
-      <!-- 个人最近订单 -->
+      <!-- 最近订单（我的 / 门店维度切换） -->
       <el-row :gutter="16" class="chart-row">
         <el-col :span="24">
           <el-card class="chart-card" shadow="hover">
             <template #header>
               <div class="chart-header">
-                <span class="chart-title">我的最近订单</span>
+                <span class="chart-title">
+                  <el-radio-group v-model="userOrderScope" size="small">
+                    <el-radio-button value="mine">我的订单</el-radio-button>
+                    <el-radio-button value="store">门店订单</el-radio-button>
+                  </el-radio-group>
+                  <span v-if="userOrderScope === 'store' && userStoreName" class="chart-scope"
+                    >· {{ userStoreName }}</span
+                  >
+                </span>
                 <el-button size="mini" type="text" :icon="DArrowRight" @click="router.push('/info/list')"
                   >查看更多</el-button
                 >
               </div>
             </template>
             <el-table
-              :data="userRecentOrders"
+              :data="displayedUserRecentOrders"
               style="width: 100%"
               size="medium"
               :header-cell-style="{ background: '#fafafa' }"
             >
               <el-table-column prop="signatureModel" label="签约型号" min-width="140" />
               <el-table-column prop="signatureImei" label="签约IMEI" min-width="160" />
+              <el-table-column v-if="userOrderScope === 'store'" label="创建人" min-width="100" align="center">
+                <template #default="scope">
+                  {{ scope.row.nickName || scope.row.createBy || '-' }}
+                </template>
+              </el-table-column>
               <el-table-column label="签约日期" min-width="120" align="center">
                 <template #default="scope">
                   {{ scope.row.signatureDate || '-' }}
@@ -517,6 +530,7 @@ import {
   getUserStatistics,
   getUserOrderTrend,
   getUserRecentOrders,
+  getStoreRecentOrders,
   getApiBalance,
 } from '@/api/dashboard';
 
@@ -597,6 +611,10 @@ const userStatistics = ref({
 });
 
 const userRecentOrders = ref([]);
+// 门店维度最近订单（所属门店全部人员）
+const storeRecentOrders = ref([]);
+// 最近订单展示维度：mine=我的订单，store=门店订单
+const userOrderScope = ref('mine');
 const userOrderTrendChart = ref(null);
 const userOrderTrendChartRef = ref(null);
 
@@ -656,6 +674,14 @@ const nickName = computed(() => {
 const avatar = computed(() => {
   return userStore.avatar;
 });
+
+/** 普通用户最近订单展示列表（按 我的/门店 维度切换） */
+const displayedUserRecentOrders = computed(() =>
+  userOrderScope.value === 'store' ? storeRecentOrders.value : userRecentOrders.value
+);
+
+/** 门店维度下所属门店名称（取第一条数据的门店名） */
+const userStoreName = computed(() => storeRecentOrders.value[0]?.storeName || '');
 
 /** 根据时间段生成问候语 */
 const greetingText = computed(() => {
@@ -1116,7 +1142,7 @@ async function initMonthlyChart() {
 
 /** 初始化普通用户数据 */
 async function initUserData() {
-  await Promise.all([fetchUserStatistics(), fetchUserRecentOrders()]);
+  await Promise.all([fetchUserStatistics(), fetchUserRecentOrders(), fetchStoreRecentOrders()]);
   nextTick(() => {
     initUserOrderTrendChart();
   });
@@ -1139,6 +1165,16 @@ async function fetchUserRecentOrders() {
     userRecentOrders.value = res.data;
   } catch (e) {
     console.error('获取用户最近订单失败：', e);
+  }
+}
+
+/** 获取门店最近订单（所属门店全部人员） */
+async function fetchStoreRecentOrders() {
+  try {
+    const res = await getStoreRecentOrders();
+    storeRecentOrders.value = res.data || [];
+  } catch (e) {
+    console.error('获取门店最近订单失败：', e);
   }
 }
 

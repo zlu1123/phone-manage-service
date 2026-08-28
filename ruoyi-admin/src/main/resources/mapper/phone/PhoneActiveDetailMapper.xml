@@ -26,4 +26,18 @@
         )
     </insert>
 
+    <!-- 仅更新非空字段：导入更新时避免覆盖未填写的列 -->
+    <update id="updateByOrderIdSelective">
+        UPDATE phone_active_detail
+        <set>
+            <if test="activated != null">activated = #{activated},</if>
+            <if test="activateDate != null">activate_date = #{activateDate},</if>
+            <if test="coverage != null">coverage = #{coverage},</if>
+            <if test="activeInfo != null">active_info = #{activeInfo},</if>
+            <if test="sysTime != null">sys_time = #{sysTime},</if>
+            <if test="imagePath != null">image_path = #{imagePath},</if>
+        </set>
+        WHERE order_id = #{orderId}
+    </update>
+
 </mapper>

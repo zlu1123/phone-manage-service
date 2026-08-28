@@ -80,6 +80,14 @@ export function getUserRecentOrders() {
   })
 }
 
+// 获取门店最近订单列表（当前用户所属门店的全部人员订单）
+export function getStoreRecentOrders() {
+  return request({
+    url: '/system/order/dashboard/storeRecentOrders',
+    method: 'get'
+  })
+}
+
 // 查询06API余额（真实接口）
 export function getApiBalance() {
   return request({

@@ -146,6 +146,14 @@ public class LeaveInforationServiceImpl implements LeaveInformationService {
         return leaveInformationMapper.selectByNameOrNum(text);
     }
 
+    @Override
+    public LeaveInformation selectByPhoneNum(String phoneNum) {
+        if (!StringUtils.hasText(phoneNum)) {
+            return null;
+        }
+        return leaveInformationMapper.selectByPhoneNum(phoneNum.trim());
+    }
+
     /**
      * 导入留资信息
      * <p>

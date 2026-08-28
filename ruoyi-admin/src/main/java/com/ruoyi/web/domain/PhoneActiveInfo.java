@@ -48,7 +48,7 @@ public class PhoneActiveInfo extends BaseEntity {
     @Excel(name = "创建时间", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss", required = true)
     private Date createTime;
 
-    @Excel(name = "昵称")
+    @Excel(name = "店员名称")
     private String nickName;
 
     @Excel(name = "更新时间", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")

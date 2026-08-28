@@ -48,4 +48,19 @@
         WHERE order_id = #{orderId}
     </update>
 
+    <!-- 仅更新非空字段：导入更新时避免覆盖未填写的列 -->
+    <update id="updateByOrderIdSelective">
+        UPDATE phone_order_contract
+        <set>
+            <if test="contractId != null">contract_id = #{contractId},</if>
+            <if test="contractPath != null">contract_path = #{contractPath},</if>
+            <if test="contractContent != null">contract_content = #{contractContent},</if>
+            <if test="signatureModel != null">signature_model = #{signatureModel},</if>
+            <if test="signatureImei != null">signature_imei = #{signatureImei},</if>
+            <if test="signatureDate != null">signature_date = #{signatureDate},</if>
+            <if test="signaturePath != null">signature_path = #{signaturePath},</if>
+        </set>
+        WHERE order_id = #{orderId}
+    </update>
+
 </mapper>

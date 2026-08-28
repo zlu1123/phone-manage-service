@@ -121,7 +121,7 @@
           <div class="expand-section">
             <h4 class="expand-title">签约信息</h4>
             <el-descriptions :column="3" size="small" border>
-              <el-descriptions-item label="昵称">{{ row.nickName || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="店员名称">{{ row.nickName || '-' }}</el-descriptions-item>
               <el-descriptions-item label="签名型号">{{ row.signatureModel || '-' }}</el-descriptions-item>
               <el-descriptions-item label="签名IMEI">{{ row.signatureImei || '-' }}</el-descriptions-item>
               <el-descriptions-item label="签名日期">{{ row.signatureDate || '-' }}</el-descriptions-item>
@@ -196,13 +196,18 @@
     </el-drawer>
 
     <!-- 订单导入对话框 -->
-    <el-dialog :title="upload.title" v-model="upload.open" width="450px" append-to-body>
+    <el-dialog :title="upload.title" v-model="upload.open" width="450px" append-to-body :before-close="handleUploadDialogClose">
       <el-alert type="info" :closable="false" style="margin-bottom: 16px">
         <template #title>
           <ol style="margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.8">
-            <li>先进入<a href="javascript:void(0)" style="color: #409eff; text-decoration: underline" @click="goToLeaveInfo">「留资用户」</a>页面，导入留资人（姓名 + 电话）</li>
-            <li>下载模板，按格式填写订单数据（含留资人电话）</li>
-            <li>上传后系统自动根据<strong>留资人电话</strong>匹配 infoId</li>
+            <li>
+              <strong>跳过API</strong>：0=旧手机识别（走API查询，需填旧手机序列号），1=自有渠道（跳过API，需填旧手机状态：0=无旧手机，1=丢失/损坏）
+            </li>
+            <li>
+              <strong>所属门店</strong>填门店名称即可，系统自动匹配（也可填门店ID，留空则归属当前账号所属门店）
+            </li>
+            <li>先进入<a href="javascript:void(0)" style="color: #409eff; text-decoration: underline" @click="goToLeaveInfo">「留资用户」</a>页面导入留资人（姓名 + 电话）；留资库中不存在时，填写「留资人电话 + 留资人姓名」系统会自动创建</li>
+            <li>下载模板，按格式填写订单数据，上传后系统自动根据<strong>留资人电话</strong>匹配留资记录</li>
           </ol>
         </template>
       </el-alert>
@@ -225,11 +230,15 @@
           <span>仅允许导入xls、xlsx格式文件。</span>
           <br />
           <span style="color: #e6a23c">
-            必填列：创建时间、跳过API；旧手机识别时序列号必填，自有渠道时旧手机状态必填
+            必填列：创建时间（yyyy-MM-dd）、跳过API、签名日期；旧手机识别时序列号必填，自有渠道时旧手机状态必填
           </span>
           <br />
           <span style="color: #909399; font-size: 12px">
-            留资人电话用于匹配已有留资记录，请先在「留资用户」中导入后再上传订单
+            跳过API：0=旧手机识别（走API查询），1=自有渠道（跳过API查询）；所属门店填门店名称即可，系统自动匹配
+          </span>
+          <br />
+          <span style="color: #909399; font-size: 12px">
+            留资人电话用于匹配已有留资记录，匹配不到且填写了留资人姓名时系统自动创建留资记录
           </span>
           <br />
           <el-link
@@ -237,14 +246,17 @@
             :underline="false"
             style="font-size: 12px; vertical-align: baseline"
             @click="importTemplate"
-            >下载模板（含示例数据）</el-link
+            >下载模板（含填写说明和示例数据）</el-link
           >
         </template>
       </el-upload>
       <template #footer>
         <div class="dialog-footer">
-          <el-button type="primary" @click="submitFileForm">确 定</el-button>
+          <el-button type="primary" :loading="upload.isUploading" :disabled="upload.isUploading" @click="submitFileForm"
+            >确 定</el-button
+          >
           <el-button
+            :disabled="upload.isUploading"
             @click="
               upload.open = false;
               selectedFile = null;
@@ -360,7 +372,7 @@ const searchFields = computed(() => [
     ],
   },
   { prop: 'createBy', label: '创建者', type: 'input' },
-  { prop: 'nickName', label: '昵称', type: 'input' },
+  { prop: 'nickName', label: '店员名称', type: 'input' },
   {
     prop: 'storeId',
     label: '所属门店',
@@ -446,7 +458,7 @@ const columns = [
   },
   { label: '留资人姓名', prop: 'name', width: '100' },
   { label: '留资人电话', prop: 'phoneNum' },
-  { label: '创建者', prop: 'nickName' },
+  { label: '店员名称', prop: 'nickName' },
   { label: '所属门店', prop: 'storeName', width: '130' },
   {
     label: '创建时间',
@@ -736,7 +748,7 @@ const exportColumns = [
   { label: '鸭宝查询保修到期时间', prop: 'coverage', formatter: (row) => formatDate(row.coverage) },
   { label: '旧手机质保状态', formatter: (row) => getWarrantyInfo(row).status },
   { label: '查询时系统时间', prop: 'sysTime' },
-  { label: '创建者', prop: 'nickName' },
+  { label: '店员名称', prop: 'nickName' },
   { label: '留资人姓名', prop: 'name' },
   { label: '留资人电话', prop: 'phoneNum' },
   {
@@ -832,6 +844,7 @@ const handleImport = () => {
   upload.title = '订单导入';
   upload.open = true;
   selectedFile.value = null;
+  upload.isUploading = false;
 };
 
 /** 跳转到留资用户页面 */
@@ -852,15 +865,14 @@ const importTemplateHeaders = [
   '旧手机IMEI1',
   '旧手机IMEI2',
   '旧手机使用月数',
-  '昵称',
+  '店员名称',
   '所属门店',
   '留资人电话',
   '留资人姓名',
   '鸭宝激活状态',
   '旧手机激活日期',
-  '鸭宝查询保修到期时间',
+  '旧手机保修到期时间',
   '查询时系统时间',
-  '图片路径',
   '签名型号',
   '签名IMEI',
   '签名日期',
@@ -868,7 +880,7 @@ const importTemplateHeaders = [
 
 /** 导入模板示例行（含两个场景示例） */
 const importTemplateExample1 = [
-  '2025-06-01 10:00:00',
+  '2025-06-01',
   '0',
   '',
   'ABC123456789',
@@ -878,21 +890,20 @@ const importTemplateExample1 = [
   '123456789012346',
   '12',
   '张璐',
-  '101',
+  '示例门店',
   '13800000000',
   '张三',
   'false',
   '2025-01-15',
   '2026-01-15',
   '2025-06-01 10:00:00',
-  '',
   'iPhone 16',
   '123456789012345',
   '2025-06-01',
 ];
 
 const importTemplateExample2 = [
-  '2025-06-01 11:00:00',
+  '2025-06-01',
   '1',
   '1',
   '',
@@ -909,15 +920,45 @@ const importTemplateExample2 = [
   '',
   '',
   '',
-  '',
   '平板3',
   '12312312312312312',
   '2025-06-01',
 ];
 
-/** 下载模板（前端生成，含两个场景示例数据） */
+/** 模板「填写说明」sheet 内容（放在第二个sheet，不影响后端按第一个sheet解析） */
+const importTemplateHelpRows = [
+  ['字段名', '是否必填', '填写说明'],
+  ['创建时间', '必填', '订单创建时间，格式：yyyy-MM-dd（只填年月日即可）'],
+  ['跳过API', '必填', '是否跳过第三方手机识别API查询：0=旧手机识别（走API查询，需填旧手机序列号），1=自有渠道（跳过API查询，需填旧手机状态）'],
+  ['旧手机状态', '条件必填', '跳过API=1时必填：0=无旧手机，1=丢失/损坏'],
+  ['旧手机序列号', '条件必填', '跳过API=0时必填：旧手机序列号（sn），用于API识别'],
+  ['旧手机品牌', '选填', '旧手机品牌名称'],
+  ['旧手机型号', '选填', '旧手机型号'],
+  ['旧手机IMEI1', '选填', '旧手机IMEI1号'],
+  ['旧手机IMEI2', '选填', '旧手机IMEI2号'],
+  ['旧手机使用月数', '选填', '旧手机已使用月数，正整数'],
+  ['店员名称', '选填', '店员姓名（创建该订单的店员）'],
+  ['所属门店', '选填', '填写门店名称即可，系统自动匹配；也可填门店ID；留空则归属当前操作人所属门店（模板示例1填名称、示例2填ID）'],
+  ['留资人电话', '选填', '用于匹配留资库中的留资记录；匹配不到且填写了留资人姓名时，系统自动创建留资记录'],
+  ['留资人姓名', '选填', '留资人姓名（配合留资人电话使用）'],
+  ['鸭宝激活状态', '选填', '可填：已激活/未激活（或 true/false、1/0）'],
+  ['旧手机激活日期', '选填', '旧手机激活日期，格式：yyyy-MM-dd'],
+  ['旧手机保修到期时间', '选填', '保修到期时间，格式：yyyy-MM-dd'],
+  ['查询时系统时间', '选填', '查询时的系统时间'],
+  ['签名型号', '选填', '签约手机型号'],
+  ['签名IMEI', '选填', '签约手机IMEI'],
+  ['签名日期', '必填', '签约日期，格式：yyyy-MM-dd'],
+];
+
+/** 下载模板（前端生成，含两个场景示例数据 + 填写说明） */
 const importTemplate = () => {
-  const sheetData = [importTemplateHeaders, importTemplateExample1, importTemplateExample2];
+  // 所属门店示例使用系统真实门店：示例1填门店名称、示例2填门店ID（门店列表未加载到时退回占位文案）
+  const firstStore = storeOptions.value[0];
+  const example1 = [...importTemplateExample1];
+  const example2 = [...importTemplateExample2];
+  example1[10] = firstStore?.label || '示例门店';
+  example2[10] = firstStore?.value != null ? String(firstStore.value) : '';
+  const sheetData = [importTemplateHeaders, example1, example2];
   const ws = XLSX.utils.aoa_to_sheet(sheetData);
   ws['!cols'] = [
     { wch: 22 }, { wch: 10 }, { wch: 12 }, { wch: 18 },
@@ -925,17 +966,30 @@ const importTemplate = () => {
     { wch: 16 }, { wch: 12 }, { wch: 10 },
     { wch: 16 }, { wch: 12 },
     { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 18 },
-    { wch: 34 }, { wch: 14 }, { wch: 22 }, { wch: 14 },
+    { wch: 14 }, { wch: 22 }, { wch: 14 },
   ];
+  // 填写说明单独一个sheet，置于模板之后，避免影响后端按第一个sheet解析导入
+  const helpWs = XLSX.utils.aoa_to_sheet(importTemplateHelpRows);
+  helpWs['!cols'] = [{ wch: 18 }, { wch: 10 }, { wch: 80 }];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '订单导入模板');
+  XLSX.utils.book_append_sheet(wb, helpWs, '填写说明');
   const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
   saveAs(new Blob([wbout], { type: 'application/octet-stream' }), '订单导入模板.xlsx');
 };
 
-/** 文件上传进度 */
+/** 文件上传进度（仅用于锁定按钮和展示loading） */
 const handleFileUploadProgress = () => {
   upload.isUploading = true;
+};
+
+/** 导入过程中禁止关闭弹窗（X 按钮、ESC、遮罩点击均会触发此钩子） */
+const handleUploadDialogClose = (done) => {
+  if (upload.isUploading) {
+    ElMessage.warning('数据导入中，请稍候…');
+    return;
+  }
+  done();
 };
 
 /** 文件上传成功 */
@@ -944,7 +998,9 @@ const handleFileSuccess = (response) => {
   upload.isUploading = false;
   selectedFile.value = null;
   uploadRef.value.clearFiles();
-  const msg = typeof response === 'string' ? response : response.data || response.msg || '';
+  // 后端返回结构化导入结果：data.message 为结果摘要（含错误/提示明细）
+  const result = response && response.data;
+  const msg = (result && result.message) || (typeof result === 'string' ? result : '') || (response && response.msg) || '';
   ElMessageBox.alert(
     "<div style='overflow: auto;overflow-x: hidden;max-height: 70vh;padding: 10px 20px 0;'>" + msg + '</div>',
     '导入结果',
@@ -991,7 +1047,7 @@ const submitFileForm = () => {
       // 解析表头，构建列索引映射
       const headerRow = rows[0];
       const colMap = {}; // { '列名' : 列索引 }
-      const requiredHeaders = ['创建时间', '跳过API'];
+      const requiredHeaders = ['创建时间', '跳过API', '签名日期'];
       headerRow.forEach((h, idx) => {
         const clean = String(h || '').trim();
         if (clean) colMap[clean] = idx;
@@ -1004,7 +1060,11 @@ const submitFileForm = () => {
         return;
       }
 
-      // 逐行校验
+      // 逐行校验（规则与后端校验保持一致），全部通过才允许上传
+      const errors = [];
+      const dateRegex = /^\d{4}-\d{1,2}-\d{1,2}$/;
+      const datetimeRegex = /^\d{4}-\d{1,2}-\d{1,2}( \d{1,2}:\d{1,2}(:\d{1,2})?)?$/;
+
       for (let r = 1; r < rows.length; r++) {
         const row = rows[r];
         // 跳过全空行
@@ -1016,27 +1076,40 @@ const submitFileForm = () => {
         // 辅助取值函数
         const getVal = (colName) => {
           const idx = colMap[colName];
-          if (idx === undefined) return undefined;
+          if (idx === undefined) return '';
           const v = row[idx];
           return v !== undefined && v !== null ? String(v).trim() : '';
         };
+        // 日期列取值：单元格为真正的Excel日期（序列号）时转换为 yyyy-MM-dd 字符串
+        const getDateVal = (colName) => {
+          const idx = colMap[colName];
+          if (idx === undefined) return '';
+          const v = row[idx];
+          if (v === undefined || v === null || v === '') return '';
+          if (typeof v === 'number') {
+            try {
+              return XLSX.SSF.format('yyyy-mm-dd', v);
+            } catch (e) {
+              return String(v);
+            }
+          }
+          return String(v).trim();
+        };
 
-        // 1. 创建时间必填
-        const createTimeVal = getVal('创建时间');
+        // 1. 创建时间必填 + 格式（yyyy-MM-dd，可带时分秒）
+        const createTimeVal = getDateVal('创建时间');
         if (!createTimeVal) {
-          ElMessage.warning(`${rowLabel}「创建时间」不能为空`);
-          return;
+          errors.push(`${rowLabel}「创建时间」不能为空`);
+        } else if (!datetimeRegex.test(createTimeVal)) {
+          errors.push(`${rowLabel}「创建时间」格式无效（${createTimeVal}），应为 yyyy-MM-dd`);
         }
 
         // 2. 跳过API 必填 + 值域校验
         const skipApiCallVal = getVal('跳过API');
         if (!skipApiCallVal) {
-          ElMessage.warning(`${rowLabel}「跳过API」不能为空（0=旧手机识别, 1=自有渠道）`);
-          return;
-        }
-        if (skipApiCallVal !== '0' && skipApiCallVal !== '1') {
-          ElMessage.warning(`${rowLabel}「跳过API」值无效（${skipApiCallVal}），必须为 0 或 1`);
-          return;
+          errors.push(`${rowLabel}「跳过API」不能为空（0=旧手机识别, 1=自有渠道）`);
+        } else if (skipApiCallVal !== '0' && skipApiCallVal !== '1') {
+          errors.push(`${rowLabel}「跳过API」值无效（${skipApiCallVal}），必须为 0 或 1`);
         }
 
         const oldPhoneStatusVal = getVal('旧手机状态');
@@ -1045,20 +1118,63 @@ const submitFileForm = () => {
         if (skipApiCallVal === '0') {
           // 旧手机识别：序列号必填
           if (!snVal) {
-            ElMessage.warning(`${rowLabel}跳过API=0（旧手机识别），「旧手机序列号」不能为空`);
-            return;
+            errors.push(`${rowLabel}跳过API=0（旧手机识别），「旧手机序列号」不能为空`);
           }
-        } else {
-          // 自有渠道：旧手机状态必填
+        } else if (skipApiCallVal === '1') {
+          // 自有渠道：旧手机状态必填 + 值域
           if (!oldPhoneStatusVal) {
-            ElMessage.warning(`${rowLabel}跳过API=1（自有渠道），「旧手机状态」不能为空（0=无旧手机, 1=丢失/损坏）`);
-            return;
-          }
-          if (oldPhoneStatusVal !== '0' && oldPhoneStatusVal !== '1') {
-            ElMessage.warning(`${rowLabel}「旧手机状态」值无效（${oldPhoneStatusVal}），必须为 0 或 1`);
-            return;
+            errors.push(`${rowLabel}跳过API=1（自有渠道），「旧手机状态」不能为空（0=无旧手机, 1=丢失/损坏）`);
+          } else if (oldPhoneStatusVal !== '0' && oldPhoneStatusVal !== '1') {
+            errors.push(`${rowLabel}「旧手机状态」值无效（${oldPhoneStatusVal}），必须为 0 或 1`);
           }
         }
+
+        // 3. 旧手机使用月数：选填，填了必须为正整数
+        const usageMonthsVal = getVal('旧手机使用月数');
+        if (usageMonthsVal && !/^\d+(\.0+)?$/.test(usageMonthsVal)) {
+          errors.push(`${rowLabel}「旧手机使用月数」无效（${usageMonthsVal}），必须为正整数`);
+        }
+
+        // 4. 鸭宝激活状态：选填，填了必须在枚举范围内
+        const activatedVal = getVal('鸭宝激活状态');
+        if (activatedVal && !['已激活', '未激活', '是', '否', '1', '0'].includes(activatedVal) && !/^(true|false)$/i.test(activatedVal)) {
+          errors.push(`${rowLabel}「鸭宝激活状态」值无效（${activatedVal}），可填写：已激活/未激活（或 true/false、1/0）`);
+        }
+
+        // 5. 日期列：选填，填了必须为 yyyy-MM-dd
+        ['旧手机激活日期', '旧手机保修到期时间'].forEach((colName) => {
+          const v = getDateVal(colName);
+          if (v && !dateRegex.test(v)) {
+            errors.push(`${rowLabel}「${colName}」格式无效（${v}），应为 yyyy-MM-dd`);
+          }
+        });
+
+        // 6. 查询时系统时间：选填，填了必须为日期或日期时间
+        const sysTimeVal = getDateVal('查询时系统时间');
+        if (sysTimeVal && !datetimeRegex.test(sysTimeVal)) {
+          errors.push(`${rowLabel}「查询时系统时间」格式无效（${sysTimeVal}），应为 yyyy-MM-dd HH:mm:ss`);
+        }
+
+        // 7. 签名日期必填 + 格式
+        const signatureDateVal = getDateVal('签名日期');
+        if (!signatureDateVal) {
+          errors.push(`${rowLabel}「签名日期」不能为空`);
+        } else if (!dateRegex.test(signatureDateVal)) {
+          errors.push(`${rowLabel}「签名日期」格式无效（${signatureDateVal}），应为 yyyy-MM-dd`);
+        }
+      }
+
+      // 存在校验错误：不上传，弹出全部错误明细
+      if (errors.length > 0) {
+        ElMessageBox.alert(
+          "<div style='overflow: auto;overflow-x: hidden;max-height: 70vh;padding: 10px 20px 0;'>" +
+            '文件校验未通过，未导入任何数据，请修改后重新上传：<br/>' +
+            errors.join('<br/>') +
+            '</div>',
+          '导入校验失败',
+          { dangerouslyUseHTMLString: true },
+        );
+        return;
       }
 
       uploadRef.value.submit();
