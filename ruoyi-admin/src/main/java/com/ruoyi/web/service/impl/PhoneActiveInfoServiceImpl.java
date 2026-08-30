@@ -2,6 +2,7 @@ package com.ruoyi.web.service.impl;
 
 import com.ruoyi.common.core.domain.entity.SysDept;
 import com.ruoyi.common.core.domain.entity.SysUser;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.framework.config.ServerConfig;
 import com.ruoyi.system.mapper.SysDeptMapper;
@@ -115,6 +116,13 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
     @Override
     @Transactional
     public Map<String, Object> importActiveInfo(List<PhoneActiveInfoImport> list, boolean updateSupport, String operName) {
+        return importActiveInfo(list, updateSupport, operName, null);
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Object> importActiveInfo(List<PhoneActiveInfoImport> list, boolean updateSupport,
+                                                String operName, java.util.function.IntConsumer onRowProcessed) {
         Map<String, Object> result = new HashMap<>(8);
         result.put("total", list == null ? 0 : list.size());
         List<String> errors = new ArrayList<>();
@@ -172,10 +180,11 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
             return result;
         }
 
-        // 第二阶段：全部校验通过后逐行入库，运行期冲突（如序列号已存在）仅影响对应行。
+        // 第二阶段：全部校验通过后逐行入库，任意一行运行期冲突（如序列号已存在）
+        // 立即抛出异常，触发 @Transactional 整体回滚（含已入库行与留资自动创建），
+        // 保证全量原子：所有数据都成功才导入。
         int successCount = 0;
         int updateCount = 0;
-        int failCount = 0;
         for (ParsedImportRow parsed : parsedRows) {
             int rowNum = parsed.rowNum;
             PhoneActiveInfoImport row = parsed.row;
@@ -187,30 +196,32 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
                 PhoneActiveInfo exist = info.getSn() != null ? phoneActiveInfoMapper.selectBySn(info.getSn()) : null;
                 if (exist != null) {
                     if (!updateSupport) {
-                        errors.add("第" + rowNum + "行：序列号「" + info.getSn() + "」已存在");
-                        failCount++;
-                    } else {
-                        updateExistingOrder(info, row, exist, operName);
-                        updateCount++;
+                        throw new ServiceException("序列号「" + info.getSn() + "」已存在（如需覆盖已存在数据请勾选更新模式）");
                     }
+                    updateExistingOrder(info, row, exist, operName);
+                    updateCount++;
                 } else {
                     insertNewOrder(info, row, operName);
                     successCount++;
                 }
+            } catch (ServiceException e) {
+                throw new ServiceException("第" + rowNum + "行：" + e.getMessage());
             } catch (DuplicateKeyException e) {
-                errors.add("第" + rowNum + "行：序列号已存在或数据冲突，导入失败");
-                failCount++;
+                throw new ServiceException("第" + rowNum + "行：序列号已存在或数据冲突");
             } catch (Exception e) {
-                errors.add("第" + rowNum + "行导入失败："
+                // 异常堆栈由异步任务侧统一打日志，此处只保留面向用户的错误文案
+                throw new ServiceException("第" + rowNum + "行导入失败："
                         + (StringUtils.hasText(e.getMessage()) ? e.getMessage() : e.getClass().getSimpleName()));
-                failCount++;
+            }
+            if (onRowProcessed != null) {
+                onRowProcessed.accept(successCount + updateCount);
             }
         }
 
         result.put("successCount", successCount);
         result.put("updateCount", updateCount);
-        result.put("failCount", failCount);
-        result.put("message", buildImportResultMessage(list.size(), successCount, updateCount, failCount, errors, warns));
+        result.put("failCount", 0);
+        result.put("message", buildImportResultMessage(list.size(), successCount, updateCount, 0, errors, warns));
         return result;
     }
 
@@ -287,10 +298,11 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
     }
 
     /**
-     * 解析「渠道」列：兼容旧模板的 0/1，也支持新模板直接填渠道文本 自有/亚丁
+     * 解析渠道取值（兼容旧模板的 0/1 与新模板文本 自有/亚丁），
+     * 用于导入行值域校验及旧模板「跳过API」列的订单类型还原：
      * <ul>
-     *     <li>自有 → 1（自有渠道，跳过API查询）</li>
-     *     <li>亚丁 → 0（走API识别的亚丁渠道）</li>
+     *     <li>0/亚丁 → 0（走API识别的亚丁渠道）</li>
+     *     <li>1/自有 → 1（自有渠道，跳过API查询）</li>
      * </ul>
      *
      * @return 解析后的 skipApiCall 值，无法识别返回 null
@@ -307,6 +319,20 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
             return 1;
         }
         return null;
+    }
+
+    /** 渠道文本归一化：兼容旧模板在「渠道」列填 0/1（0→亚丁，1→自有），文本原样返回 */
+    private String normalizeChannel(String value) {
+        if (value == null) {
+            return null;
+        }
+        if ("0".equals(value)) {
+            return "亚丁";
+        }
+        if ("1".equals(value)) {
+            return "自有";
+        }
+        return value;
     }
 
     /** 由 skipApiCall 值还原渠道文本（兼容旧模板：0→亚丁，1→自有） */
@@ -326,12 +352,23 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
         info.setImei1(trimToNull(row.getImei1()));
         info.setImei2(trimToNull(row.getImei2()));
         info.setNickName(trimToNull(row.getNickName()));
-        Integer skipApiCall = parseSkipApiCall(importChannelValue(row));
-        info.setSkipApiCall(skipApiCall);
-        info.setChannel(channelOf(skipApiCall));
-        // 旧照片不存在，新数据无旧手机信息：自有渠道统一按「无旧手机」落库，亚丁渠道不记录旧手机状态
+        // 渠道（自有/亚丁）仅作页面渠道展示直接落库，不参与订单类型判断；
+        // 导入数据均无旧手机识别信息（照片/序列号/保修期），统一按签约记录落库。
+        // 旧模板「跳过API」列兼容：0=旧手机识别（走API），1=自有渠道（跳过API）。
+        String channelText = normalizeChannel(trimToNull(row.getSkipApiCall()));
         Integer oldPhoneStatus = parseIntOrNull(row.getOldPhoneStatus());
-        info.setOldPhoneStatus(oldPhoneStatus != null ? oldPhoneStatus : (skipApiCall != null && skipApiCall == 1 ? 0 : null));
+        if (channelText != null) {
+            // 新模板：订单类型由「旧手机状态」决定，未填默认「无旧手机」→ 页面展示「无旧手机新手机签约」
+            info.setChannel(channelText);
+            info.setSkipApiCall(1);
+            info.setOldPhoneStatus(oldPhoneStatus != null ? oldPhoneStatus : 0);
+        } else {
+            Integer legacySkipApiCall = parseSkipApiCall(trimToNull(row.getLegacySkipApiCall()));
+            info.setSkipApiCall(legacySkipApiCall);
+            info.setChannel(channelOf(legacySkipApiCall));
+            info.setOldPhoneStatus(oldPhoneStatus != null ? oldPhoneStatus
+                    : (legacySkipApiCall != null && legacySkipApiCall == 1 ? 0 : null));
+        }
         info.setOldPhoneUsageMonths(parseUsageMonthsOrNull(row.getOldPhoneUsageMonths()));
         info.setCreateTime(row.getCreateTime());
         info.setStoreId(resolveImportStoreId(row.getStore(), operName));

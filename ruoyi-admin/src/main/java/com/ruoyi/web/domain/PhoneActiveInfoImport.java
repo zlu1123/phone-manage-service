@@ -24,7 +24,7 @@ public class PhoneActiveInfoImport {
     @Excel(name = "创建时间", width = 24, dateFormat = "yyyy-MM-dd", required = true)
     private Date createTime;
 
-    /** 渠道（必填）：填 自有/亚丁（兼容旧模板的 1/0），自有=自有渠道，亚丁=走API识别的亚丁渠道 */
+    /** 渠道（必填）：填 自有/亚丁（兼容旧模板的 1/0），仅作页面渠道展示直接落库，不参与订单类型判断；订单类型由「旧手机状态」决定 */
     @Excel(name = "渠道", width = 12, required = true)
     private String skipApiCall;
 
@@ -32,7 +32,7 @@ public class PhoneActiveInfoImport {
     @Excel(name = "跳过API", width = 12)
     private String legacySkipApiCall;
 
-    /** 旧手机状态：0/无旧手机，1/丢失/损坏（选填；旧手机照片已不存在，新数据可不填） */
+    /** 旧手机状态：0/无旧手机，1/丢失/损坏（选填；未填默认按无旧手机落库） */
     @Excel(name = "旧手机状态", width = 12)
     private String oldPhoneStatus;
 

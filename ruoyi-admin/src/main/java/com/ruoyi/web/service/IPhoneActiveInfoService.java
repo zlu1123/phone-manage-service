@@ -39,7 +39,8 @@ public interface IPhoneActiveInfoService {
      * <ol>
      *     <li>先对全部行做字段校验（含门店匹配、文件内序列号去重），
      *         任何一行校验不通过则整个文件不导入，不会写入任何数据；</li>
-     *     <li>全部校验通过后逐行入库，运行期冲突（如序列号已存在）仅影响对应行。</li>
+     *     <li>全部校验通过后逐行入库，任意一行运行期冲突（如序列号已存在）
+     *         立即抛出异常触发整体回滚，保持全量原子：所有数据都成功才导入。</li>
      * </ol>
      * 返回结构化结果：
      * <ul>
@@ -56,6 +57,14 @@ public interface IPhoneActiveInfoService {
      * @return 结构化导入结果
      */
     Map<String, Object> importActiveInfo(List<PhoneActiveInfoImport> list, boolean updateSupport, String operName);
+
+    /**
+     * 同 {@link #importActiveInfo(List, boolean, String)}，额外支持进度回调：
+     * 每处理完一行调用一次 {@code onRowProcessed}，参数为已处理行数（回调在导入事务内执行，
+     * 需要实时可见的进度更新请在回调内使用独立事务）。
+     */
+    Map<String, Object> importActiveInfo(List<PhoneActiveInfoImport> list, boolean updateSupport,
+                                         String operName, java.util.function.IntConsumer onRowProcessed);
 
     /**
      * 标记订单为测试数据（逻辑删除，列表/导出/统计不再展示），支持单条/批量，仅管理员调用

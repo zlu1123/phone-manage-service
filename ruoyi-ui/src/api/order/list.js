@@ -52,3 +52,12 @@ export function markTestData(ids) {
     params: { ids: ids.join(',') }
   })
 }
+
+// 查询导入任务状态（异步导入：0-进行中 1-成功 2-失败）
+export function queryImportTask(taskId) {
+  return request({
+    url: '/system/order/importTask',
+    method: 'get',
+    params: { taskId }
+  })
+}

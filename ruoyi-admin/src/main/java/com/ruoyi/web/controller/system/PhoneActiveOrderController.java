@@ -3,14 +3,20 @@ package com.ruoyi.web.controller.system;
 import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.R;
 import com.ruoyi.common.utils.poi.ExcelUtil;
+import com.ruoyi.common.utils.uuid.IdUtils;
 import com.ruoyi.web.domain.PhoneActiveInfo;
 import com.ruoyi.web.domain.PhoneActiveInfoImport;
+import com.ruoyi.web.domain.PhoneImportTask;
 import com.ruoyi.web.mapper.PhoneActiveInfoMapper;
+import com.ruoyi.web.mapper.PhoneImportTaskMapper;
 import com.ruoyi.web.service.IPhoneActiveInfoService;
+import com.ruoyi.web.service.ImportTaskService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -19,8 +25,10 @@ import javax.servlet.http.HttpServletResponse;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.RejectedExecutionException;
 
 import static com.ruoyi.common.utils.PageUtils.startPage;
 import static com.ruoyi.common.utils.SecurityUtils.getUsername;
@@ -34,11 +42,24 @@ public class PhoneActiveOrderController extends BaseController {
     private static final int DASHBOARD_RECENT_LIMIT = 8;
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
+    /** 导入任务中断兜底：进行中任务超过该分钟数未更新视为中断（服务重启/超时） */
+    private static final int IMPORT_TASK_STALE_MINUTES = 30;
+
     @Autowired
     private IPhoneActiveInfoService phoneActiveInfoService;
 
     @Autowired
     private PhoneActiveInfoMapper phoneActiveInfoMapper;
+
+    @Autowired
+    private PhoneImportTaskMapper phoneImportTaskMapper;
+
+    @Autowired
+    private ImportTaskService importTaskService;
+
+    @Autowired
+    @Qualifier("importTaskExecutor")
+    private ThreadPoolTaskExecutor importTaskExecutor;
 
     /**
      * @param phoneActiveInfo 查询条件
@@ -194,18 +215,69 @@ public class PhoneActiveOrderController extends BaseController {
     }
 
     /**
-     * 导入订单数据
+     * 导入订单数据（异步任务 + 全量原子）
+     * <p>
+     * Excel 解析与行校验在请求线程同步完成（解析失败直接返回错误），
+     * 入库由后台线程执行，本接口创建任务后立即返回 taskId；
+     * 前端通过 {@link #importTask(String)} 轮询任务状态/进度/结果。
+     * 任意一行入库失败则整体回滚，任务标记为失败并记录错误明细。
      *
      * @param file 上传的Excel文件
      * @param updateSupport 是否更新已存在的数据
      */
-    @ApiOperation("导入订单数据")
+    @ApiOperation("导入订单数据（异步任务）")
     @PostMapping("/importData")
     public R importData(MultipartFile file, @RequestParam(defaultValue = "false") boolean updateSupport) throws Exception {
         ExcelUtil<PhoneActiveInfoImport> util = new ExcelUtil<>(PhoneActiveInfoImport.class);
         List<PhoneActiveInfoImport> list = util.importExcel(file.getInputStream());
-        Map<String, Object> result = phoneActiveInfoService.importActiveInfo(list, updateSupport, getUsername());
-        return R.ok(result);
+        if (list == null || list.isEmpty()) {
+            return R.fail("导入数据为空，请填写至少一行数据");
+        }
+
+        // 中断任务兜底 + 并发保护：同一时间只允许一个导入任务
+        phoneImportTaskMapper.failStaleRunning(IMPORT_TASK_STALE_MINUTES);
+        if (phoneImportTaskMapper.countRunning() > 0) {
+            return R.fail("已有导入任务正在执行，请等待其完成后再导入");
+        }
+
+        PhoneImportTask task = new PhoneImportTask();
+        task.setTaskId(IdUtils.simpleUUID());
+        task.setFileName(file.getOriginalFilename());
+        task.setStatus(PhoneImportTask.STATUS_RUNNING);
+        task.setTotalCount(list.size());
+        task.setProcessedCount(0);
+        task.setSuccessCount(0);
+        task.setUpdateCount(0);
+        task.setFailCount(0);
+        task.setCreateBy(getUsername());
+        task.setCreateTime(new Date());
+        phoneImportTaskMapper.insert(task);
+
+        // 操作人在请求线程提前取出：后台线程没有 SecurityContext，不能再调 getUsername()
+        String operName = getUsername();
+        try {
+            importTaskExecutor.submit(() -> importTaskService.runImport(task, list, updateSupport, operName));
+        } catch (RejectedExecutionException e) {
+            phoneImportTaskMapper.updateFinish(task.getTaskId(), PhoneImportTask.STATUS_FAILED,
+                    0, 0, 0, list.size(), "导入任务提交失败，请稍后重试");
+            return R.fail("导入任务提交失败，请稍后重试");
+        }
+        return R.ok(task);
+    }
+
+    /**
+     * 查询导入任务状态（前端轮询：进行中返回实时进度，结束后返回统计与错误明细）
+     *
+     * @param taskId 导入任务ID（importData 返回）
+     */
+    @ApiOperation("查询导入任务状态")
+    @GetMapping("/importTask")
+    public R importTask(@RequestParam("taskId") String taskId) {
+        PhoneImportTask task = phoneImportTaskMapper.selectByTaskId(taskId);
+        if (task == null) {
+            return R.fail("导入任务不存在");
+        }
+        return R.ok(task);
     }
 
     /**

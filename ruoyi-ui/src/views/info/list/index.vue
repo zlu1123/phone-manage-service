@@ -248,7 +248,7 @@
           </span>
           <br />
           <span style="color: #909399; font-size: 12px">
-            渠道：自有=自有渠道，亚丁=亚丁渠道（旧模板表头「跳过API」和 1/0 仍兼容）；所属门店填门店名称即可，系统自动匹配
+            渠道仅作页面渠道展示（自有/亚丁，旧模板表头「跳过API」和 1/0 仍兼容）；「旧手机状态」未填默认按无旧手机处理；所属门店填门店名称即可，系统自动匹配
           </span>
           <br />
           <span style="color: #909399; font-size: 12px">
@@ -286,9 +286,9 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, getCurrentInstance } from 'vue';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { ElMessage, ElMessageBox, ElLoading } from 'element-plus';
 import { Download, Upload, Picture, View, Printer, UploadFilled, Delete } from '@element-plus/icons-vue';
-import { queryOrderList, queryPhoneTypeList, getOrderContractContent, getOrderDetail, exportOrderList, markTestData } from '@/api/order/list';
+import { queryOrderList, queryPhoneTypeList, getOrderContractContent, getOrderDetail, exportOrderList, markTestData, queryImportTask } from '@/api/order/list';
 import { getStoreList } from '@/api/dashboard';
 import { getToken } from '@/utils/auth';
 import * as XLSX from 'xlsx';
@@ -1006,22 +1006,70 @@ const handleUploadDialogClose = (done) => {
   done();
 };
 
-/** 文件上传成功 */
+/** 文件上传成功：后端已改为异步导入，返回任务信息，前端轮询任务状态 */
 const handleFileSuccess = (response) => {
   upload.open = false;
   upload.isUploading = false;
   selectedFile.value = null;
   uploadRef.value.clearFiles();
-  // 后端返回结构化导入结果：data.message 为结果摘要（含错误/提示明细）
-  const result = response && response.data;
-  const msg = (result && result.message) || (typeof result === 'string' ? result : '') || (response && response.msg) || '';
-  ElMessageBox.alert(
-    "<div style='overflow: auto;overflow-x: hidden;max-height: 70vh;padding: 10px 20px 0;'>" + msg + '</div>',
-    '导入结果',
-    { dangerouslyUseHTMLString: true },
-  );
-  proTableRef.value.queryParams.pageNum = 1;
-  proTableRef.value.refresh();
+  const task = response && response.data;
+  if (!task || !task.taskId) {
+    ElMessage.error((response && response.msg) || '导入任务创建失败，请重试');
+    return;
+  }
+  pollImportTask(task.taskId, task.totalCount || 0);
+};
+
+/**
+ * 轮询导入任务状态：进行中展示实时进度，结束后提示结果并刷新列表。
+ * 任务失败时后端已整体回滚（全量原子），提示错误明细并刷新保持页面与库一致。
+ */
+const pollImportTask = (taskId, total) => {
+  const loading = ElLoading.service({ lock: true, text: `导入任务执行中（0/${total} 行）…` });
+  let finished = false;
+  const stop = () => {
+    finished = true;
+    clearInterval(timer);
+    clearTimeout(timeout);
+    loading.close();
+  };
+  const showResult = (task) => {
+    const msg =
+      "<div style='overflow: auto;overflow-x: hidden;max-height: 70vh;padding: 10px 20px 0;'>" +
+      (task.message || '') +
+      '</div>';
+    if (task.status === '1') {
+      ElMessageBox.alert(msg, '导入成功', { dangerouslyUseHTMLString: true });
+    } else {
+      ElMessageBox.alert(msg, '导入失败（数据已回滚）', { dangerouslyUseHTMLString: true, type: 'error' });
+    }
+  };
+  const timer = setInterval(() => {
+    if (finished) return;
+    queryImportTask(taskId)
+      .then((res) => {
+        if (finished) return;
+        const task = res && res.data;
+        if (!task) return;
+        if (task.status === '0') {
+          loading.setText(`导入任务执行中（${task.processedCount || 0}/${task.totalCount || total} 行）…`);
+          return;
+        }
+        stop();
+        proTableRef.value.queryParams.pageNum = 1;
+        proTableRef.value.refresh();
+        showResult(task);
+      })
+      .catch(() => {
+        // 网络异常不中断轮询，下个周期重试
+      });
+  }, 2000);
+  // 兜底：超过10分钟强制结束轮询，避免定时器泄漏
+  const timeout = setTimeout(() => {
+    if (finished) return;
+    stop();
+    ElMessage.warning('导入任务查询超时（10分钟），请稍后在列表中确认导入结果');
+  }, 10 * 60 * 1000);
 };
 
 /** 文件变化时记录选中文件 */
