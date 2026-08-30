@@ -15,6 +15,7 @@
         <result column="info_id" property="infoId"/>
         <result column="store_id" property="storeId"/>
         <result column="skip_api_call" property="skipApiCall"/>
+        <result column="channel" property="channel"/>
         <result column="old_phone_status" property="oldPhoneStatus"/>
         <result column="old_phone_usage_months" property="oldPhoneUsageMonths"/>
         <result column="create_time" property="createTime"/>
@@ -46,14 +47,14 @@
     <!-- 主表所有列 -->
     <sql id="Base_Column_List">
         id, sn, phone_type, imei1, imei2, model, info_id, store_id,
-        skip_api_call, old_phone_status, old_phone_usage_months,
+        skip_api_call, channel, old_phone_status, old_phone_usage_months,
         create_time, create_by, nick_name, update_time, update_by
     </sql>
 
     <!-- 主表列（不含 active_info 大字段，用于列表查询） -->
     <sql id="Base_Column_List_Q">
         pai.id, pai.sn, pai.phone_type, pai.imei1, pai.imei2, pai.model, pai.info_id, pai.store_id,
-        pai.skip_api_call, pai.old_phone_status, pai.old_phone_usage_months,
+        pai.skip_api_call, pai.channel, pai.old_phone_status, pai.old_phone_usage_months,
         pai.create_time, pai.create_by, pai.nick_name, pai.update_time, pai.update_by
     </sql>
 
@@ -83,11 +84,11 @@
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO phone_active_info (
             sn, phone_type, imei1, imei2, model, info_id, store_id,
-            skip_api_call, old_phone_status, old_phone_usage_months,
+            skip_api_call, channel, old_phone_status, old_phone_usage_months,
             create_time, create_by, nick_name, update_time, update_by
         ) VALUES (
             #{sn}, #{phoneType}, #{imei1}, #{imei2}, #{model}, #{infoId}, #{storeId},
-            #{skipApiCall}, #{oldPhoneStatus}, #{oldPhoneUsageMonths},
+            #{skipApiCall}, #{channel}, #{oldPhoneStatus}, #{oldPhoneUsageMonths},
             #{createTime}, #{createBy}, #{nickName}, #{updateTime}, #{updateBy}
         )
     </insert>
@@ -103,6 +104,7 @@
             <if test="infoId != null">info_id = #{infoId},</if>
             <if test="storeId != null">store_id = #{storeId},</if>
             <if test="skipApiCall != null">skip_api_call = #{skipApiCall},</if>
+            <if test="channel != null">channel = #{channel},</if>
             <if test="oldPhoneStatus != null">old_phone_status = #{oldPhoneStatus},</if>
             <if test="oldPhoneUsageMonths != null">old_phone_usage_months = #{oldPhoneUsageMonths},</if>
             <if test="nickName != null">nick_name = #{nickName},</if>
@@ -110,6 +112,15 @@
             <if test="updateBy != null">, update_by = #{updateBy}</if>
         </set>
         WHERE id = #{id}
+    </update>
+
+    <!-- 逻辑删除：标记为测试数据（del_flag=2），列表/导出/统计不再展示，仅管理员调用 -->
+    <update id="updateDelFlagByIds">
+        UPDATE phone_active_info
+        SET del_flag = '2', update_time = now(), update_by = #{updateBy}
+        WHERE del_flag = '0'
+        AND id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
     </update>
 
     <delete id="deleteBySn">
@@ -120,7 +131,7 @@
     <select id="selectListByExample" resultMap="BaseResultMap" parameterType="com.ruoyi.web.domain.PhoneActiveInfo">
         SELECT
             pai.id, pai.info_id, pai.store_id,
-            pai.skip_api_call, pai.old_phone_status, pai.old_phone_usage_months,
+            pai.skip_api_call, pai.channel, pai.old_phone_status, pai.old_phone_usage_months,
             pai.create_time, pai.create_by, pai.nick_name, pai.update_time, pai.update_by,
             pad.coverage, pad.sys_time,
             poc.contract_id, poc.signature_model, poc.signature_imei,
@@ -133,6 +144,7 @@
         LEFT JOIN phone_active_detail pad ON pai.id = pad.order_id
         LEFT JOIN phone_order_contract poc ON pai.id = poc.order_id
         <where>
+            pai.del_flag = '0'
             <if test="id != null"> AND pai.id = #{id}</if>
             <if test="sn != null and sn != ''"> AND pai.sn = #{sn}</if>
             <if test="phoneType != null and phoneType != ''"> AND pai.phone_type = #{phoneType}</if>
@@ -177,6 +189,7 @@
         LEFT JOIN leave_information li ON pai.info_id = li.id
         LEFT JOIN sys_dept sd ON pai.store_id = sd.dept_id
         <where>
+            pai.del_flag = '0'
             <if test="id != null"> AND pai.id = #{id}</if>
             <if test="sn != null and sn != ''"> AND pai.sn = #{sn}</if>
             <if test="phoneType != null and phoneType != ''"> AND pai.phone_type = #{phoneType}</if>
@@ -214,6 +227,7 @@
         LEFT JOIN leave_information li ON pai.info_id = li.id
         LEFT JOIN sys_dept sd ON pai.store_id = sd.dept_id
         <where>
+            pai.del_flag = '0'
             <if test="skipApiCall != null"> AND pai.skip_api_call = #{skipApiCall}</if>
             <if test="oldPhoneStatus != null"> AND pai.old_phone_status = #{oldPhoneStatus}</if>
             <if test="createBy != null and createBy != ''"> AND pai.create_by = #{createBy}</if>
@@ -242,7 +256,8 @@
         LEFT JOIN phone_active_detail pad ON pai.id = pad.order_id
         LEFT JOIN phone_order_contract poc ON pai.id = poc.order_id
         <where>
-            <if test="storeId != null">pai.store_id = #{storeId}</if>
+            pai.del_flag = '0'
+            <if test="storeId != null"> AND pai.store_id = #{storeId}</if>
         </where>
     </select>
 
@@ -262,6 +277,7 @@
         LEFT JOIN phone_active_detail pad ON pai.id = pad.order_id
         LEFT JOIN phone_order_contract poc ON pai.id = poc.order_id
         WHERE pai.create_by = #{createBy}
+          AND pai.del_flag = '0'
     </select>
 
     <select id="selectOrderTrend" resultType="java.util.HashMap">
@@ -275,6 +291,7 @@
         LEFT JOIN phone_order_contract poc ON pai.id = poc.order_id
         WHERE DATE(pai.create_time) &gt;= STR_TO_DATE(#{startDate}, '%Y-%m-%d')
           AND DATE(pai.create_time) &lt;= STR_TO_DATE(#{endDate}, '%Y-%m-%d')
+          AND pai.del_flag = '0'
         <if test="createBy != null and createBy != ''">
             AND pai.create_by = #{createBy}
         </if>
@@ -296,6 +313,7 @@
         LEFT JOIN phone_order_contract poc ON pai.id = poc.order_id
         WHERE DATE_FORMAT(pai.create_time, '%Y-%m') &gt;= #{startMonth}
           AND DATE_FORMAT(pai.create_time, '%Y-%m') &lt;= #{endMonth}
+          AND pai.del_flag = '0'
         <if test="storeId != null">
             AND pai.store_id = #{storeId}
         </if>
@@ -312,6 +330,7 @@
             END AS name,
             COUNT(*) AS value
         FROM phone_active_info
+        WHERE del_flag = '0'
         GROUP BY name
         ORDER BY value DESC, name ASC
         LIMIT 10
@@ -326,6 +345,7 @@
             END AS name,
             COUNT(*) AS value
         FROM phone_order_contract poc
+        INNER JOIN phone_active_info pai ON pai.id = poc.order_id AND pai.del_flag = '0'
         WHERE poc.signature_date IS NOT NULL AND poc.signature_date != ''
         GROUP BY name
         ORDER BY value DESC, name ASC
@@ -372,6 +392,7 @@
             ) AS expiredCount
         FROM phone_active_info pai
         LEFT JOIN phone_active_detail pad ON pai.id = pad.order_id
+        WHERE pai.del_flag = '0'
     </select>
 
     <!-- 最近订单：JOIN 详情和签约 -->
@@ -386,7 +407,8 @@
         LEFT JOIN phone_order_contract poc ON pai.id = poc.order_id
         LEFT JOIN sys_dept sd ON pai.store_id = sd.dept_id
         <where>
-            poc.signature_date IS NOT NULL AND poc.signature_date != ''
+            pai.del_flag = '0'
+            AND poc.signature_date IS NOT NULL AND poc.signature_date != ''
             <if test="createBy != null and createBy != ''">
                 AND pai.create_by = #{createBy}
             </if>
@@ -429,7 +451,7 @@
             COALESCE(SUM(CASE WHEN pad.activated = 1 THEN 1 ELSE 0 END), 0) AS activatedCount,
             COALESCE(SUM(CASE WHEN poc.signature_date IS NOT NULL AND poc.signature_date != '' THEN 1 ELSE 0 END), 0) AS signedCount
         FROM sys_dept sd
-        LEFT JOIN phone_active_info pai ON pai.store_id = sd.dept_id
+        LEFT JOIN phone_active_info pai ON pai.store_id = sd.dept_id AND pai.del_flag = '0'
         LEFT JOIN phone_active_detail pad ON pai.id = pad.order_id
         LEFT JOIN phone_order_contract poc ON pai.id = poc.order_id
         WHERE sd.parent_id = #{storeParentDeptId}

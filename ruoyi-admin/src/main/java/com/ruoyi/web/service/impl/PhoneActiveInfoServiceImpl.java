@@ -214,6 +214,14 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
         return result;
     }
 
+    @Override
+    public int markTestDataByIds(Long[] ids, String operName) {
+        if (ids == null || ids.length == 0) {
+            return 0;
+        }
+        return phoneActiveInfoMapper.updateDelFlagByIds(ids, operName);
+    }
+
     /** 校验通过后待入库的行数据 */
     private static class ParsedImportRow {
         final int rowNum;
@@ -243,30 +251,18 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
             return prefix + "创建时间不能为空";
         }
 
-        // 跳过API 必填 + 值域
-        String skipApiCall = trimToNull(row.getSkipApiCall());
-        if (skipApiCall == null) {
-            return prefix + "跳过API不能为空（0=旧手机识别, 1=自有渠道）";
+        // 跳过API 必填 + 值域（兼容旧模板的 0/1，新模板填 自有/亚丁）
+        if (trimToNull(row.getSkipApiCall()) == null) {
+            return prefix + "跳过API不能为空（自有/亚丁，或旧模板的 0/1）";
         }
-        if (!"0".equals(skipApiCall) && !"1".equals(skipApiCall)) {
-            return prefix + "跳过API值无效，必须为 0 或 1";
-        }
-
-        // 旧手机识别模式：序列号必填
-        String sn = trimToNull(row.getSn());
-        if ("0".equals(skipApiCall) && sn == null) {
-            return prefix + "跳过API=0（旧手机识别）时，旧手机序列号不能为空";
+        if (parseSkipApiCall(row.getSkipApiCall()) == null) {
+            return prefix + "跳过API值无效，必须为 0/1 或 自有/亚丁";
         }
 
-        // 自有渠道模式：旧手机状态必填 + 值域
+        // 旧手机状态：选填（照片已不存在，新数据不提供），填了必须在值域内
         String oldPhoneStatus = trimToNull(row.getOldPhoneStatus());
-        if ("1".equals(skipApiCall)) {
-            if (oldPhoneStatus == null) {
-                return prefix + "跳过API=1（自有渠道）时，旧手机状态不能为空（0=无旧手机, 1=丢失/损坏）";
-            }
-            if (!"0".equals(oldPhoneStatus) && !"1".equals(oldPhoneStatus)) {
-                return prefix + "旧手机状态值无效，必须为 0 或 1";
-            }
+        if (oldPhoneStatus != null && !"0".equals(oldPhoneStatus) && !"1".equals(oldPhoneStatus)) {
+            return prefix + "旧手机状态值无效，必须为 0 或 1";
         }
 
         // 旧手机使用月数：选填，填了必须为正整数
@@ -281,12 +277,38 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
             return prefix + "鸭宝激活状态值无效，可填写：已激活/未激活（或 true/false、1/0、是/否）";
         }
 
-        // 签约日期必填
-        if (trimToNull(row.getSignatureDate()) == null) {
-            return prefix + "签约日期不能为空";
-        }
-
         return null;
+    }
+
+    /**
+     * 解析「跳过API」列：兼容旧模板的 0/1，也支持新模板直接填渠道文本 自有/亚丁
+     * <ul>
+     *     <li>自有 → 1（自有渠道，跳过API查询）</li>
+     *     <li>亚丁 → 0（走API识别的亚丁渠道）</li>
+     * </ul>
+     *
+     * @return 解析后的 skipApiCall 值，无法识别返回 null
+     */
+    private Integer parseSkipApiCall(String value) {
+        String v = trimToNull(value);
+        if (v == null) {
+            return null;
+        }
+        if ("0".equals(v) || "亚丁".equals(v)) {
+            return 0;
+        }
+        if ("1".equals(v) || "自有".equals(v)) {
+            return 1;
+        }
+        return null;
+    }
+
+    /** 由 skipApiCall 值还原渠道文本（兼容旧模板：0→亚丁，1→自有） */
+    private String channelOf(Integer skipApiCall) {
+        if (skipApiCall == null) {
+            return null;
+        }
+        return skipApiCall == 0 ? "亚丁" : "自有";
     }
 
     /** 将导入模型解析为订单对象（含门店归属解析，留资匹配另行处理） */
@@ -298,15 +320,32 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
         info.setImei1(trimToNull(row.getImei1()));
         info.setImei2(trimToNull(row.getImei2()));
         info.setNickName(trimToNull(row.getNickName()));
-        info.setSkipApiCall(Integer.valueOf(trimToNull(row.getSkipApiCall())));
-        info.setOldPhoneStatus(parseIntOrNull(row.getOldPhoneStatus()));
+        Integer skipApiCall = parseSkipApiCall(row.getSkipApiCall());
+        info.setSkipApiCall(skipApiCall);
+        info.setChannel(channelOf(skipApiCall));
+        // 旧照片不存在，新数据无旧手机信息：自有渠道统一按「无旧手机」落库，亚丁渠道不记录旧手机状态
+        Integer oldPhoneStatus = parseIntOrNull(row.getOldPhoneStatus());
+        info.setOldPhoneStatus(oldPhoneStatus != null ? oldPhoneStatus : (skipApiCall != null && skipApiCall == 1 ? 0 : null));
         info.setOldPhoneUsageMonths(parseUsageMonthsOrNull(row.getOldPhoneUsageMonths()));
         info.setCreateTime(row.getCreateTime());
         info.setStoreId(resolveImportStoreId(row.getStore(), operName));
         info.setSignatureModel(trimToNull(row.getSignatureModel()));
         info.setSignatureImei(trimToNull(row.getSignatureImei()));
-        info.setSignatureDate(trimToNull(row.getSignatureDate()));
+        // 没有签约时间：以创建时间作为签约日期
+        info.setSignatureDate(resolveSignatureDate(row));
         return info;
+    }
+
+    /** 签约日期：填了用填的值，没填默认取创建时间（yyyy-MM-dd） */
+    private String resolveSignatureDate(PhoneActiveInfoImport row) {
+        String signatureDate = trimToNull(row.getSignatureDate());
+        if (signatureDate != null || row.getCreateTime() == null) {
+            return signatureDate;
+        }
+        return row.getCreateTime().toInstant()
+                .atZone(java.time.ZoneId.systemDefault())
+                .toLocalDate()
+                .format(DAY_FORMATTER);
     }
 
     /**
@@ -433,17 +472,17 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
                 || detail.getSysTime() != null;
     }
 
-    /** 由导入行构建签约表数据 */
+    /** 由导入行构建签约表数据（签约日期未填时默认取创建时间） */
     private PhoneOrderContract buildContract(Long orderId, PhoneActiveInfoImport row) {
         PhoneOrderContract contract = new PhoneOrderContract();
         contract.setOrderId(orderId);
         contract.setSignatureModel(trimToNull(row.getSignatureModel()));
         contract.setSignatureImei(trimToNull(row.getSignatureImei()));
-        contract.setSignatureDate(trimToNull(row.getSignatureDate()));
+        contract.setSignatureDate(resolveSignatureDate(row));
         return contract;
     }
 
-    /** 判断导入行是否存在签约数据 */
+    /** 判断导入行是否存在签约数据（签约日期默认为创建时间，不作为判断依据） */
     private boolean hasContractData(PhoneActiveInfoImport row) {
         return trimToNull(row.getSignatureModel()) != null
                 || trimToNull(row.getSignatureImei()) != null
@@ -501,11 +540,12 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
         return message.toString();
     }
 
+    /** 去除首尾空白（含 Excel 常见的不间断空格、全角空格），空串返回 null */
     private String trimToNull(String value) {
         if (value == null) {
             return null;
         }
-        String trimmed = value.trim();
+        String trimmed = value.replaceAll("^[\\s\\u00A0\\u3000]+|[\\s\\u00A0\\u3000]+$", "");
         return trimmed.isEmpty() ? null : trimmed;
     }
 

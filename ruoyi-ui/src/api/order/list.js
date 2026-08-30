@@ -43,3 +43,12 @@ export function getOrderContractContent(id) {
     params: { id }
   })
 }
+
+// 标记订单为测试数据（逻辑删除，列表不再展示），支持单条/批量，仅管理员
+export function markTestData(ids) {
+  return request({
+    url: '/system/order/markTestData',
+    method: 'put',
+    params: { ids: ids.join(',') }
+  })
+}

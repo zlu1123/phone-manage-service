@@ -39,6 +39,9 @@ public class PhoneActiveInfo extends BaseEntity {
     @Excel(name = "跳过API", readConverterExp = "0=否,1=是")
     private Integer skipApiCall; // 0-正常查询 1-无旧手机跳过
 
+    /** 订单渠道：自有/亚丁（Excel 导入时直接指定；历史数据为空时由前端按规则推导） */
+    private String channel;
+
     @Excel(name = "旧手机状态", readConverterExp = "0=无旧手机,1=丢失/损坏")
     private Integer oldPhoneStatus;
 

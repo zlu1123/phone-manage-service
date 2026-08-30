@@ -11,6 +11,7 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -205,6 +206,23 @@ public class PhoneActiveOrderController extends BaseController {
         List<PhoneActiveInfoImport> list = util.importExcel(file.getInputStream());
         Map<String, Object> result = phoneActiveInfoService.importActiveInfo(list, updateSupport, getUsername());
         return R.ok(result);
+    }
+
+    /**
+     * 标记订单为测试数据（逻辑删除，列表/导出/统计不再展示），支持单条/批量，仅管理员
+     *
+     * @param ids 订单ID集合
+     * @return 实际标记数量
+     */
+    @ApiOperation("标记订单为测试数据（仅管理员）")
+    @PreAuthorize("@ss.hasRole('admin')")
+    @PutMapping("/markTestData")
+    public R markTestData(@RequestParam Long[] ids) {
+        if (ids == null || ids.length == 0) {
+            return R.fail("请选择要标记的订单");
+        }
+        int count = phoneActiveInfoService.markTestDataByIds(ids, getUsername());
+        return R.ok(count);
     }
 
     /**

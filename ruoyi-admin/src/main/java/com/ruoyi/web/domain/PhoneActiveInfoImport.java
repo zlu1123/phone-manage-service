@@ -24,11 +24,11 @@ public class PhoneActiveInfoImport {
     @Excel(name = "创建时间", width = 24, dateFormat = "yyyy-MM-dd", required = true)
     private Date createTime;
 
-    /** 跳过API（必填）：0/旧手机识别，1/自有渠道 */
+    /** 跳过API（必填）：填 自有/亚丁（兼容旧模板的 1/0），自有=自有渠道，亚丁=走API识别的亚丁渠道 */
     @Excel(name = "跳过API", width = 12, required = true)
     private String skipApiCall;
 
-    /** 旧手机状态：0/无旧手机，1/丢失/损坏（仅自有渠道必填） */
+    /** 旧手机状态：0/无旧手机，1/丢失/损坏（选填；旧手机照片已不存在，新数据可不填） */
     @Excel(name = "旧手机状态", width = 12)
     private String oldPhoneStatus;
 
@@ -96,7 +96,7 @@ public class PhoneActiveInfoImport {
     @Excel(name = "签名IMEI", width = 18)
     private String signatureImei;
 
-    /** 签名日期 */
+    /** 签名日期（选填，未填默认取创建时间） */
     @Excel(name = "签名日期", width = 14, dateFormat = "yyyy-MM-dd")
     private String signatureDate;
 }

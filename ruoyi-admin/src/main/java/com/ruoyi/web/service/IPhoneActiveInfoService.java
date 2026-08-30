@@ -58,6 +58,15 @@ public interface IPhoneActiveInfoService {
     Map<String, Object> importActiveInfo(List<PhoneActiveInfoImport> list, boolean updateSupport, String operName);
 
     /**
+     * 标记订单为测试数据（逻辑删除，列表/导出/统计不再展示），支持单条/批量，仅管理员调用
+     *
+     * @param ids     订单ID集合
+     * @param operName 操作人
+     * @return 实际逻辑删除的行数
+     */
+    int markTestDataByIds(Long[] ids, String operName);
+
+    /**
      * 首页统计卡片（管理员，可选门店维度）
      *
      * @param currentDate 当前业务日期

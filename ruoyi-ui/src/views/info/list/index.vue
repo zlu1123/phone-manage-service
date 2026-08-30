@@ -8,6 +8,7 @@
       :extra-params="extraParams"
       row-key="id"
       @expand-change="handleExpandChange"
+      @selection-change="handleSelectionChange"
     >
       <!-- 工具栏：导出/导入按钮 -->
       <template #toolbar>
@@ -34,6 +35,18 @@
             @click="handleImport"
             v-hasRole="['admin', 'user']"
             >导入</el-button
+          >
+        </el-col>
+        <el-col :span="1.5">
+          <el-button
+            type="danger"
+            plain
+            :icon="Delete"
+            size="small"
+            :disabled="selectedIds.length === 0"
+            @click="handleMarkTestData"
+            v-hasRole="['admin']"
+            >标记测试数据</el-button
           >
         </el-col>
       </template>
@@ -201,7 +214,7 @@
         <template #title>
           <ol style="margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.8">
             <li>
-              <strong>跳过API</strong>：0=旧手机识别（走API查询，需填旧手机序列号），1=自有渠道（跳过API，需填旧手机状态：0=无旧手机，1=丢失/损坏）
+              <strong>跳过API</strong>：填<strong>自有</strong>或<strong>亚丁</strong>（也兼容旧模板的 1=自有、0=亚丁）；旧手机信息（序列号、照片等）可不填
             </li>
             <li>
               <strong>所属门店</strong>填门店名称即可，系统自动匹配（也可填门店ID，留空则归属当前账号所属门店）
@@ -220,6 +233,7 @@
         :disabled="upload.isUploading"
         :on-progress="handleFileUploadProgress"
         :on-success="handleFileSuccess"
+        :on-error="handleFileError"
         :auto-upload="false"
         drag
         @change="handleFileChange"
@@ -230,11 +244,11 @@
           <span>仅允许导入xls、xlsx格式文件。</span>
           <br />
           <span style="color: #e6a23c">
-            必填列：创建时间（yyyy-MM-dd）、跳过API、签名日期；旧手机识别时序列号必填，自有渠道时旧手机状态必填
+            必填列：创建时间（yyyy-MM-dd）、跳过API（填 自有/亚丁）；签名日期未填时默认取创建时间
           </span>
           <br />
           <span style="color: #909399; font-size: 12px">
-            跳过API：0=旧手机识别（走API查询），1=自有渠道（跳过API查询）；所属门店填门店名称即可，系统自动匹配
+            跳过API：自有=自有渠道，亚丁=亚丁渠道（旧模板的 1/0 仍可填写）；所属门店填门店名称即可，系统自动匹配
           </span>
           <br />
           <span style="color: #909399; font-size: 12px">
@@ -273,8 +287,8 @@
 <script setup>
 import { ref, reactive, computed, onMounted, getCurrentInstance } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Download, Upload, Picture, View, Printer, UploadFilled } from '@element-plus/icons-vue';
-import { queryOrderList, queryPhoneTypeList, getOrderContractContent, getOrderDetail, exportOrderList } from '@/api/order/list';
+import { Download, Upload, Picture, View, Printer, UploadFilled, Delete } from '@element-plus/icons-vue';
+import { queryOrderList, queryPhoneTypeList, getOrderContractContent, getOrderDetail, exportOrderList, markTestData } from '@/api/order/list';
 import { getStoreList } from '@/api/dashboard';
 import { getToken } from '@/utils/auth';
 import * as XLSX from 'xlsx';
@@ -423,6 +437,8 @@ const mapOrderSource = (params) => {
  *     oldPhoneUsageMonths=0（≤24个月）→ 亚丁，否则 → 自有
  */
 const getChannel = (row) => {
+  // Excel 导入的订单直接指定了渠道，优先使用；历史订单按下方规则推导
+  if (row.channel) return row.channel;
   if (row.skipApiCall === 0) {
     // OCR 路径：根据保修到期时间 vs 查询时系统时间判断
     const coverage = (row.coverage || '').substring(0, 10);
@@ -443,6 +459,7 @@ const fetchOrderList = (params) => {
 // 表格列配置
 const columns = [
   { label: '', slot: 'expand', width: '50' },
+  { type: 'selection', width: '50' },
   { label: 'ID', prop: 'id', width: '50' },
   {
     label: '订单类型',
@@ -847,6 +864,43 @@ const handleImport = () => {
   upload.isUploading = false;
 };
 
+/** 勾选的订单ID（标记测试数据用） */
+const selectedIds = ref([]);
+
+/** 表格多选变化 */
+const handleSelectionChange = (rows) => {
+  selectedIds.value = (rows || []).map((r) => r.id);
+};
+
+/** 标记测试数据：逻辑删除（列表/导出/统计不再展示），支持单条/批量，仅管理员 */
+const handleMarkTestData = () => {
+  if (selectedIds.value.length === 0) {
+    ElMessage.warning('请先勾选要标记的订单');
+    return;
+  }
+  ElMessageBox.confirm(
+    `确定将选中的 ${selectedIds.value.length} 条订单标记为测试数据吗？标记后列表将不再展示（数据库中仅逻辑删除，数据仍保留）。`,
+    '标记测试数据',
+    { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' },
+  )
+    .then(() => {
+      markTestData(selectedIds.value)
+        .then((res) => {
+          const count = res && res.data != null ? res.data : selectedIds.value.length;
+          ElMessage.success(`已标记 ${count} 条测试数据`);
+          selectedIds.value = [];
+          proTableRef.value.queryParams.pageNum = 1;
+          proTableRef.value.refresh();
+        })
+        .catch(() => {
+          ElMessage.error('标记失败，请稍后重试');
+        });
+    })
+    .catch(() => {
+      // 用户取消，不操作
+    });
+};
+
 /** 跳转到留资用户页面 */
 const goToLeaveInfo = () => {
   upload.open = false;
@@ -878,40 +932,40 @@ const importTemplateHeaders = [
   '签名日期',
 ];
 
-/** 导入模板示例行（含两个场景示例） */
+/** 导入模板示例行（含两个场景示例：亚丁渠道 / 自有渠道） */
 const importTemplateExample1 = [
-  '2025-06-01',
-  '0',
+  '2025-03-08',
+  '亚丁',
   '',
-  'ABC123456789',
-  '1',
-  'iPhone 16',
-  '123456789012345',
-  '123456789012346',
-  '12',
-  '张璐',
+  '',
+  '',
+  '',
+  '',
+  '',
+  '',
+  '张向玉',
   '示例门店',
   '13800000000',
   '张三',
-  'false',
-  '2025-01-15',
-  '2026-01-15',
-  '2025-06-01 10:00:00',
-  'iPhone 16',
-  '123456789012345',
-  '2025-06-01',
+  '',
+  '',
+  '',
+  '',
+  'iPhone 16ProMax 512G',
+  'SFXWPK9HLQ7',
+  '',
 ];
 
 const importTemplateExample2 = [
-  '2025-06-01',
-  '1',
-  '1',
+  '2025-03-08',
+  '自有',
   '',
   '',
   '',
   '',
   '',
-  '24',
+  '',
+  '',
   '张浩',
   '',
   '18189201567',
@@ -922,23 +976,23 @@ const importTemplateExample2 = [
   '',
   '平板3',
   '12312312312312312',
-  '2025-06-01',
+  '2025-03-08',
 ];
 
 /** 模板「填写说明」sheet 内容（放在第二个sheet，不影响后端按第一个sheet解析） */
 const importTemplateHelpRows = [
   ['字段名', '是否必填', '填写说明'],
   ['创建时间', '必填', '订单创建时间，格式：yyyy-MM-dd（只填年月日即可）'],
-  ['跳过API', '必填', '是否跳过第三方手机识别API查询：0=旧手机识别（走API查询，需填旧手机序列号），1=自有渠道（跳过API查询，需填旧手机状态）'],
-  ['旧手机状态', '条件必填', '跳过API=1时必填：0=无旧手机，1=丢失/损坏'],
-  ['旧手机序列号', '条件必填', '跳过API=0时必填：旧手机序列号（sn），用于API识别'],
+  ['跳过API', '必填', '订单渠道：填 自有 或 亚丁（也兼容旧模板的 1=自有、0=亚丁）'],
+  ['旧手机状态', '选填', '旧手机信息（照片/序列号）已不存在，可留空；如填写：0=无旧手机，1=丢失/损坏'],
+  ['旧手机序列号', '选填', '旧手机序列号（sn），无旧手机信息时留空'],
   ['旧手机品牌', '选填', '旧手机品牌名称'],
   ['旧手机型号', '选填', '旧手机型号'],
   ['旧手机IMEI1', '选填', '旧手机IMEI1号'],
   ['旧手机IMEI2', '选填', '旧手机IMEI2号'],
   ['旧手机使用月数', '选填', '旧手机已使用月数，正整数'],
   ['店员名称', '选填', '店员姓名（创建该订单的店员）'],
-  ['所属门店', '选填', '填写门店名称即可，系统自动匹配；也可填门店ID；留空则归属当前操作人所属门店（模板示例1填名称、示例2填ID）'],
+  ['所属门店', '选填', '填写门店名称即可，系统自动匹配；也可填门店ID；留空则归属当前操作人所属门店'],
   ['留资人电话', '选填', '用于匹配留资库中的留资记录；匹配不到且填写了留资人姓名时，系统自动创建留资记录'],
   ['留资人姓名', '选填', '留资人姓名（配合留资人电话使用）'],
   ['鸭宝激活状态', '选填', '可填：已激活/未激活（或 true/false、1/0）'],
@@ -947,7 +1001,7 @@ const importTemplateHelpRows = [
   ['查询时系统时间', '选填', '查询时的系统时间'],
   ['签名型号', '选填', '签约手机型号'],
   ['签名IMEI', '选填', '签约手机IMEI'],
-  ['签名日期', '必填', '签约日期，格式：yyyy-MM-dd'],
+  ['签名日期', '选填', '签约日期，格式：yyyy-MM-dd；未填写时默认取「创建时间」'],
 ];
 
 /** 下载模板（前端生成，含两个场景示例数据 + 填写说明） */
@@ -981,6 +1035,12 @@ const importTemplate = () => {
 /** 文件上传进度（仅用于锁定按钮和展示loading） */
 const handleFileUploadProgress = () => {
   upload.isUploading = true;
+};
+
+/** 上传失败（网络/服务端错误）：恢复按钮状态，否则 loading 会卡死且弹窗无法关闭 */
+const handleFileError = () => {
+  upload.isUploading = false;
+  ElMessage.error('文件上传失败，请稍后重试');
 };
 
 /** 导入过程中禁止关闭弹窗（X 按钮、ESC、遮罩点击均会触发此钩子） */
@@ -1032,6 +1092,8 @@ const submitFileForm = () => {
     ElMessage.warning('文件读取失败，请重新选择文件');
     return;
   }
+  // 本地解析 + 校验 + 上传全程保持按钮 loading，避免解析大文件时界面无反馈
+  upload.isUploading = true;
   const reader = new FileReader();
   reader.onload = (e) => {
     try {
@@ -1040,6 +1102,7 @@ const submitFileForm = () => {
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
       if (!rows || rows.length < 2) {
+        upload.isUploading = false;
         ElMessage.warning('Excel 文件中没有数据行，请填写至少一行数据');
         return;
       }
@@ -1047,7 +1110,7 @@ const submitFileForm = () => {
       // 解析表头，构建列索引映射
       const headerRow = rows[0];
       const colMap = {}; // { '列名' : 列索引 }
-      const requiredHeaders = ['创建时间', '跳过API', '签名日期'];
+      const requiredHeaders = ['创建时间', '跳过API'];
       headerRow.forEach((h, idx) => {
         const clean = String(h || '').trim();
         if (clean) colMap[clean] = idx;
@@ -1056,6 +1119,7 @@ const submitFileForm = () => {
       // 检查必填列是否存在
       const missingHeaders = requiredHeaders.filter((col) => !(col in colMap));
       if (missingHeaders.length > 0) {
+        upload.isUploading = false;
         ElMessage.warning('Excel 缺少必填列：' + missingHeaders.join('、') + '，请使用最新模板');
         return;
       }
@@ -1078,7 +1142,7 @@ const submitFileForm = () => {
           const idx = colMap[colName];
           if (idx === undefined) return '';
           const v = row[idx];
-          return v !== undefined && v !== null ? String(v).trim() : '';
+          return v !== undefined && v !== null ? cleanCell(v) : '';
         };
         // 日期列取值：单元格为真正的Excel日期（序列号）时转换为 yyyy-MM-dd 字符串
         const getDateVal = (colName) => {
@@ -1093,8 +1157,10 @@ const submitFileForm = () => {
               return String(v);
             }
           }
-          return String(v).trim();
+          return cleanCell(v);
         };
+        // 去除首尾空白（含 Excel 常见的不间断空格  、全角空格 　），与后端 trim 规则一致
+        const cleanCell = (v) => String(v).replace(/^[\s 　]+|[\s 　]+$/g, '');
 
         // 1. 创建时间必填 + 格式（yyyy-MM-dd，可带时分秒）
         const createTimeVal = getDateVal('创建时间');
@@ -1104,29 +1170,18 @@ const submitFileForm = () => {
           errors.push(`${rowLabel}「创建时间」格式无效（${createTimeVal}），应为 yyyy-MM-dd`);
         }
 
-        // 2. 跳过API 必填 + 值域校验
+        // 2. 跳过API 必填 + 值域校验（填 自有/亚丁，兼容旧模板的 0/1）
         const skipApiCallVal = getVal('跳过API');
         if (!skipApiCallVal) {
-          errors.push(`${rowLabel}「跳过API」不能为空（0=旧手机识别, 1=自有渠道）`);
-        } else if (skipApiCallVal !== '0' && skipApiCallVal !== '1') {
-          errors.push(`${rowLabel}「跳过API」值无效（${skipApiCallVal}），必须为 0 或 1`);
+          errors.push(`${rowLabel}「跳过API」不能为空（填 自有 或 亚丁）`);
+        } else if (!['0', '1', '自有', '亚丁'].includes(skipApiCallVal)) {
+          errors.push(`${rowLabel}「跳过API」值无效（${skipApiCallVal}），必须为 自有/亚丁（或旧模板的 0/1）`);
         }
 
+        // 旧手机状态：选填（旧手机照片已不存在），填了必须为 0/1
         const oldPhoneStatusVal = getVal('旧手机状态');
-        const snVal = getVal('旧手机序列号');
-
-        if (skipApiCallVal === '0') {
-          // 旧手机识别：序列号必填
-          if (!snVal) {
-            errors.push(`${rowLabel}跳过API=0（旧手机识别），「旧手机序列号」不能为空`);
-          }
-        } else if (skipApiCallVal === '1') {
-          // 自有渠道：旧手机状态必填 + 值域
-          if (!oldPhoneStatusVal) {
-            errors.push(`${rowLabel}跳过API=1（自有渠道），「旧手机状态」不能为空（0=无旧手机, 1=丢失/损坏）`);
-          } else if (oldPhoneStatusVal !== '0' && oldPhoneStatusVal !== '1') {
-            errors.push(`${rowLabel}「旧手机状态」值无效（${oldPhoneStatusVal}），必须为 0 或 1`);
-          }
+        if (oldPhoneStatusVal && oldPhoneStatusVal !== '0' && oldPhoneStatusVal !== '1') {
+          errors.push(`${rowLabel}「旧手机状态」值无效（${oldPhoneStatusVal}），必须为 0 或 1`);
         }
 
         // 3. 旧手机使用月数：选填，填了必须为正整数
@@ -1155,17 +1210,16 @@ const submitFileForm = () => {
           errors.push(`${rowLabel}「查询时系统时间」格式无效（${sysTimeVal}），应为 yyyy-MM-dd HH:mm:ss`);
         }
 
-        // 7. 签名日期必填 + 格式
+        // 7. 签名日期选填（未填默认取创建时间），填了必须为 yyyy-MM-dd
         const signatureDateVal = getDateVal('签名日期');
-        if (!signatureDateVal) {
-          errors.push(`${rowLabel}「签名日期」不能为空`);
-        } else if (!dateRegex.test(signatureDateVal)) {
+        if (signatureDateVal && !dateRegex.test(signatureDateVal)) {
           errors.push(`${rowLabel}「签名日期」格式无效（${signatureDateVal}），应为 yyyy-MM-dd`);
         }
       }
 
       // 存在校验错误：不上传，弹出全部错误明细
       if (errors.length > 0) {
+        upload.isUploading = false;
         ElMessageBox.alert(
           "<div style='overflow: auto;overflow-x: hidden;max-height: 70vh;padding: 10px 20px 0;'>" +
             '文件校验未通过，未导入任何数据，请修改后重新上传：<br/>' +
@@ -1180,6 +1234,7 @@ const submitFileForm = () => {
       uploadRef.value.submit();
     } catch (err) {
       console.error('Excel 解析失败：', err);
+      upload.isUploading = false;
       ElMessage.warning('Excel 文件解析失败，请检查文件格式');
     }
   };

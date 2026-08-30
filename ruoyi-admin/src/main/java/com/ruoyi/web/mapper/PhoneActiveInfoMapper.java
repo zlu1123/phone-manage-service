@@ -13,6 +13,15 @@ public interface PhoneActiveInfoMapper {
     int insert(PhoneActiveInfo info);
     int updateById(PhoneActiveInfo info);
     int deleteBySn(@Param("sn") String sn);
+
+    /**
+     * 逻辑删除订单（标记为测试数据，del_flag=2），仅管理员调用
+     *
+     * @param ids      订单ID集合（支持单条/多条）
+     * @param updateBy 操作人
+     * @return 实际更新的行数
+     */
+    int updateDelFlagByIds(@Param("ids") Long[] ids, @Param("updateBy") String updateBy);
     List<PhoneActiveInfo> selectByExample(PhoneActiveInfo phoneActiveInfo);
 
     /**

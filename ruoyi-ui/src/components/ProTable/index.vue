@@ -73,7 +73,7 @@
 
     <!-- 表格 -->
     <el-table v-loading="loading" :data="tableData" v-bind="tableAttrs">
-      <template v-for="col in columns" :key="col.prop || col.slot">
+      <template v-for="col in columns" :key="col.prop || col.slot || col.type">
         <!-- 展开列 -->
         <el-table-column
           v-if="col.slot === 'expand'"
@@ -86,6 +86,14 @@
             <slot name="expand" :row="scope.row" :index="scope.$index" />
           </template>
         </el-table-column>
+        <!-- 多选列 -->
+        <el-table-column
+          v-else-if="col.type === 'selection'"
+          key="selection"
+          type="selection"
+          :width="col.width || 50"
+          :align="col.align || 'center'"
+        />
         <!-- 有自定义插槽的列 -->
         <el-table-column
           v-else-if="col.slot"
