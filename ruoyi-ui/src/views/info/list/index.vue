@@ -214,7 +214,7 @@
         <template #title>
           <ol style="margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.8">
             <li>
-              <strong>跳过API</strong>：填<strong>自有</strong>或<strong>亚丁</strong>（也兼容旧模板的 1=自有、0=亚丁）；旧手机信息（序列号、照片等）可不填
+              <strong>渠道</strong>：填<strong>自有</strong>或<strong>亚丁</strong>（也兼容旧模板的 1=自有、0=亚丁）；旧手机信息（序列号、照片等）可不填
             </li>
             <li>
               <strong>所属门店</strong>填门店名称即可，系统自动匹配（也可填门店ID，留空则归属当前账号所属门店）
@@ -244,11 +244,11 @@
           <span>仅允许导入xls、xlsx格式文件。</span>
           <br />
           <span style="color: #e6a23c">
-            必填列：创建时间（yyyy-MM-dd）、跳过API（填 自有/亚丁）；签名日期未填时默认取创建时间
+            必填列：创建时间（yyyy-MM-dd）、渠道（填 自有/亚丁）；签名日期未填时默认取创建时间
           </span>
           <br />
           <span style="color: #909399; font-size: 12px">
-            跳过API：自有=自有渠道，亚丁=亚丁渠道（旧模板的 1/0 仍可填写）；所属门店填门店名称即可，系统自动匹配
+            渠道：自有=自有渠道，亚丁=亚丁渠道（旧模板表头「跳过API」和 1/0 仍兼容）；所属门店填门店名称即可，系统自动匹配
           </span>
           <br />
           <span style="color: #909399; font-size: 12px">
@@ -908,25 +908,14 @@ const goToLeaveInfo = () => {
   router.push('/info/user');
 };
 
-/** 导入模板列定义（列名必须匹配后端 @Excel 注解的 name 值） */
+/** 导入模板列定义（列名必须匹配后端 @Excel 注解的 name 值；只保留当前能提供的字段，旧手机相关列已移除） */
 const importTemplateHeaders = [
   '创建时间',
-  '跳过API',
-  '旧手机状态',
-  '旧手机序列号',
-  '旧手机品牌',
-  '旧手机型号',
-  '旧手机IMEI1',
-  '旧手机IMEI2',
-  '旧手机使用月数',
+  '渠道',
   '店员名称',
   '所属门店',
   '留资人电话',
   '留资人姓名',
-  '鸭宝激活状态',
-  '旧手机激活日期',
-  '旧手机保修到期时间',
-  '查询时系统时间',
   '签名型号',
   '签名IMEI',
   '签名日期',
@@ -936,21 +925,10 @@ const importTemplateHeaders = [
 const importTemplateExample1 = [
   '2025-03-08',
   '亚丁',
-  '',
-  '',
-  '',
-  '',
-  '',
-  '',
-  '',
   '张向玉',
   '示例门店',
   '13800000000',
   '张三',
-  '',
-  '',
-  '',
-  '',
   'iPhone 16ProMax 512G',
   'SFXWPK9HLQ7',
   '',
@@ -959,21 +937,10 @@ const importTemplateExample1 = [
 const importTemplateExample2 = [
   '2025-03-08',
   '自有',
-  '',
-  '',
-  '',
-  '',
-  '',
-  '',
-  '',
   '张浩',
   '',
   '18189201567',
   '张浩',
-  '',
-  '',
-  '',
-  '',
   '平板3',
   '12312312312312312',
   '2025-03-08',
@@ -983,25 +950,15 @@ const importTemplateExample2 = [
 const importTemplateHelpRows = [
   ['字段名', '是否必填', '填写说明'],
   ['创建时间', '必填', '订单创建时间，格式：yyyy-MM-dd（只填年月日即可）'],
-  ['跳过API', '必填', '订单渠道：填 自有 或 亚丁（也兼容旧模板的 1=自有、0=亚丁）'],
-  ['旧手机状态', '选填', '旧手机信息（照片/序列号）已不存在，可留空；如填写：0=无旧手机，1=丢失/损坏'],
-  ['旧手机序列号', '选填', '旧手机序列号（sn），无旧手机信息时留空'],
-  ['旧手机品牌', '选填', '旧手机品牌名称'],
-  ['旧手机型号', '选填', '旧手机型号'],
-  ['旧手机IMEI1', '选填', '旧手机IMEI1号'],
-  ['旧手机IMEI2', '选填', '旧手机IMEI2号'],
-  ['旧手机使用月数', '选填', '旧手机已使用月数，正整数'],
+  ['渠道', '必填', '订单渠道：填 自有 或 亚丁（也兼容旧模板的 1=自有、0=亚丁）'],
   ['店员名称', '选填', '店员姓名（创建该订单的店员）'],
   ['所属门店', '选填', '填写门店名称即可，系统自动匹配；也可填门店ID；留空则归属当前操作人所属门店'],
   ['留资人电话', '选填', '用于匹配留资库中的留资记录；匹配不到且填写了留资人姓名时，系统自动创建留资记录'],
   ['留资人姓名', '选填', '留资人姓名（配合留资人电话使用）'],
-  ['鸭宝激活状态', '选填', '可填：已激活/未激活（或 true/false、1/0）'],
-  ['旧手机激活日期', '选填', '旧手机激活日期，格式：yyyy-MM-dd'],
-  ['旧手机保修到期时间', '选填', '保修到期时间，格式：yyyy-MM-dd'],
-  ['查询时系统时间', '选填', '查询时的系统时间'],
   ['签名型号', '选填', '签约手机型号'],
   ['签名IMEI', '选填', '签约手机IMEI'],
   ['签名日期', '选填', '签约日期，格式：yyyy-MM-dd；未填写时默认取「创建时间」'],
+  ['提示', '-', '旧手机照片/序列号等已不存在，模板已移除旧手机相关列；旧版模板文件（表头为「跳过API」的 20 列文件）仍可直接导入，多出的列会被自动忽略'],
 ];
 
 /** 下载模板（前端生成，含两个场景示例数据 + 填写说明） */
@@ -1010,17 +967,14 @@ const importTemplate = () => {
   const firstStore = storeOptions.value[0];
   const example1 = [...importTemplateExample1];
   const example2 = [...importTemplateExample2];
-  example1[10] = firstStore?.label || '示例门店';
-  example2[10] = firstStore?.value != null ? String(firstStore.value) : '';
+  example1[3] = firstStore?.label || '示例门店';
+  example2[3] = firstStore?.value != null ? String(firstStore.value) : '';
   const sheetData = [importTemplateHeaders, example1, example2];
   const ws = XLSX.utils.aoa_to_sheet(sheetData);
   ws['!cols'] = [
-    { wch: 22 }, { wch: 10 }, { wch: 12 }, { wch: 18 },
-    { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 18 },
-    { wch: 16 }, { wch: 12 }, { wch: 10 },
-    { wch: 16 }, { wch: 12 },
-    { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 18 },
-    { wch: 14 }, { wch: 22 }, { wch: 14 },
+    { wch: 14 }, { wch: 10 }, { wch: 12 },
+    { wch: 18 }, { wch: 16 }, { wch: 16 },
+    { wch: 22 }, { wch: 18 }, { wch: 14 },
   ];
   // 填写说明单独一个sheet，置于模板之后，避免影响后端按第一个sheet解析导入
   const helpWs = XLSX.utils.aoa_to_sheet(importTemplateHelpRows);
@@ -1110,17 +1064,18 @@ const submitFileForm = () => {
       // 解析表头，构建列索引映射
       const headerRow = rows[0];
       const colMap = {}; // { '列名' : 列索引 }
-      const requiredHeaders = ['创建时间', '跳过API'];
+      const requiredHeaders = ['创建时间'];
       headerRow.forEach((h, idx) => {
         const clean = String(h || '').trim();
         if (clean) colMap[clean] = idx;
       });
 
-      // 检查必填列是否存在
+      // 检查必填列是否存在（渠道列兼容旧表头「跳过API」）
       const missingHeaders = requiredHeaders.filter((col) => !(col in colMap));
-      if (missingHeaders.length > 0) {
+      if (missingHeaders.length > 0 || !('渠道' in colMap) && !('跳过API' in colMap)) {
         upload.isUploading = false;
-        ElMessage.warning('Excel 缺少必填列：' + missingHeaders.join('、') + '，请使用最新模板');
+        const cols = missingHeaders.length > 0 ? missingHeaders : ['渠道（旧模板为 跳过API）'];
+        ElMessage.warning('Excel 缺少必填列：' + cols.join('、') + '，请使用最新模板');
         return;
       }
 
@@ -1170,12 +1125,12 @@ const submitFileForm = () => {
           errors.push(`${rowLabel}「创建时间」格式无效（${createTimeVal}），应为 yyyy-MM-dd`);
         }
 
-        // 2. 跳过API 必填 + 值域校验（填 自有/亚丁，兼容旧模板的 0/1）
-        const skipApiCallVal = getVal('跳过API');
+        // 2. 渠道 必填 + 值域校验（填 自有/亚丁，兼容旧模板的 0/1 及旧表头「跳过API」）
+        const skipApiCallVal = getVal('渠道') || getVal('跳过API');
         if (!skipApiCallVal) {
-          errors.push(`${rowLabel}「跳过API」不能为空（填 自有 或 亚丁）`);
+          errors.push(`${rowLabel}「渠道」不能为空（填 自有 或 亚丁）`);
         } else if (!['0', '1', '自有', '亚丁'].includes(skipApiCallVal)) {
-          errors.push(`${rowLabel}「跳过API」值无效（${skipApiCallVal}），必须为 自有/亚丁（或旧模板的 0/1）`);
+          errors.push(`${rowLabel}「渠道」值无效（${skipApiCallVal}），必须为 自有/亚丁（或旧模板的 0/1）`);
         }
 
         // 旧手机状态：选填（旧手机照片已不存在），填了必须为 0/1

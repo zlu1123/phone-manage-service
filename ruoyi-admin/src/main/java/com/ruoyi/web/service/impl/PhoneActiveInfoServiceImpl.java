@@ -251,12 +251,12 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
             return prefix + "创建时间不能为空";
         }
 
-        // 跳过API 必填 + 值域（兼容旧模板的 0/1，新模板填 自有/亚丁）
-        if (trimToNull(row.getSkipApiCall()) == null) {
-            return prefix + "跳过API不能为空（自有/亚丁，或旧模板的 0/1）";
+        // 渠道 必填 + 值域（新模板填 自有/亚丁，兼容旧模板的 0/1 及旧表头「跳过API」）
+        if (importChannelValue(row) == null) {
+            return prefix + "渠道不能为空（填 自有/亚丁，或旧模板的 0/1）";
         }
-        if (parseSkipApiCall(row.getSkipApiCall()) == null) {
-            return prefix + "跳过API值无效，必须为 0/1 或 自有/亚丁";
+        if (parseSkipApiCall(importChannelValue(row)) == null) {
+            return prefix + "渠道值无效，必须为 自有/亚丁（或旧模板的 0/1）";
         }
 
         // 旧手机状态：选填（照片已不存在，新数据不提供），填了必须在值域内
@@ -280,8 +280,14 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
         return null;
     }
 
+    /** 渠道取值：优先新表头「渠道」列，为空时回退旧表头「跳过API」列（老文件兼容） */
+    private String importChannelValue(PhoneActiveInfoImport row) {
+        String v = trimToNull(row.getSkipApiCall());
+        return v != null ? v : trimToNull(row.getLegacySkipApiCall());
+    }
+
     /**
-     * 解析「跳过API」列：兼容旧模板的 0/1，也支持新模板直接填渠道文本 自有/亚丁
+     * 解析「渠道」列：兼容旧模板的 0/1，也支持新模板直接填渠道文本 自有/亚丁
      * <ul>
      *     <li>自有 → 1（自有渠道，跳过API查询）</li>
      *     <li>亚丁 → 0（走API识别的亚丁渠道）</li>
@@ -320,7 +326,7 @@ public class PhoneActiveInfoServiceImpl implements IPhoneActiveInfoService {
         info.setImei1(trimToNull(row.getImei1()));
         info.setImei2(trimToNull(row.getImei2()));
         info.setNickName(trimToNull(row.getNickName()));
-        Integer skipApiCall = parseSkipApiCall(row.getSkipApiCall());
+        Integer skipApiCall = parseSkipApiCall(importChannelValue(row));
         info.setSkipApiCall(skipApiCall);
         info.setChannel(channelOf(skipApiCall));
         // 旧照片不存在，新数据无旧手机信息：自有渠道统一按「无旧手机」落库，亚丁渠道不记录旧手机状态

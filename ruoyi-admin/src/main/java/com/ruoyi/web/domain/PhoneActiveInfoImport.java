@@ -24,9 +24,13 @@ public class PhoneActiveInfoImport {
     @Excel(name = "创建时间", width = 24, dateFormat = "yyyy-MM-dd", required = true)
     private Date createTime;
 
-    /** 跳过API（必填）：填 自有/亚丁（兼容旧模板的 1/0），自有=自有渠道，亚丁=走API识别的亚丁渠道 */
-    @Excel(name = "跳过API", width = 12, required = true)
+    /** 渠道（必填）：填 自有/亚丁（兼容旧模板的 1/0），自有=自有渠道，亚丁=走API识别的亚丁渠道 */
+    @Excel(name = "渠道", width = 12, required = true)
     private String skipApiCall;
+
+    /** 旧模板表头「跳过API」兼容列：老文件仍可直接导入，与「渠道」列二选一 */
+    @Excel(name = "跳过API", width = 12)
+    private String legacySkipApiCall;
 
     /** 旧手机状态：0/无旧手机，1/丢失/损坏（选填；旧手机照片已不存在，新数据可不填） */
     @Excel(name = "旧手机状态", width = 12)
