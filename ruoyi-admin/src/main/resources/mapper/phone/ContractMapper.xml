@@ -48,7 +48,7 @@
     <select id="selectAll" resultMap="BaseResultMap">
         SELECT <include refid="Base_Column_List"/>
         FROM contract
-        ORDER BY create_time DESC
+        ORDER BY create_time DESC, id DESC
     </select>
 
     <!-- 查询生效中的协议列表 -->
@@ -56,14 +56,14 @@
         SELECT <include refid="Base_Column_List"/>
         FROM contract
         WHERE status = 1
-        ORDER BY create_time DESC
+        ORDER BY create_time DESC, id DESC
     </select>
 
     <!-- 分页查询协议列表 -->
     <select id="selectByPage" resultMap="BaseResultMap">
         SELECT <include refid="Base_Column_List"/>
         FROM contract
-        ORDER BY create_time DESC
+        ORDER BY create_time DESC, id DESC
         LIMIT #{offset}, #{limit}
     </select>
 
@@ -85,7 +85,7 @@
                 AND create_by LIKE CONCAT('%', #{createBy}, '%')
             </if>
         </where>
-        ORDER BY update_time DESC
+        ORDER BY update_time DESC, id DESC
     </select>
 
     <!-- 新增协议 -->

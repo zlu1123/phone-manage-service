@@ -160,7 +160,7 @@
             <if test="phoneNum != null and phoneNum != ''"> AND li.phone_num LIKE CONCAT('%', #{phoneNum}, '%')</if>
             <if test="isSignature != null and isSignature == 1"> AND poc.signature_imei IS NOT NULL</if>
         </where>
-        ORDER BY pai.create_time DESC
+        ORDER BY pai.create_time DESC, pai.id DESC
     </select>
 
     <!-- 详情查询（全字段）：JOIN 所有关联表 -->
@@ -236,7 +236,7 @@
             <if test="name != null and name != ''"> AND li.name LIKE CONCAT('%', #{name}, '%')</if>
             <if test="phoneNum != null and phoneNum != ''"> AND li.phone_num LIKE CONCAT('%', #{phoneNum}, '%')</if>
         </where>
-        ORDER BY pai.create_time DESC
+        ORDER BY pai.create_time DESC, pai.id DESC
     </select>
 
     <!-- 仪表盘统计：需要 JOIN 详情表和签约表 -->

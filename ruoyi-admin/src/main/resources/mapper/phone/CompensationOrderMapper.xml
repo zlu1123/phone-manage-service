@@ -85,7 +85,7 @@
                 AND co.create_by LIKE CONCAT('%', #{createBy}, '%')
             </if>
         </where>
-        ORDER BY co.update_time DESC
+        ORDER BY co.update_time DESC, co.id DESC
     </select>
 
     <!-- 新增赔付订单 -->
