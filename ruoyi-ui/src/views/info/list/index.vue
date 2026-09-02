@@ -460,28 +460,28 @@ const fetchOrderList = (params) => {
 const columns = [
   { label: '', slot: 'expand', width: '50' },
   { type: 'selection', width: '50' },
-  { label: 'ID', prop: 'id', width: '50' },
+  { label: 'ID', prop: 'id', minWidth: '80' },
   {
     label: '订单类型',
     prop: 'skipApiCall',
     slot: 'skipApiCall',
-    width: '150',
+    minWidth: '150',
   },
   {
     label: '渠道',
     prop: 'channel',
     slot: 'channel',
-    width: '80',
+    minWidth: '80',
   },
-  { label: '留资人姓名', prop: 'name', width: '100' },
-  { label: '留资人电话', prop: 'phoneNum' },
-  { label: '店员名称', prop: 'nickName' },
-  { label: '所属门店', prop: 'storeName', width: '130' },
+  { label: '留资人姓名', prop: 'name', minWidth: '100' },
+  { label: '留资人电话', prop: 'phoneNum', minWidth: '130' },
+  { label: '店员名称', prop: 'nickName', minWidth: '120' },
+  { label: '所属门店', prop: 'storeName', minWidth: '130' },
   {
     label: '创建时间',
     prop: 'createTime',
     slot: 'createTime',
-    width: '180',
+    minWidth: '180',
   },
 ];
 
