@@ -50,6 +50,7 @@
           end-placeholder="结束日期"
           clearable
           value-format="YYYY-MM-DD"
+          :shortcuts="field.shortcuts || defaultRangeShortcuts"
           :style="{ width: field.width || '340px' }"
         />
         <!-- 自定义搜索项插槽 -->
@@ -261,6 +262,15 @@ const cleanParams = (params) => {
   });
   return result;
 };
+
+/** daterange 快捷选项（字段可用 field.shortcuts 覆盖） */
+const defaultRangeShortcuts = [
+  { text: '今天', value: () => { const d = new Date(); return [d, d]; } },
+  { text: '近7天', value: () => { const end = new Date(); const start = new Date(); start.setDate(start.getDate() - 6); return [start, end]; } },
+  { text: '近30天', value: () => { const end = new Date(); const start = new Date(); start.setDate(start.getDate() - 29); return [start, end]; } },
+  { text: '近3个月', value: () => { const end = new Date(); const start = new Date(); start.setMonth(start.getMonth() - 3); return [start, end]; } },
+  { text: '近一年', value: () => { const end = new Date(); const start = new Date(); start.setFullYear(start.getFullYear() - 1); return [start, end]; } },
+];
 
 /** 请求列表数据 */
 const fetchData = () => {
