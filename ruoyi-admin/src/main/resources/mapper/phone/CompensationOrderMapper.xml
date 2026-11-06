@@ -84,6 +84,12 @@
             <if test="createBy != null and createBy != ''">
                 AND co.create_by LIKE CONCAT('%', #{createBy}, '%')
             </if>
+            <if test="beginTime != null and beginTime != ''">
+                AND co.create_time &gt;= #{beginTime}
+            </if>
+            <if test="endTime != null and endTime != ''">
+                AND co.create_time &lt;= #{endTime}
+            </if>
         </where>
         ORDER BY co.update_time DESC, co.id DESC
     </select>

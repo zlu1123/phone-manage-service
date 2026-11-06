@@ -37,7 +37,7 @@
           type="date"
           :placeholder="field.placeholder || `请选择${field.label}`"
           clearable
-          value-format="yyyy-MM-dd"
+          value-format="YYYY-MM-DD"
           :style="{ width: field.width || '200px' }"
         />
         <!-- 日期范围 -->
@@ -49,7 +49,7 @@
           start-placeholder="开始日期"
           end-placeholder="结束日期"
           clearable
-          value-format="yyyy-MM-dd"
+          value-format="YYYY-MM-DD"
           :style="{ width: field.width || '340px' }"
         />
         <!-- 自定义搜索项插槽 -->

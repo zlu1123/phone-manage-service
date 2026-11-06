@@ -159,6 +159,9 @@
             <if test="name != null and name != ''"> AND li.name LIKE CONCAT('%', #{name}, '%')</if>
             <if test="phoneNum != null and phoneNum != ''"> AND li.phone_num LIKE CONCAT('%', #{phoneNum}, '%')</if>
             <if test="isSignature != null and isSignature == 1"> AND poc.signature_imei IS NOT NULL</if>
+            <!-- 创建时间范围（前端「创建时间」daterange → params.beginTime/params.endTime） -->
+            <if test="params.beginTime != null and params.beginTime != ''"> AND pai.create_time &gt;= #{params.beginTime}</if>
+            <if test="params.endTime != null and params.endTime != ''"> AND pai.create_time &lt;= #{params.endTime}</if>
         </where>
         ORDER BY pai.create_time DESC, pai.id DESC
     </select>
@@ -235,6 +238,9 @@
             <if test="storeId != null"> AND pai.store_id = #{storeId}</if>
             <if test="name != null and name != ''"> AND li.name LIKE CONCAT('%', #{name}, '%')</if>
             <if test="phoneNum != null and phoneNum != ''"> AND li.phone_num LIKE CONCAT('%', #{phoneNum}, '%')</if>
+            <!-- 创建时间范围：导出沿用列表的筛选条件 -->
+            <if test="params.beginTime != null and params.beginTime != ''"> AND pai.create_time &gt;= #{params.beginTime}</if>
+            <if test="params.endTime != null and params.endTime != ''"> AND pai.create_time &lt;= #{params.endTime}</if>
         </where>
         ORDER BY pai.create_time DESC, pai.id DESC
     </select>

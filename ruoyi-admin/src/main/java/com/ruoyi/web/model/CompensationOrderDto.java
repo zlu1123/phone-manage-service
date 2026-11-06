@@ -86,4 +86,14 @@ public class CompensationOrderDto {
      * 修改人
      */
     private String updateBy;
+
+    /**
+     * 创建时间起（查询条件，格式 yyyy-MM-dd HH:mm:ss）
+     */
+    private String beginTime;
+
+    /**
+     * 创建时间止（查询条件，格式 yyyy-MM-dd HH:mm:ss）
+     */
+    private String endTime;
 }

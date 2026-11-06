@@ -94,12 +94,13 @@ public class WechatApiController extends BaseController {
                              @RequestParam(value = "file", required = false) MultipartFile file,
                              @RequestParam(value = "skipApiCall", required = false, defaultValue = "false") Boolean skipApiCall,
                              @RequestParam(value = "oldPhoneStatus", required = false) Integer oldPhoneStatus,
-                             @RequestParam(value = "oldPhoneUsageMonths", required = false) Integer oldPhoneUsageMonths) {
+                             @RequestParam(value = "oldPhoneUsageMonths", required = false) Integer oldPhoneUsageMonths,
+                             @RequestParam(value = "channel", required = false) String channel) {
         // 跳过06 API调用（无旧手机场景：新增用户 / 旧手机损坏丢失等）
         if (Boolean.TRUE.equals(skipApiCall)) {
             log.info("skipApiCall=true，跳过06 API查询，直接进入下一步。typeCode={}, code={}, imei={}, imei2={}, oldPhoneStatus={}, oldPhoneUsageMonths={}",
                     typeCode, code, imei, imei2, oldPhoneStatus, oldPhoneUsageMonths);
-            return handleSkipApiCall(typeCode, code, imei, imei2, imagePath, imageUrl, img, file, infoId, oldPhoneStatus, oldPhoneUsageMonths);
+            return handleSkipApiCall(typeCode, code, imei, imei2, imagePath, imageUrl, img, file, infoId, oldPhoneStatus, oldPhoneUsageMonths, channel);
         }
 
         String type = PhoneType.getValueByCode(typeCode);
@@ -210,7 +211,7 @@ public class WechatApiController extends BaseController {
     private R handleSkipApiCall(String typeCode, String code, String imei, String imei2,
                                  String imagePath, String imageUrl, MultipartFile img,
                                  MultipartFile file, Long infoId,
-                                 Integer oldPhoneStatus, Integer oldPhoneUsageMonths) {
+                                 Integer oldPhoneStatus, Integer oldPhoneUsageMonths, String channel) {
         String resolvedImagePath;
         try {
             resolvedImagePath = resolveImagePath(imagePath, imageUrl, img, file);
@@ -247,7 +248,7 @@ public class WechatApiController extends BaseController {
         phoneInfoDto.setImageUrl(buildImageUrl(phoneInfoDto.getImagePath()));
 
         try {
-            Long id = saveActiveInfo(phoneInfoDto, null, typeCode, phoneInfoDto.getImagePath(), infoId, 1);
+            Long id = saveActiveInfo(phoneInfoDto, null, typeCode, phoneInfoDto.getImagePath(), infoId, 1, channel);
             phoneInfoDto.setId(id);
         } catch (Exception e) {
             log.error("保存数据失败（skipApiCall）", e);
@@ -413,11 +414,11 @@ public class WechatApiController extends BaseController {
     }
 
     private Long saveActiveInfo(PhoneInfoDto dto, String rawJson, String typeCode, String imagePath, Long infoId) {
-        return saveActiveInfo(dto, rawJson, typeCode, imagePath, infoId, 0);
+        return saveActiveInfo(dto, rawJson, typeCode, imagePath, infoId, 0, null);
     }
 
-    private Long saveActiveInfo(PhoneInfoDto dto, String rawJson, String typeCode, String imagePath, Long infoId, Integer skipApiCall) {
-        log.info("开始保存信息，skipApiCall={}, {}", skipApiCall, dto);
+    private Long saveActiveInfo(PhoneInfoDto dto, String rawJson, String typeCode, String imagePath, Long infoId, Integer skipApiCall, String channel) {
+        log.info("开始保存信息，skipApiCall={}, channel={}, {}", skipApiCall, channel, dto);
         PhoneActiveInfo info = new PhoneActiveInfo();
         info.setSn(dto.getSn());
         info.setPhoneType(typeCode);
@@ -432,6 +433,7 @@ public class WechatApiController extends BaseController {
         info.setImagePath(imagePath);
         info.setInfoId(infoId);
         info.setSkipApiCall(skipApiCall);
+        info.setChannel(channel);
         info.setOldPhoneStatus(dto.getOldPhoneStatus());
         info.setOldPhoneUsageMonths(dto.getOldPhoneUsageMonths());
         // 设置创建人/更新人

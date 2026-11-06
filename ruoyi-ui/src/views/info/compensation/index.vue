@@ -190,8 +190,20 @@ import { queryOrderList } from '@/api/order/list';
 import { getLeaveInfoList } from '@/api/order/user';
 import { parseTime } from '@/utils/ruoyi';
 
+// 把「创建时间」区间拆成后端可用的 beginTime / endTime
+const mapQueryParams = (params) => {
+  const rest = { ...params };
+  const range = rest.createTimeRange;
+  if (Array.isArray(range) && range.length === 2) {
+    rest.beginTime = `${range[0]} 00:00:00`;
+    rest.endTime = `${range[1]} 23:59:59`;
+  }
+  delete rest.createTimeRange;
+  return rest;
+};
+
 // 列表请求 API
-const getListApi = getCompensationList;
+const getListApi = (params) => getCompensationList(mapQueryParams(params));
 
 // 表格引用
 const proTableRef = ref(null);
@@ -249,12 +261,32 @@ const editAmountRules = {
   amount: [{ required: true, message: '请输入赔付金额', trigger: 'blur' }],
 };
 
+// 默认创建时间范围：近一年（今天往前推一年 ~ 今天）
+const defaultCreateTimeRange = (() => {
+  const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const end = new Date();
+  const start = new Date();
+  start.setFullYear(start.getFullYear() - 1);
+  return [fmt(start), fmt(end)];
+})();
+
 // 搜索字段配置
 const searchFields = [
   { prop: 'name', label: '留资人姓名', type: 'input' },
   { prop: 'phoneNum', label: '留资人电话', type: 'input' },
   { prop: 'signatureImei', label: '签约IMEI', type: 'input' },
   { prop: 'createBy', label: '创建人', type: 'input' },
+  {
+    prop: 'status',
+    label: '审核状态',
+    type: 'select',
+    options: [
+      { label: '审核通过', value: 1 },
+      { label: '待审核', value: 0 },
+      { label: '审核不通过', value: 2 },
+    ],
+  },
+  { prop: 'createTimeRange', label: '创建时间', type: 'daterange', defaultValue: defaultCreateTimeRange },
 ];
 
 // 表格列配置

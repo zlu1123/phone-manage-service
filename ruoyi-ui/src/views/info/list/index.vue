@@ -372,6 +372,15 @@ const selectedFile = ref(null);
 // 门店列表（所属门店下拉数据源）
 const storeOptions = ref([]);
 
+/** 「创建时间」默认范围：近一年（今天往前推一年 ~ 今天），格式 yyyy-MM-dd */
+const defaultCreateTimeRange = (() => {
+  const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const end = new Date();
+  const start = new Date();
+  start.setFullYear(start.getFullYear() - 1);
+  return [fmt(start), fmt(end)];
+})();
+
 // 搜索字段配置
 const searchFields = computed(() => [
   {
@@ -395,6 +404,8 @@ const searchFields = computed(() => [
   },
   { prop: 'name', label: '留资人姓名', type: 'input' },
   { prop: 'phoneNum', label: '留资人电话', type: 'input' },
+  // 创建时间范围：默认近一年；取值 ['yyyy-MM-dd', 'yyyy-MM-dd']，提交前由 mapQueryParams 转为 params.beginTime/endTime
+  { prop: 'createTimeRange', label: '创建时间', type: 'daterange', defaultValue: defaultCreateTimeRange },
 ]);
 
 /** 获取门店列表（所属门店下拉数据源） */
@@ -411,11 +422,26 @@ const fetchStoreList = () => {
     });
 };
 
-/** 将前端「订单来源」映射为后端 skipApiCall + oldPhoneStatus 参数 */
-const mapOrderSource = (params) => {
+/**
+ * 前端查询条件 → 后端查询参数：
+ *  1. 订单来源 映射为 skipApiCall + oldPhoneStatus
+ *  2. 创建时间范围 映射为 params.beginTime / params.endTime（补足当天首尾秒）
+ */
+const mapQueryParams = (params) => {
   const mapped = { ...params };
   const source = mapped.orderSource;
   delete mapped.orderSource;
+
+  // 创建时间范围 → params[beginTime]=yyyy-MM-dd 00:00:00、params[endTime]=yyyy-MM-dd 23:59:59
+  // 由 request.js 的 tansParams 序列化为 params[beginTime]=...，后端由 BaseEntity.params 接收
+  const createTimeRange = mapped.createTimeRange;
+  delete mapped.createTimeRange;
+  if (Array.isArray(createTimeRange) && createTimeRange.length === 2) {
+    mapped.params = {
+      beginTime: `${createTimeRange[0]} 00:00:00`,
+      endTime: `${createTimeRange[1]} 23:59:59`,
+    };
+  }
 
   if (source === 'old_phone') {
     mapped.skipApiCall = 0;
@@ -451,9 +477,9 @@ const getChannel = (row) => {
   return row.oldPhoneUsageMonths === 0 ? '亚丁' : '自有'; // 丢失/损坏：≤24月 → 亚丁
 };
 
-/** 列表查询：映射 orderSource 后调 queryOrderList，渠道字段已由后端列表 SQL 直接返回 */
+/** 列表查询：映射订单来源/创建时间范围后调 queryOrderList，渠道字段已由后端列表 SQL 直接返回 */
 const fetchOrderList = (params) => {
-  return queryOrderList(mapOrderSource(params));
+  return queryOrderList(mapQueryParams(params));
 };
 
 // 表格列配置
@@ -829,7 +855,7 @@ const handleExport = () => {
       // 导出全部数据
       exportLoading.value = true;
       const queryParams = proTableRef.value.getQueryParams();
-      exportOrderList(mapOrderSource(queryParams))
+      exportOrderList(mapQueryParams(queryParams))
         .then((res) => {
           const rows = res.data || res || [];
           generateExcel(rows, '订单数据');
